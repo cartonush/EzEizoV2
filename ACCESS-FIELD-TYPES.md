@@ -19,7 +19,7 @@
 
 | טבלה | טקסט קצר 36 (מזהים) | טקסט קצר רגיל | טקסט ארוך | מספר שלם ארוך | תאריך/שעה | כן/לא |
 | --- | --- | --- | --- | --- | --- | --- |
-| `Users` | `UserID` | `DisplayName`, `Email`, `Role` | — | — | `CreatedAt`, `DeletedAt`, `UpdatedAt` | `Active` |
+| `Users` | `UserID` | `DisplayName`, `PersonalNumber` (גודל 7, ייחודי), `Email` (אופציונלי), `Role` | — | — | `CreatedAt`, `DeletedAt`, `UpdatedAt` | `Active` |
 | `Squadrons` | `SquadronID` | `Name` | — | — | — | — |
 | `Aircraft` | `AircraftID`, `SquadronID` | `AircraftNumber`, `DefaultEWSuite` | — | — | — | `Active` |
 | `Locations` | `LocationID`, `SquadronID` | `ShelterName`, `WorkshopName` | — | — | — | `Active` |
@@ -42,7 +42,7 @@
 
 ### דיוקים חשובים
 
-- `AircraftNumber` (`034`), `SerialNumber` (`K-000000001` או מספר תקלה בן עשר ספרות), `InspectorPersonalNumber` (עד 7 ספרות), `ToolNumber` ו־`Mascha` נשארים **טקסט קצר**; אחרת אפסים מובילים עלולים להיעלם.
+- `AircraftNumber` (`034`), `SerialNumber` (`K-000000001` או מספר תקלה בן עשר ספרות), `Users.PersonalNumber` (בדיוק 7 ספרות), `InspectorPersonalNumber` (עד 7 ספרות), `ToolNumber` ו־`Mascha` נשארים **טקסט קצר**; אחרת אפסים מובילים עלולים להיעלם.
 - גם `AircraftConstants.Value` הוא **טקסט קצר**. הקבועים כוללים כעת מספרים שלמים, אך שמירת הערך כטקסט מאפשרת תיעוד מדויק של סימן, אפסים מובילים וערכים עתידיים. אם יהיה צורך לחשב איתם, האפליקציה תאמת ותמיר לערך מספרי בעת החישוב.
 - `ArrivalTime`, `CompletionTime`, `WorkTime`, `ActionTime`, `DepartureTime`: סוג **תאריך/שעה**, פורמט תצוגה **שעה קצרה**. האפליקציה תשמור תאריך ושעה מלאים, גם אם יוצגת רק השעה, כדי שלא לאבד את היום במקרה של עבודה מעבר לחצות.
 - `WorkDate`: סוג **תאריך/שעה**, פורמט **תאריך קצר**. את `Period` אפשר לשמור כטקסט לדוגמה `11-12/26`, אך היסטוריית ההטענה לכל סוג מפתח נגזרת מהתאריך ומהשורות בטבלה, ולא מסתמכת על המחרוזת לבדה.

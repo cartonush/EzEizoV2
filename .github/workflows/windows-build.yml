@@ -1,0 +1,69 @@
+name: Build Windows prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/windows-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish manager
+        shell: pwsh
+        run: dotnet publish src/EzEizo.Metis/EzEizo.Metis.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o dist/Metis
+      - name: Publish mechanic
+        shell: pwsh
+        run: dotnet publish src/EzEizo.Mechanic/EzEizo.Mechanic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o dist/Mechanic
+      - name: Prepare desktop folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/EzEizo/data | Out-Null
+          Copy-Item dist/Metis/EzEizo-Metis.exe dist/EzEizo/
+          Copy-Item dist/Mechanic/EzEizo-Mechanic.exe dist/EzEizo/
+          Copy-Item INSTALL-WINDOWS.md dist/EzEizo/README.txt
+      - name: Install Access Engine on disposable build runner
+        shell: pwsh
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
+          Invoke-WebRequest 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $download
+          $process = Start-Process -FilePath $download -ArgumentList '/quiet' -Wait -PassThru
+          if ($process.ExitCode -notin @(0,3010)) { throw "Access Engine installation failed: $($process.ExitCode)" }
+      - name: Try creating an Access database on Windows
+        shell: pwsh
+        run: |
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          try {
+            $provider = [type]::GetTypeFromProgID('ADOX.Catalog')
+            if ($null -eq $provider) { throw 'Access Database Engine is not installed on this runner' }
+            & dist/EzEizo/EzEizo-Metis.exe --create-database
+            $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
+            if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
+            Copy-Item $generated dist/EzEizo/data/
+            Write-Host 'Created real EzEizo.accdb with all tables'
+          }
+          catch {
+            Write-Warning "ACCDB could not be prebuilt: $_. The EXEs create it on first run when Access Database Engine x64 is installed."
+          }
+      - name: Check output
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/EzEizo -Recurse | Select-Object FullName,Length
+          if (!(Test-Path dist/EzEizo/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/EzEizo-Mechanic.exe)) { throw 'Missing executable' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-Windows-x64
+          path: dist/EzEizo
+          if-no-files-found: error
+          retention-days: 30
