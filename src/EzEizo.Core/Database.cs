@@ -89,7 +89,7 @@ public sealed class Database
             {
                 bool => OleDbType.Boolean,
                 int => OleDbType.Integer,
-                DateTime => OleDbType.DBTimeStamp,
+                DateTime => OleDbType.Date,
                 _ => OleDbType.VarWChar
             });
             parameter.Value = value ?? DBNull.Value;
