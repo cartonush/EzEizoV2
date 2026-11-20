@@ -147,6 +147,29 @@ public sealed class Database
         return result;
     }
 
+    public sealed record TechnicianRecord(string Id, string Name, string PersonalNumber, bool Active, bool Deleted);
+    public List<TechnicianRecord> AllTechnicians()
+    {
+        var list = new List<TechnicianRecord>();
+        using var c = Connect();
+        using var cmd = Command(c, null, "SELECT [UserID],[DisplayName],[PersonalNumber],[Active],[DeletedAt] FROM [Users] WHERE [Role]='mechanic' ORDER BY [DisplayName]");
+        using var r = cmd.ExecuteReader();
+        while (r is not null && r.Read()) list.Add(new TechnicianRecord(r.GetString(0),r.GetString(1),r.GetString(2),Convert.ToBoolean(r.GetValue(3)),!r.IsDBNull(4)));
+        return list;
+    }
+    public void SetTechnicianActive(string id, bool active)
+    {
+        using var c=Connect();
+        using var cmd=Command(c,null,"UPDATE [Users] SET [Active]=?,[DeletedAt]=?,[UpdatedAt]=? WHERE [UserID]=? AND [Role]='mechanic'",active,active?null:DateTime.Now,DateTime.Now,id);
+        if(cmd.ExecuteNonQuery()!=1)throw new InvalidOperationException("הטכנאי לא נמצא.");
+    }
+    public void DeleteTechnician(string id)
+    {
+        using var c=Connect();
+        using var cmd=Command(c,null,"DELETE FROM [Users] WHERE [UserID]=? AND [Role]='mechanic' AND [Active]=False",id);
+        if(cmd.ExecuteNonQuery()!=1)throw new InvalidOperationException("אפשר למחוק סופית רק טכנאי שהוסר.");
+    }
+
     public Ticket CreateFault(Account manager, string squadron, string aircraft, string description, IReadOnlyList<Account> assigned)
     {
         if (assigned.Count == 0) throw new ArgumentException("יש לבחור לפחות טכנאי אחד.");

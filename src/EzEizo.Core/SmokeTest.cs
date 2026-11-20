@@ -24,5 +24,6 @@ public static class SmokeTest
         db.Review(submitted, manager);
         if (db.Faults().Single().Status != "closed")
             throw new InvalidOperationException("סגירת המנהל נכשלה.");
+        OfflineSmokeTest.Run(db, manager, mechanic);
     }
 }

@@ -1,0 +1,102 @@
+.keys-nav { display: flex; gap: 8px; margin-bottom: 16px; }
+.keys-nav button { flex: 1; min-height: 44px; border: 1px solid #c8dce7; border-radius: 10px; background: white; color: #17668f; font: inherit; font-weight: 700; cursor: pointer; }
+.keys-nav button[aria-current="page"] { color: white; background: #176b96; }
+.squad-tabs button { flex: 1; border: 1px solid #c8dce7; border-radius: 9px; background: white; padding: 9px; color: #17668f; font-weight: 700; }
+.squad-tabs button[aria-current="page"] { color: white; background: #176b96; }
+.keys-table { width: 100%; min-width: 570px; border-collapse: collapse; text-align: right; }
+.keys-table th,.keys-table td { padding: 9px; border: 1px solid #dbe6ec; }
+.keys-table th { background: #eaf3f8; }
+.keys-table input[type="text"], .keys-table input[type="search"], .keys-table select { min-width: 100px; width: 100%; padding: 8px; border: 1px solid #cbdce5; border-radius: 8px; font-size: 16px; }
+.keys-table input[type="checkbox"] { width: 22px; height: 22px; }
+.keys-table .remove-row { min-width: 30px; }
+.instruction-table { margin-top: 0; border-top: 0; }
+.instruction-table td,.instruction-table p { background: #f3f8fb; font-size: 13px; line-height: 1.6; }
+.key-task-list { padding-inline-start: 25px; }
+.key-task-list li { margin: 8px 0; border: 1px solid #dbe6ec; border-radius: 9px; padding: 11px; background: #f6f9fa; }
+.key-task-list label { display: flex; align-items: center; gap: 10px; }
+.key-task-list input[type="checkbox"] { flex: none; width: 20px; height: 20px; }
+.key-reference summary { cursor: pointer; color: #173b5d; font-size: 18px; }
+#extra-tables .card { margin-top: 16px; }
+#work-summary { line-height: 1.8; }
+#work-rows table { width: 100%; min-width: 520px; border-collapse: collapse; }
+#work-rows th,#work-rows td { border: 1px solid #dbe6ec; padding: 9px; }
+#work-rows th { background: #eaf3f8; }
+#reference-table table { width: 100%; min-width: 480px; border-collapse: collapse; }
+#reference-table td,#reference-table th { border: 1px solid #dbe6ec; padding: 8px; }
+#reference-table th { background: #eaf3f8; }
+#work-view[hidden],#history-view[hidden],#create-view[hidden],#open-view[hidden],#closed-view[hidden] { display: none; }
+@media (max-width: 620px) { .keys-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .keys-nav button { font-size: 12px; } }
+.key-reopen-history { margin-top: 14px; padding: 10px; border: 1px solid #dbe6ec; border-radius: 10px; }
+.key-reopen-history summary { cursor: pointer; font-weight: 700; color: #355b70; }
+.key-work-notes p { margin: 0 0 5px; }
+.key-technician-note { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px; border: 1px solid #cbdce5; border-radius: 7px; resize: vertical; font: inherit; }
+.key-manager-notes { margin: 12px 0; padding: 12px; border: 1px solid #cbdce5; border-radius: 9px; background: #f1f7fa; white-space: pre-wrap; overflow-wrap: anywhere; }
+.key-manager-notes::before { content: "הערות מנהל:"; display: block; margin-bottom: 5px; font-weight: 700; }
+
+/* The key loading grid must fit the phone; only the two checks are narrow. */
+.key-load-table-wrap { overflow: visible; }
+.key-load-table,.instruction-table { width: 100%; min-width: 0; table-layout: fixed; }
+.key-load-table .aircraft-col { width: 30%; }
+.key-load-table .check-col { width: 13%; }
+.key-load-table .notes-col { width: 35%; }
+.key-load-table .remove-col { width: 9%; }
+/* Override the shared fault-table header widths (48% / 42% / 10%). */
+.key-load-table th:nth-child(1) { width: 30%; }
+.key-load-table th:nth-child(2),.key-load-table th:nth-child(3) { width: 13%; }
+.key-load-table th:nth-child(4) { width: 35%; }
+.key-load-table th:nth-child(5) { width: 9%; }
+.key-load-table th,.key-load-table td { padding: 7px 4px; overflow-wrap: anywhere; }
+.key-load-table th { font-size: 11px; line-height: 1.25; }
+.key-load-table td:nth-child(2),.key-load-table td:nth-child(3),.key-load-table th:nth-child(2),.key-load-table th:nth-child(3) { text-align: center; }
+.key-load-table input[type="search"],.key-load-table input[type="text"] { min-width: 0; width: 100%; padding: 7px 4px; font-size: 14px; box-sizing: border-box; }
+.key-load-table input[type="checkbox"] { width: 19px; height: 19px; margin: 0; accent-color: #168b79; }
+.key-load-table .remove-row { min-width: 24px; padding: 3px; }
+.key-load-table .picker-list { z-index: 80; min-width: max(100%, 150px); max-height: 220px; }
+.key-load-table .search-picker input[aria-expanded="true"] { border-color: #176b96; box-shadow: 0 0 0 2px #176b9633; }
+.instruction-table { border-top: 0; }
+.instruction-table td { padding: 10px; }
+.key-tasks-details { margin-top: 16px; border: 1px solid #dbe6ec; border-radius: 10px; padding: 12px; }
+.key-tasks-details summary { cursor: pointer; color: #17668f; font-weight: 700; }
+#work-rows table,#reference-table table,#history-table table { width: 100%; min-width: 0; table-layout: fixed; }
+#history-table th { width: 20%; }
+#history-table th,#history-table td { text-align: center; white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; padding: 8px 3px; }
+#history-table .key-history-missing { color: #a45419; background: #fff8ed; }
+#history-table .key-history-pending { display: block; color: #a45419; font-weight: 700; }
+@media (max-width: 620px) { #history-table th,#history-table td { font-size: 10px; padding: 7px 2px; } }
+#work-rows td,#work-rows th,#reference-table td,#reference-table th { overflow-wrap: anywhere; font-size: 11px; padding: 7px 4px; }
+#work-rows td:nth-child(2),#work-rows td:nth-child(3) { text-align: center; }
+#work-rows input[type="checkbox"] { width: 18px; height: 18px; }
+.key-create-loading:not([hidden]) { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 20px; background: #f0f6f9f5; }
+.key-create-loading .skeleton-card { width: min(100%, 720px); margin: 0 auto; box-shadow: 0 12px 32px #183b5d16; }
+.key-create-loading p { width: min(100%, 720px); margin: 0 auto; color: #173b5d; font-weight: 700; }
+/* The shared table header widths must not distort the aircraft and reference grids. */
+#work-rows .work-aircraft-table,#reference-table .key-reference-table { width: 100%; min-width: 0; table-layout: fixed; }
+#work-rows .work-aircraft-table th:nth-child(1) { width: 19%; }
+#work-rows .work-aircraft-table th:nth-child(2),#work-rows .work-aircraft-table th:nth-child(3) { width: 21%; }
+#work-rows .work-aircraft-table th:nth-child(4) { width: 39%; }
+#reference-table .key-reference-table th:nth-child(1) { width: 21%; }
+#reference-table .key-reference-table th:nth-child(2) { width: 22%; }
+#reference-table .key-reference-table th:nth-child(3) { width: 40%; }
+#reference-table .key-reference-table th:nth-child(4) { width: 17%; }
+#work-rows .work-aircraft-table td,#work-rows .work-aircraft-table th,#reference-table .key-reference-table td,#reference-table .key-reference-table th { overflow-wrap: normal; word-break: normal; font-size: 12px; line-height: 1.4; }
+#work-rows .work-aircraft-table td:nth-child(2),#work-rows .work-aircraft-table td:nth-child(3) { text-align: center; }
+.work-check { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+.work-check input { flex: none; margin: 0; }
+@media (max-width: 620px) {
+  #work-rows .work-aircraft-table td,#work-rows .work-aircraft-table th,#reference-table .key-reference-table td,#reference-table .key-reference-table th { font-size: 11px; padding: 7px 3px; }
+  .work-check span { display: none; }
+  #reference-table .key-reference-table th:nth-child(1) { width: 20%; }
+  #reference-table .key-reference-table th:nth-child(2) { width: 25%; }
+  #reference-table .key-reference-table th:nth-child(3) { width: 38%; }
+  #reference-table .key-reference-table th:nth-child(4) { width: 17%; }
+  .key-load-table th,.key-load-table td { padding: 5px 2px; }
+  .key-load-table input[type="search"],.key-load-table input[type="text"] { font-size: 12px; padding: 5px 2px; }
+  #extra-tables .table-wrap { overflow: visible; }
+  #extra-tables table { display: block; width: 100%; min-width: 0; }
+  #extra-tables thead { display: none; }
+  #extra-tables tbody { display: grid; gap: 10px; padding: 8px; }
+  #extra-tables tr { display: block; padding: 8px; border: 1px solid #dbe6ec; border-radius: 10px; }
+  #extra-tables td { display: flex; align-items: center; gap: 8px; border: 0; width: 100%; padding: 5px 0; }
+  #extra-tables td[data-label]::before { content: attr(data-label); flex: 0 0 35%; font-size: 11px; font-weight: 700; }
+  #extra-tables td input { flex: 1; min-width: 0; width: 100%; }
+}

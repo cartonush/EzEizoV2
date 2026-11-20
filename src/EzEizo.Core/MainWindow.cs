@@ -8,6 +8,7 @@ public sealed class MainWindow : Form
 {
     private readonly AppRole role;
     private readonly Database db = new();
+    private readonly OfflineStore store = new();
     private readonly WebView2 web = new() { Dock = DockStyle.Fill };
     private Account? account;
 
@@ -26,6 +27,7 @@ public sealed class MainWindow : Form
         try
         {
             db.Initialize();
+            store.Initialize();
             var assets = Path.Combine(AppContext.BaseDirectory, "wwwroot");
             if (!File.Exists(Path.Combine(assets, "index.html")))
                 throw new FileNotFoundException("קובצי הממשק חסרים. יש להעתיק גם את תיקיית wwwroot.");
@@ -71,6 +73,20 @@ public sealed class MainWindow : Form
                 "outcomes" => Outcomes(p),
                 "saveFault" => SaveFault(p),
                 "reviewFault" => ReviewFault(p),
+                "offline.list" => store.List(Get(p,"collection"), RequireLogin()),
+                "offline.get" => store.Get(Get(p,"collection"),Get(p,"id"),RequireLogin()),
+                "offline.createIssues" => store.CreateIssues(p.GetProperty("sheet"),p.GetProperty("assignees"),RequireManager()),
+                "offline.createKey" => store.CreateKey(p.GetProperty("load"),RequireManager()),
+                "offline.update" => store.Update(Get(p,"collection"),Get(p,"id"),Get(p,"operation"),p,RequireLogin()),
+                "offline.lock" => store.Lock(Get(p,"collection"),Get(p,"id"),Get(p,"session"),RequireLogin()),
+                "offline.readLock" => store.ReadLock(Get(p,"id")),
+                "offline.releaseLock" => ReleaseLock(p),
+                "offline.constants" => store.Constants(RequireManager()),
+                "offline.saveConstants" => SaveConstants(p),
+                "offline.technicians" => OfflineTechnicians(),
+                "offline.createTechnician" => CreateTechnician(p),
+                "offline.setTechnicianActive" => SetTechnicianActive(p),
+                "offline.deleteTechnician" => DeleteTechnician(p),
                 _ => throw new InvalidOperationException("פעולה לא מוכרת.")
             };
             Reply(id, true, data, null);
@@ -80,7 +96,12 @@ public sealed class MainWindow : Form
     }
 
     private static string Get(JsonElement p, string key) => p.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
-    private Account RequireLogin() => account ?? throw new UnauthorizedAccessException("יש להתחבר מחדש.");
+    private Account RequireLogin()
+    {
+        var current = account ?? throw new UnauthorizedAccessException("יש להתחבר מחדש.");
+        if (db.SignIn(current.PersonalNumber, role)?.Id != current.Id) throw new UnauthorizedAccessException("המשתמש אינו פעיל. התחבר מחדש.");
+        return current;
+    }
     private Account RequireManager()
     {
         var current = RequireLogin();
@@ -98,7 +119,7 @@ public sealed class MainWindow : Form
         return new { found.Name, found.Role };
     }
     private object Logout() { account = null; return new { }; }
-    private object Home() { var current = RequireLogin(); return new { current.Name, current.Role }; }
+    private object Home() { var current = RequireLogin(); return new { current.Name, current.Role, uid = current.Id, email = current.PersonalNumber }; }
     private object Users() { RequireManager(); return db.Technicians(); }
     private object CreateUser(JsonElement p)
     {
@@ -138,6 +159,21 @@ public sealed class MainWindow : Form
         db.Review(FindFault(p), manager);
         return new { saved = true };
     }
+    private object ReleaseLock(JsonElement p) { store.ReleaseLock(Get(p,"id"),Get(p,"session")); return new { }; }
+    private object SaveConstants(JsonElement p) { store.SaveConstants(p,RequireManager()); return new { }; }
+    private object OfflineTechnicians()
+    {
+        RequireManager(); return db.AllTechnicians().Select(x => new { uid=x.Id, name=x.Name, personalNumber=x.PersonalNumber, email=x.PersonalNumber, role="technician", active=x.Active, deleted=x.Deleted });
+    }
+    private object CreateTechnician(JsonElement p)
+    {
+        RequireManager(); var created=db.CreateAccount(Get(p,"name"),Get(p,"number"),"mechanic");return new { uid=created.Id };
+    }
+    private object SetTechnicianActive(JsonElement p)
+    { RequireManager(); db.SetTechnicianActive(Get(p,"uid"),p.GetProperty("active").GetBoolean());return new { }; }
+    private object DeleteTechnician(JsonElement p)
+    { RequireManager();db.DeleteTechnician(Get(p,"uid"));return new { }; }
+
     private void Reply(string id, bool ok, object? data, string? error)
     {
         if (web.IsDisposed || web.CoreWebView2 is null) return;

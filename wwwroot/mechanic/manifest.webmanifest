@@ -1,0 +1,17 @@
+{
+  "id": "/EzEizo/mechanic/",
+  "name": "EzEizo - דף טכנאי",
+  "short_name": "EzEizo טכנאי",
+  "description": "דף טיפול דיגיטלי בתקלה",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f6f8",
+  "theme_color": "#0b2743",
+  "icons": [
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

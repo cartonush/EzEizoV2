@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#173b5d">
+  <meta name="description" content="יצירת דפי תקלה לטכנאים - EzEizo">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Metis מנהל">
+  <title>Metis | מנהל תקלות</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="../styles.css?v=1.6.3">
+  <link rel="stylesheet" href="styles.css?v=1.6.3">
+  <link rel="stylesheet" href="../keys/styles.css?v=1.6.3">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar manager-topbar">
+      <div class="brand-mark manager-mark" aria-hidden="true">מ</div>
+      <div class="brand-copy">
+        <p class="eyebrow">כנף 1 - טייסת תחזוקה</p>
+        <h1>Metis · דף מנהל</h1>
+        <p class="header-subtitle">יצירת דפי תקלה לטכנאים</p>
+      </div>
+      <span class="version-pill">v2.0.1</span>
+      <div id="manager-controls" class="header-actions">
+        <button id="manager-back" class="secondary-button" type="button" hidden>→ חזרה</button>
+        <a id="key-back-link" class="secondary-button" href="#keys/open" aria-label="חזרה להטענות" hidden>→ חזרה</a>
+        <button id="reset-draft" class="secondary-button" type="button" hidden>איפוס</button>
+      </div>
+    </header>
+
+    <div id="app-skeleton" class="app-skeleton" role="status" aria-live="polite" aria-label="הדף נטען">
+      <span class="sr-only">הדף נטען…</span>
+      <div class="skeleton-nav"><span></span><span></span><span></span><span></span></div>
+      <div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-line short"></span><span class="skeleton-input"></span></div>
+      <div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-input"></span><span class="skeleton-input"></span></div>
+    </div>
+    <main hidden>
+      <nav class="manager-nav" aria-label="דפי ניהול">
+        <a class="manager-nav-link" href="#home" data-view-link="home">בית</a>
+        <a class="manager-nav-link" href="#new" data-view-link="faults">תקלות</a>
+        <a class="manager-nav-link" href="#keys" data-view-link="keys">מפתחות</a>
+        <a class="manager-nav-link" href="#management" data-view-link="management">ניהול</a>
+      </nav>
+      <div id="view-home" data-manager-view="home">
+        <section class="card manager-home-intro"><div class="section-heading"><div><p class="section-kicker">דף בית</p><h2>שלום נימר</h2></div></div><p>בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.</p></section>
+        <div class="manager-home-grid">
+          <a href="#new" class="manager-home-tile"><strong>פתיחת תקלה</strong><span>יצירת דף טיפול חדש לטכנאים</span></a>
+          <a href="#open" class="manager-home-tile"><strong>תקלות פתוחות</strong><span id="home-open-count">משימות טיפול פעילות</span></a>
+          <a href="#closed" class="manager-home-tile"><strong>תקלות לסגירה וסגורות</strong><span id="home-review-count">סקירה וחתימת בודק הדף</span></a>
+          <a href="#keys" class="manager-home-tile"><strong>מפתחות</strong><span>פתיחת הטענה, מעקב והיסטוריה</span></a>
+          <a href="#management" class="manager-home-tile"><strong>ניהול</strong><span>משתמשים, הפקת דוחות ועדכון קבועים לפי מטוס</span></a>
+        </div>
+      </div>
+      <nav id="fault-nav" class="review-tabs fault-nav" aria-label="דפי תקלות" hidden>
+        <a href="#new" data-fault-link="new">פתיחת תקלה</a><a href="#open" data-fault-link="open">פתוחות</a><a href="#closed" data-fault-link="closed">סגורות</a>
+      </nav>
+      <div id="view-management" data-manager-view="management" hidden>
+        <section class="card"><div class="section-heading"><div><p class="section-kicker">דף ראשי</p><h2>ניהול</h2></div></div><div class="manager-home-grid"><a href="#users" class="manager-home-tile"><strong>ניהול משתמשים</strong><span>יצירה, הסרה וצפייה בתקלות לפי טכנאי</span></a><a href="#reports" class="manager-home-tile"><strong>הפקת דוחות</strong><span>סינון, תצוגה מקדימה והפקת PDF או CSV</span></a><a href="#aircraft-constants" class="manager-home-tile"><strong>עדכון קבועים לפי מטוס</strong><span>דף קבועים למטוסים</span></a></div></section>
+      </div>
+      <div id="view-keys" data-manager-view="keys" hidden>
+<div id="keys-loading" class="app-skeleton" role="status" aria-label="דף המפתחות נטען"><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-input"></span></div></div>
+<div id="keys-content" hidden>
+<nav id="keys-nav" class="keys-nav" aria-label="דפי מפתחות"><button type="button" data-view="history">היסטוריית מפתחות</button><button type="button" data-view="create">הטענת מפתחות</button><button type="button" data-view="open">הטענות פתוחות</button><button type="button" data-view="closed">הטענות סגורות</button></nav>
+<section id="history-view" class="card"><div class="section-heading"><div><p class="section-kicker">שלוש טייסות</p><h2>היסטוריית מפתחות</h2></div></div><p class="section-note">ארז כחול ושחק מתעדכנים בנפרד לאחר הטענה שהושלמה. סוג מפתח שלא נטען עדיין מסומן ״טרם הוטען״.</p><div class="review-tabs squad-tabs" id="history-tabs"></div><div id="history-table" class="table-wrap"></div><p id="history-status" class="copy-status" role="status"></p></section>
+<section id="create-view" hidden>
+<section class="card"><div class="section-heading"><div><p class="section-kicker">דף חדש</p><h2>הטענת מפתחות</h2></div></div><div class="manager-grid">
+<label class="input-field">תאריך<input id="key-date" type="date" required></label><label class="input-field">שעה<input id="key-time" type="time" required></label>
+<label class="input-field">טייסת<select id="key-squadron" required></select></label><label class="input-field">דת״ק<select id="key-shelter" required></select></label>
+</div><fieldset class="assignee-fieldset"><legend>צוות · לפחות שני טכנאים שונים</legend><div id="key-team" class="assignee-options"></div><button id="add-team" class="secondary-button" type="button">+ הוסף טכנאי</button></fieldset></section>
+<section class="card"><div class="section-heading"><div><p class="section-kicker">מטוסים ומפתחות</p><h2>רשימת הטענה</h2></div></div><p id="key-aircraft-hint" class="section-note" role="status">חפש ובחר מטוס מהתוצאות, וסמן לפחות סוג מפתח אחד. שורה נוספת תיפתח אוטומטית.</p><div class="table-wrap key-load-table-wrap"><table class="keys-table key-load-table"><colgroup><col class="aircraft-col"><col class="check-col"><col class="check-col"><col class="notes-col"><col class="remove-col"></colgroup><thead><tr><th>מס׳ מטוס</th><th>ארז כחול</th><th>שחק</th><th>הערות</th><th></th></tr></thead><tbody id="key-aircraft-rows"></tbody></table>
+<table class="keys-table instruction-table"><tbody><tr><td id="key-required"></td></tr><tr><td>יש לוודא כי לא מופיעות תקלות: EREZ 78 לאחר טעינה ולאחר שידור PTT בארז, SAK 7 / 34 בשחק.</td></tr><tr><td>כלי עבודה / צב״ד צת״ת / חלפים נדרשים: מ.כ 2020 + חרב אש</td></tr></tbody></table></div></section>
+<section class="card"><div class="section-heading"><div><p class="section-kicker">תדריך</p><h2>משימות לביצוע</h2></div></div><p>המשימה הראשונה תאושר ותיחתם בידי משלח המשימה בעת פתיחת הדף.</p><label class="replaced-toggle"><input id="key-briefed" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span>תדריך בטיחות וניהול סיכונים ע״י מ״ע המחלקה / משלח המשימה</span></label><div class="signature-field"><span class="field-label">חתימת משלח המשימה</span><canvas id="key-dispatch-signature" class="signature-pad" aria-label="חתימת משלח המשימה"></canvas><button id="key-clear-signature" class="clear-signature" type="button">נקה חתימה</button></div><details class="key-tasks-details"><summary>הצג את 12 המשימות לביצוע</summary><ol id="manager-key-tasks" class="key-task-list"></ol></details></section>
+<button id="create-key-load" class="primary-button" type="button">פתח הטענת מפתחות</button><div id="key-create-loading" class="key-create-loading" role="status" aria-live="polite" hidden><p>הטענת המפתחות נפתחת…</p><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-line short"></span></div><div class="skeleton-card"><span class="skeleton-line"></span><span class="skeleton-input"></span></div></div><p id="create-status" class="copy-status" role="status" aria-live="polite"></p></section>
+<section id="open-view" class="card" hidden><div class="section-heading"><div><p class="section-kicker">מעקב צוות</p><h2>הטענות פתוחות</h2></div></div><label class="input-field list-search">חיפוש לפי מספר הטענה<input id="open-key-search" type="search" inputmode="numeric" placeholder="לדוגמה: 1" autocomplete="off"></label><p class="key-numbering-status copy-status" role="status"></p><div id="open-key-loads" class="issue-list"></div></section>
+<section id="closed-view" class="card" hidden><div class="section-heading"><div><p class="section-kicker">ארכיון הטענות</p><h2>הטענות סגורות</h2></div></div><label class="input-field list-search">חיפוש לפי מספר הטענה<input id="closed-key-search" type="search" inputmode="numeric" placeholder="לדוגמה: 1" autocomplete="off"></label><p class="key-numbering-status copy-status" role="status"></p><div id="closed-key-loads" class="issue-list"></div></section>
+<section id="work-view" hidden>
+<section id="key-edit-lock-notice" class="card edit-lock-notice" role="status" aria-live="polite" hidden><strong>בודק אם הטופס פנוי לעריכה…</strong><button id="retry-key-edit-lock" type="button" class="secondary-button">בדוק שוב</button></section>
+<section class="card"><div class="section-heading"><div><p class="section-kicker">דף צוות</p><h2>ביצוע הטענת מפתחות</h2></div></div><div id="work-summary"></div><div id="work-manager-notes" class="key-manager-notes" hidden></div><div id="work-rows" class="table-wrap"></div><div id="work-instructions" class="instruction-table"></div></section>
+<section class="card"><div class="section-heading"><div><p class="section-kicker">12 משימות</p><h2>פעולות לביצוע</h2></div></div><details class="key-tasks-details"><summary>הצג משימות לביצוע</summary><ol id="work-tasks" class="key-task-list"></ol></details></section>
+<details class="card key-reference"><summary><strong>מידע לעזר הטכנאי</strong></summary><p>קוד ביקורת: ברק 1 – 500 · ברק 2 – 584 לביצוע מפתחות שחק.</p><p>קוד ביקורת: ברק 1 – 510 · ברק 2 – 578 לביצוע מפתחות ארז.</p><div id="reference-table" class="table-wrap"></div></details>
+<div id="extra-tables">      <section class="card tools-card" aria-labelledby="tools-title">
+        <div class="section-heading">
+          <div><p class="section-kicker">ציוד וביקורות</p><h2 id="tools-title">כלים</h2></div>
+          <span class="step-badge">05</span>
+        </div>
+        <label class="replaced-toggle" for="tools-toggle">
+          <input id="tools-toggle" type="checkbox" data-toggle-state="toolsEnabled" data-target="tools-area">
+          <span class="custom-check" aria-hidden="true"></span>
+          <span><strong>תיעוד כלים</strong><small>סמן כדי לפתוח את טבלת הכלים והביקורות</small></span>
+        </label>
+        <div id="tools-area" class="conditional-area" hidden>
+          <div class="unit-table-card wide-table">
+            <div class="unit-table-heading"><h3>כלים</h3></div>
+            <div class="table-wrap"><table><thead><tr><th>שם כלי</th><th>מספר כלי</th><th>הערות</th><th aria-label="פעולות"></th></tr></thead><tbody id="tools-rows"></tbody></table></div>
+          </div>
+          <div class="inspection-checks">
+            <label class="replaced-toggle sub-toggle" for="entry-check">
+              <input id="entry-check" type="checkbox" data-toggle-state="entryEnabled" data-target="entry-fields">
+              <span class="custom-check" aria-hidden="true"></span>
+              <span><strong>ביקורת כניסה</strong><small>סמן כדי למלא חתימות ומספר אישי</small></span>
+            </label>
+            <div id="entry-fields" class="signature-grid" hidden>
+              <div class="signature-field"><span class="field-label">חתימת הטכנאי</span><canvas class="signature-pad" data-signature="entryTechnicianSignature" aria-label="חתימת הטכנאי בביקורת כניסה"></canvas><button type="button" class="clear-signature" data-clear-signature="entryTechnicianSignature">נקה חתימה</button></div>
+              <div class="signature-field"><span class="field-label">חתימת הבודק</span><canvas class="signature-pad" data-signature="entryInspectorSignature" aria-label="חתימת הבודק בביקורת כניסה"></canvas><button type="button" class="clear-signature" data-clear-signature="entryInspectorSignature">נקה חתימה</button></div>
+              <label class="input-field">מספר אישי של הבודק<input type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{1,7}" data-state-field="entryInspectorNumber"></label>
+            </div>
+            <label class="replaced-toggle sub-toggle" for="interim-check">
+              <input id="interim-check" type="checkbox" data-toggle-state="interimEnabled" data-target="interim-fields">
+              <span class="custom-check" aria-hidden="true"></span>
+              <span><strong>ביקורת במהלך העבודה</strong><small>סמן כדי למלא חתימות</small></span>
+            </label>
+            <div id="interim-fields" class="signature-grid" hidden>
+              <div class="signature-field"><span class="field-label">חתימת הטכנאי</span><canvas class="signature-pad" data-signature="interimTechnicianSignature" aria-label="חתימת הטכנאי"></canvas><button type="button" class="clear-signature" data-clear-signature="interimTechnicianSignature">נקה חתימה</button></div>
+              <label class="input-field">מספר אישי של הבודק<input type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{1,7}" data-state-field="interimInspectorNumber"></label>
+              <div class="signature-field"><span class="field-label">חתימת הבודק</span><canvas class="signature-pad" data-signature="interimInspectorSignature" aria-label="חתימת הבודק"></canvas><button type="button" class="clear-signature" data-clear-signature="interimInspectorSignature">נקה חתימה</button></div>
+              <div class="named-signature"><label class="input-field">שם פ.כלים / מ״ע<input type="text" data-state-field="interimToolsName"></label><div class="signature-field"><span class="field-label">חתימת פ.כלים / מ״ע</span><canvas class="signature-pad" data-signature="interimToolsSignature" aria-label="חתימת פ.כלים או מ״ע"></canvas><button type="button" class="clear-signature" data-clear-signature="interimToolsSignature">נקה חתימה</button></div></div>
+            </div>
+            <label class="replaced-toggle sub-toggle" for="final-check">
+              <input id="final-check" type="checkbox" data-toggle-state="finalEnabled" data-target="final-fields">
+              <span class="custom-check" aria-hidden="true"></span>
+              <span><strong>ביקורת בסיום העבודה</strong><small>סמן כדי למלא חתימות ושעת עזיבה</small></span>
+            </label>
+            <div id="final-fields" class="signature-grid" hidden>
+              <div class="signature-field"><span class="field-label">חתימת הטכנאי</span><canvas class="signature-pad" data-signature="finalTechnicianSignature" aria-label="חתימת הטכנאי בסיום"></canvas><button type="button" class="clear-signature" data-clear-signature="finalTechnicianSignature">נקה חתימה</button></div>
+              <label class="input-field">מספר אישי של הבודק<input type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{1,7}" data-state-field="finalInspectorNumber"></label>
+              <div class="signature-field"><span class="field-label">חתימת הבודק</span><canvas class="signature-pad" data-signature="finalInspectorSignature" aria-label="חתימת הבודק בסיום"></canvas><button type="button" class="clear-signature" data-clear-signature="finalInspectorSignature">נקה חתימה</button></div>
+              <div class="named-signature"><label class="input-field">שם ר״צ / מ״ע<input type="text" data-state-field="finalLeadName"></label><div class="signature-field"><span class="field-label">חתימת ר״צ / מ״ע</span><canvas class="signature-pad" data-signature="finalLeadSignature" aria-label="חתימת ר״צ או מ״ע"></canvas><button type="button" class="clear-signature" data-clear-signature="finalLeadSignature">נקה חתימה</button></div></div>
+              <label class="input-field">שעת עזיבה<input type="time" step="60" data-state-field="departureTime"></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card parts-card" aria-labelledby="taken-title">
+        <div class="section-heading">
+          <div><p class="section-kicker">תיעוד חומרים</p><h2 id="taken-title">קשיחים נצרכים</h2></div>
+          <span class="step-badge">06</span>
+        </div>
+        <label class="replaced-toggle" for="taken-toggle">
+          <input id="taken-toggle" type="checkbox" data-toggle-state="takenEnabled" data-target="taken-area">
+          <span class="custom-check" aria-hidden="true"></span>
+          <span><strong>תיעוד קשיחים נצרכים</strong><small>סמן כדי לפתוח טבלה ופרטי חתימה</small></span>
+        </label>
+        <div id="taken-area" class="conditional-area" hidden>
+          <div class="unit-table-card wide-table">
+            <div class="unit-table-heading"><h3>קשיחים נצרכים</h3></div>
+            <div class="table-wrap"><table><thead><tr><th>תיאור קשיח / נצרך</th><th>הוסר מרכיב / אזור</th><th>כמות בכניסה</th><th>כמות ביציאה</th><th>הערות</th><th aria-label="פעולות"></th></tr></thead><tbody id="taken-rows"></tbody></table></div>
+          </div>
+          <div class="signature-grid taken-signature-grid">
+            <label class="input-field">שם מלא<input type="text" data-state-field="takenFullName" autocomplete="name"></label>
+            <label class="input-field">מספר אישי<input type="text" inputmode="numeric" maxlength="7" pattern="[0-9]{1,7}" data-state-field="takenPersonalNumber"></label>
+            <label class="input-field">דרגה<input type="text" data-state-field="takenRank"></label>
+            <div class="signature-field"><span class="field-label">חתימה</span><canvas class="signature-pad" data-signature="takenSignature" aria-label="חתימה על קשיחים נצרכים"></canvas><button type="button" class="clear-signature" data-clear-signature="takenSignature">נקה חתימה</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card parts-card" aria-labelledby="rejected-title">
+        <div class="section-heading">
+          <div><p class="section-kicker">תיעוד חומרים</p><h2 id="rejected-title">קשיחים שנפסלו</h2></div>
+          <span class="step-badge">07</span>
+        </div>
+        <label class="replaced-toggle" for="rejected-toggle">
+          <input id="rejected-toggle" type="checkbox" data-toggle-state="rejectedEnabled" data-target="rejected-area">
+          <span class="custom-check" aria-hidden="true"></span>
+          <span><strong>תיעוד קשיחים שנפסלו</strong><small>סמן כדי לפתוח את הטבלה</small></span>
+        </label>
+        <div id="rejected-area" class="conditional-area" hidden>
+          <div class="unit-table-card wide-table">
+            <div class="unit-table-heading"><h3>קשיחים שנפסלו</h3></div>
+            <div class="table-wrap"><table><thead><tr><th>תיאור הקשיח</th><th>כמות</th><th>מסחא</th><th>סיבת הפסילה</th><th aria-label="פעולות"></th></tr></thead><tbody id="rejected-rows"></tbody></table></div>
+          </div>
+        </div>
+      </section>
+
+</div><section class="card"><button id="complete-key-load" type="button" class="primary-button">שמור וסגור הטענה</button><p id="work-status" class="copy-status" role="status" aria-live="polite"></p><button id="reopen-key-load" type="button" class="secondary-button" hidden>החזר את ההטענה לטכנאים לעריכה</button><p id="reopen-key-status" class="copy-status" role="status" aria-live="polite"></p><details id="key-reopen-history" class="key-reopen-history" hidden><summary>היסטוריית הטופס</summary><ol id="key-reopen-events"></ol></details></section>
+</section>
+
+      </div></div>
+      <div id="view-reports" data-manager-view="reports" hidden>
+        <section class="card report-filters"><div class="section-heading"><div><p class="section-kicker">ניהול</p><h2>הפקת דוחות</h2></div></div>
+          <label class="input-field report-kind-field">סוג דוח<select id="report-kind"><option value="" selected>בחר סוג דוח</option><option value="journal">יומן פעילות</option><option value="squadron-journal">יומן טייסת</option><option value="aircraft">היסטוריית מטוס</option><option value="technician">היסטוריית טכנאי</option><option value="issue-open">תקלות פתוחות</option><option value="issue-closed">תקלות סגורות</option><option value="pending">דפים הממתינים לסגירה</option></select></label>
+          <div id="report-after-kind" hidden>
+          <div id="report-aircraft-fields" class="report-subject-fields"><label class="input-field">טייסת<select id="report-squadron"></select></label><button type="button" id="report-squadron-summary" class="secondary-button" hidden>סיכום טייסת</button><div id="report-aircraft-fields-picker" class="report-multi-aircraft" hidden><span class="field-label">מטוסים</span><details id="report-aircraft-picker"><summary id="report-aircraft-summary">בחר מטוסים</summary><div class="report-multi-aircraft-panel"><div class="report-multi-aircraft-actions"><button type="button" id="report-select-all-squadron-aircraft" class="secondary-button">בחר את כל המטוסים</button><button type="button" id="report-clear-squadron-aircraft" class="secondary-button">נקה בחירה</button></div><div id="report-aircraft-options" class="report-aircraft-options"></div></div></details></div></div>
+          <div id="report-technician-field" class="report-subject-fields" hidden><div id="report-technician-header" class="report-technician-header"><div class="report-multi-aircraft report-technician-picker"><span class="field-label">טכנאים</span><details id="report-technician-picker"><summary id="report-technician-summary">בחר טכנאים</summary><div class="report-multi-aircraft-panel"><label class="input-field">חיפוש טכנאי<input id="report-technician-search" type="search" placeholder="חפש לפי שם טכנאי" autocomplete="off"></label><div id="report-technician-options" class="report-aircraft-options"></div></div></details></div></div><button type="button" id="report-technician-all" class="secondary-button report-all-aircraft">בחר את כל המטוסים</button><div class="report-multi-aircraft report-technician-squadrons"><span class="field-label">טייסות</span><details id="report-technician-squadron-picker"><summary id="report-technician-squadron-summary">בחר טייסות</summary><div class="report-multi-aircraft-panel"><div class="report-multi-aircraft-actions"><button type="button" id="report-select-all-squadrons" class="secondary-button">בחר את כל הטייסות</button><button type="button" id="report-clear-squadrons" class="secondary-button">נקה בחירה</button></div><div id="report-technician-squadron-options" class="report-aircraft-options"></div></div></details></div><div id="report-technician-aircraft-fields" class="report-multi-aircraft" hidden><span class="field-label">מטוסים</span><details id="report-technician-aircraft-picker"><summary id="report-technician-aircraft-summary">בחר מטוסים</summary><div class="report-multi-aircraft-panel"><div class="report-multi-aircraft-actions"><button type="button" id="report-select-all-aircraft" class="secondary-button">בחר את כל המטוסים</button><button type="button" id="report-clear-aircraft" class="secondary-button">נקה בחירה</button></div><div id="report-technician-aircraft-options" class="report-aircraft-options"></div></div></details></div></div>
+          <label id="report-all-dates-field" class="report-all-dates"><input id="report-all-dates" type="checkbox"> כל התקופות</label><div id="report-view-dates" class="manager-grid report-dates"><label class="input-field">מתאריך ושעה<input id="report-from" type="datetime-local"></label><label class="input-field">עד תאריך ושעה<input id="report-to" type="datetime-local"></label></div>
+          <div id="report-form-status" class="manager-grid"><label class="input-field">סוג טופס<select id="report-form"><option value="all">תקלות והטענות מפתחות</option><option value="issue">תקלות</option><option value="key">הטענות מפתחות</option></select></label><label class="input-field">סטטוס<select id="report-status"><option value="all" selected>כל המצבים</option><option value="closed">סגור</option><option value="open">פתוח</option><option value="pendingReview">ממתין לסגירה</option></select></label></div>
+          <p id="report-help" class="report-help">טווח ברירת המחדל הוא 24 השעות האחרונות. אפשר לבחור ״כל התקופות״ כדי למצוא טפסים ישנים. דוחות פתוחים וסגורים כוללים גם הטענות מפתחות.</p></div><p id="report-error" class="copy-status" role="status"></p>
+        </section>
+        <section class="card report-output"><div class="section-heading"><div><p class="section-kicker">תצוגה מקדימה לדוח</p><h2 id="report-title">יומן פעילות</h2></div></div><p id="report-period" class="section-note"></p><p id="report-count" class="section-note" aria-live="polite"></p><div id="report-summary" class="report-summary"></div><div id="report-results" class="report-results"></div><div class="report-export"><button id="report-pdf" type="button" class="primary-button">הורד PDF של הדוח</button><button id="report-print" type="button" class="secondary-button">הדפס</button><button id="report-csv" type="button" class="secondary-button">הפק CSV</button><button id="report-download-all" type="button" class="secondary-button">הורד את תוצאות החיפוש</button></div><p id="report-download-status" class="copy-status" role="status"></p></section>
+        <dialog id="report-bulk-confirm" class="report-confirm" aria-labelledby="report-confirm-title"><h2 id="report-confirm-title">הורדת טפסים</h2><p>פעולה זו עלולה לקחת מעט זמן, האם ברצונך להמשיך?</p><div><button type="button" id="report-confirm-yes" class="primary-button">כן</button><button type="button" id="report-confirm-no" class="secondary-button">לא</button></div></dialog>
+      </div>
+      <div id="view-aircraft-constants" data-manager-view="aircraft-constants" hidden>
+        <section id="constants-picker" class="card">
+          <div class="section-heading"><div><p class="section-kicker">ניהול</p><h2>עדכון קבועים לפי מטוס</h2></div></div>
+          <div class="constants-picker-fields">
+            <p class="constants-help">בחר טייסת ומטוס כדי לראות ולערוך את הקבועים שלו. לכל מטוס נשמרת רשומה משלו.</p>
+            <label class="input-field">טייסת<select id="constants-squadron"></select></label>
+            <div id="constants-aircraft-list" class="aircraft-picker-list"></div>
+          </div>
+        </section>
+        <section id="constants-editor" class="card" hidden><div class="section-heading"><div><p class="section-kicker">קבועים למטוס</p><h2 id="constants-aircraft-title"></h2></div><button id="constants-close" type="button" class="secondary-button">→ חזרה לרשימה</button></div><div id="constants-fields" class="constants-grid"></div><button id="constants-save" type="button" class="primary-button">שמור קבועים למטוס</button><p id="constants-status" class="copy-status" role="status" aria-live="polite"></p></section>
+      </div>
+      <div id="view-new" data-manager-view="new">
+      <section class="card manager-intro">
+        <div class="section-heading"><div><p class="section-kicker">דף חדש</p><h2>יצירת תקלה</h2></div><span class="step-badge">01</span></div>
+        <p>מלא את פרטי האירוע ופתח תקלה חדשה. היא תקבל מספר סידורי ותופיע ברשימה.</p>
+
+      </section>
+
+      <section class="card" aria-labelledby="manager-details-title">
+        <div class="section-heading"><div><p class="section-kicker">פרטי אירוע</p><h2 id="manager-details-title">נתוני התקלה</h2></div><span class="step-badge">02</span></div>
+        <div class="manager-grid">
+          <div class="input-field"><label for="picker-squadron">טייסת</label><div class="search-picker" data-picker="squadron"><input id="picker-squadron" data-sheet-field="squadron" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="options-squadron" placeholder="חפש ובחר טייסת" autocomplete="off"><div id="options-squadron" class="picker-list" role="listbox" hidden></div></div></div>
+          <div class="input-field"><label for="picker-shelter">דת״ק</label><div class="search-picker" data-picker="shelter"><input id="picker-shelter" data-sheet-field="shelter" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="options-shelter" placeholder="בחר טייסת תחילה" autocomplete="off" disabled><div id="options-shelter" class="picker-list" role="listbox" hidden></div></div></div>
+          <div id="workshop-field" class="input-field" hidden><label for="picker-workshop">מוסך</label><div class="search-picker" data-picker="workshop"><input id="picker-workshop" data-sheet-field="workshop" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="options-workshop" placeholder="חפש ובחר מוסך" autocomplete="off" disabled><div id="options-workshop" class="picker-list" role="listbox" hidden></div></div></div>
+          <div class="input-field"><label for="picker-aircraft">מספר מטוס</label><div class="search-picker" data-picker="aircraft"><input id="picker-aircraft" data-sheet-field="aircraft" type="search" inputmode="numeric" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="options-aircraft" placeholder="בחר טייסת תחילה" autocomplete="off" disabled><div id="options-aircraft" class="picker-list" role="listbox" hidden></div></div></div>
+          <div class="input-field"><label for="picker-systemName">שם מערכת</label><div class="search-picker" data-picker="systemName"><input id="picker-systemName" data-sheet-field="systemName" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="options-systemName" placeholder="חפש ובחר מערכת" autocomplete="off"><div id="options-systemName" class="picker-list" role="listbox" hidden></div></div></div>
+          <label class="input-field">קוד מערכת<input data-sheet-field="systemCode" type="text" readonly placeholder="מתמלא עם בחירת מערכת"></label>
+          <label id="ew-system-field" class="input-field" for="ew-system-select" hidden>חליפת ל״א<select id="ew-system-select" data-sheet-field="ewSystem" disabled><option>גרניט</option><option>אימפריה אקטיבית</option><option>אימפריה פאסיבית</option></select></label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="manager-fault-title">
+        <div class="section-heading"><div><p class="section-kicker">נשלח לטכנאי</p><h2 id="manager-fault-title">תיאור תקלה</h2></div><span class="step-badge">03</span></div>
+        <textarea class="text-box" data-sheet-field="fault" rows="4" maxlength="2000" required placeholder="תאר את התקלה לטכנאי…"></textarea>
+        <label class="field-label" for="manager-notes">הערות לטכנאי</label>
+        <textarea id="manager-notes" class="text-box" data-sheet-field="managerNotes" rows="3" maxlength="2000" placeholder="הערות שיוצגו לטכנאים…"></textarea>
+      </section>
+
+      <details class="card manager-constants-card" aria-labelledby="manager-constants-title">
+        <summary class="section-heading"><div><p class="section-kicker">נתוני מערכת</p><h2 id="manager-constants-title">קבועים</h2></div><span class="step-badge">04</span></summary>
+        <p class="section-note">ערוך את הערכים שיופיעו לטכנאי. שמות הקבועים נשארים כפי שהוגדרו בדוגמה.</p>
+        <div id="manager-constants" class="constants-grid"></div>
+      </details>
+
+      <details class="card manager-constants-card" aria-labelledby="manager-actions-title">
+        <summary class="section-heading"><div><p class="section-kicker">רשימת ביצוע</p><h2 id="manager-actions-title">12 משימות חובה</h2></div><span class="step-badge">05</span></summary>
+        <p class="section-note">12 הפעולות קבועות. השורה האחרונה מוצגת לטכנאי כבחירת שעת סיום.</p>
+        <div id="manager-actions" class="manager-actions"></div>
+      </details>
+
+      <section class="card send-card" aria-labelledby="send-title">
+        <div class="section-heading"><div><p class="section-kicker">סיום יצירה</p><h2 id="send-title">פתיחת התקלה</h2></div><span class="step-badge">06</span></div>
+        <label class="replaced-toggle" for="creation-ack"><input id="creation-ack" type="checkbox"><span class="custom-check" aria-hidden="true"></span><span><strong>תדריך בטיחות וניהול סיכונים</strong><small>יועבר ע"י מ"ע התקלה / משלח המשימה וייחתם על ידו.</small></span></label>
+        <div class="signature-field"><span class="field-label">חתימת משלח המשימה</span><canvas id="dispatcher-signature" class="signature-pad" aria-label="חתימת משלח המשימה"></canvas><button id="clear-dispatcher-signature" type="button" class="clear-signature">נקה חתימה</button></div>
+        <fieldset class="assignee-fieldset"><legend>הקצאה לטכנאים (לפחות טכנאי אחד)</legend><div id="new-assignees" class="assignee-options"></div><button id="add-assignee" class="secondary-button" type="button">+ הוסף טכנאי</button><p id="assignee-feedback" class="copy-status" role="status" aria-live="polite"></p></fieldset>
+        <button id="create-link" class="primary-button" type="button">פתח תקלה</button>
+        <p id="created-status" class="copy-status" role="status" aria-live="polite"></p>
+        <p class="demo-note">התקלה נשלחת אוטומטית לטכנאי ונשמרת ב־Firestore.</p>
+        <p id="legacy-status" class="copy-status" role="status" aria-live="polite"></p>
+      </section>
+      <footer class="footer-note"><span class="shield-icon" aria-hidden="true">✓</span><span id="draft-status">הטיוטה נשמרת במכשיר הזה</span></footer>
+      </div>
+      <div id="view-open" data-manager-view="open" hidden>
+      <section class="card" aria-labelledby="issued-title">
+        <div class="section-heading"><div><p class="section-kicker">מעקב משותף</p><h2 id="issued-title">תקלות פתוחות</h2></div></div>
+        <label class="input-field list-search">חיפוש לפי מספר תקלה<input id="open-issue-search" type="search" inputmode="numeric" placeholder="לדוגמה: 000001" autocomplete="off"></label>
+        <div id="issued-list" class="issue-list"></div>
+      </section>
+      </div>
+      <div id="view-closed" data-manager-view="closed" hidden>
+      <div class="review-tabs" role="navigation" aria-label="מצב סגירת תקלות"><a href="#pending" data-review-link="pending">תקלות לסגירה</a><a href="#closed" data-review-link="closed">תקלות סגורות</a></div>
+      <section id="pending-section" class="card" aria-labelledby="pending-list-title" hidden>
+        <div class="section-heading"><div><p class="section-kicker">ממתין לבדיקת הדף</p><h2 id="pending-list-title">תקלות לסגירה</h2></div></div>
+        <label class="input-field list-search">חיפוש לפי מספר תקלה<input id="pending-issue-search" type="search" inputmode="numeric" placeholder="לדוגמה: 000001" autocomplete="off"></label>
+        <div id="pending-list" class="issue-list"></div>
+      </section>
+      <section id="closed-section" class="card" aria-labelledby="closed-list-title">
+        <div class="section-heading"><div><p class="section-kicker">מעקב משותף</p><h2 id="closed-list-title">תקלות סגורות</h2></div></div>
+        <label class="input-field">הצג לפי טכנאי<select id="closed-filter"><option value="">כל הטכנאים</option></select></label>
+        <label class="input-field list-search">חיפוש לפי מספר תקלה<input id="closed-issue-search" type="search" inputmode="numeric" placeholder="לדוגמה: 000001" autocomplete="off"></label>
+        <div id="closed-list" class="issue-list"></div>
+      </section>
+      </div>
+      <div id="view-users" data-manager-view="users" hidden>
+        <section class="card" aria-labelledby="users-title">
+          <div class="section-heading"><div><p class="section-kicker">ניהול צוות</p><h2 id="users-title">משתמשים</h2></div></div>
+          <p>נימר יכול ליצור טכנאים ולהסיר אותם מהמערכת. ההסרה חוסמת גישה ושומרת היסטוריית תקלות; היסטוריית הטפסים נשמרת במסד המקומי.</p>
+          <form id="create-user-form" class="user-form">
+            <label class="input-field">שם הטכנאי<input name="name" required maxlength="80" autocomplete="off"></label>
+            <label class="input-field">מספר אישי<input name="personalNumber" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required autocomplete="off"></label>
+            <button class="primary-button" type="submit">צור משתמש טכנאי</button>
+          </form>
+          <p id="user-status" class="copy-status" role="status" aria-live="polite"></p>
+          <div id="users-list" class="issue-list"></div>
+          <details class="removed-users"><summary>משתמשים שהוסרו</summary><div id="removed-users-list" class="issue-list"></div></details>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="app.js?v=1.6.3"></script>
+</body>
+</html>

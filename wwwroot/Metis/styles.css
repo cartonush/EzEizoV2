@@ -1,0 +1,188 @@
+.manager-topbar { background: radial-gradient(circle at 90% 0%, #316c88 0, transparent 36%), linear-gradient(110deg, #10364f, #125278); }
+@media (min-width: 800px) { #reset-draft:not([hidden]) { position: absolute; left: 50%; transform: translateX(-50%); } }
+.manager-mark { background: linear-gradient(145deg, #a2dfc9, #4fb5a5); }
+.manager-intro p { color: #526b7e; font-size: 13px; margin: -4px 0 11px; line-height: 1.55; }
+.preview-link { color: #17668f; font-size: 12px; font-weight: 700; text-decoration: none; }
+.preview-link:hover { text-decoration: underline; }
+.manager-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.manager-grid .input-field input { height: 43px; }
+.manager-grid .input-field[hidden] { display: none; }
+.search-picker { position: relative; }
+.search-picker input { width: 100%; min-width: 0; font-size: 16px; }
+.search-picker input:disabled { color: #6d8190; background: #f0f5f7; }
+.picker-list { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; left: 0; max-height: 210px; overflow-y: auto; padding: 5px; border: 1px solid #bfd6e3; border-radius: 10px; background: #fff; box-shadow: 0 9px 24px #102e4440; }
+.picker-list[hidden] { display: none; }
+.picker-option { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: 7px; background: #fff; color: #203a4d; text-align: right; font: inherit; cursor: pointer; }
+.picker-option:hover, .picker-option:focus-visible { background: #e9f4f9; outline: none; }
+.picker-empty { padding: 10px; margin: 0; color: #607686; }
+.manager-constants-card > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+.manager-constants-card > summary::-webkit-details-marker { display: none; }
+.manager-constants-card > summary::after { content: "⌄"; margin-inline-start: auto; color: #176b96; font-size: 22px; }
+.manager-constants-card[open] > summary { margin-bottom: 16px; }
+.manager-constants-card[open] > summary::after { transform: rotate(180deg); }
+.read-only-value { display: flex; align-items: center; min-height: 43px; padding: 8px 10px; border: 1px solid #dce6eb; border-radius: 9px; background: #f0f5f7; color: #203a4d; font-size: 14px; font-weight: 600; }
+.assignee-fieldset { margin: 12px 0; padding: 12px; border: 1px solid #cbdce5; border-radius: 10px; }
+.assignee-fieldset legend { color: #344e61; font-weight: 700; }
+.assignee-options { display: grid; gap: 10px; margin-bottom: 12px; }
+.assignee-row { display: flex; align-items: end; gap: 8px; }
+.assignee-row .input-field { flex: 1; min-width: 0; }
+.assignee-row .secondary-button { flex: 0 0 auto; }
+.assignee-row select[aria-invalid="true"] { border-color: #dc2626; box-shadow: 0 0 0 2px #dc262633; }
+.manager-constant-row { display: flex; flex-direction: column; gap: 4px; }
+.manager-constant-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.manager-constant-row span { color: #647b8b; font-size: 10px; font-weight: 700; direction: ltr; text-align: left; }
+.manager-constant-row input { width: 100%; min-width: 0; height: 35px; padding: 5px 6px; border: 1px solid #dbe6ec; border-radius: 7px; background: #fff; color: #203a4d; font-size: 12px; text-align: center; direction: ltr; }
+.manager-constant-row input:focus, .manager-action-row input:focus { outline: 2px solid #64aacc70; border-color: #5da8c5; }
+.manager-actions { display: grid; gap: 8px; }
+.manager-action-row { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 9px; align-items: center; }
+.manager-action-row span { color: #94a3ae; font-size: 11px; font-weight: 700; }
+.manager-action-row input { min-width: 0; width: 100%; min-height: 40px; border: 1px solid #dce6eb; border-radius: 9px; padding: 8px 10px; background: #fbfdfe; color: #263e50; font-size: 12px; }
+.primary-button { min-height: 43px; border: 0; border-radius: 10px; padding: 9px 17px; color: #fff; background: #176b96; font-size: 13px; font-weight: 700; cursor: pointer; }
+.primary-button:hover { background: #0f567c; }
+.secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; border: 1px solid #c8dce7; border-radius: 9px; padding: 7px 12px; background: #f3f8fb; color: #17668f; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.link-result { margin-top: 16px; }
+.share-link { min-height: 72px; resize: none; font-family: system-ui, sans-serif; font-size: 11px; word-break: break-all; }
+.link-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.copy-status { min-height: 17px; margin: 5px 0 0; color: #187b68; font-size: 11px; }
+.copy-status[data-state="error"] { color: #d40000; font-weight: 700; }
+.demo-note { margin: 15px 0 0; border-radius: 9px; padding: 10px 12px; color: #657986; background: #f2f6f8; font-size: 11px; line-height: 1.55; }
+@media (max-width: 620px) { .manager-grid { grid-template-columns: 1fr; } }
+main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.manager-nav { position: fixed; z-index: 40; inset-inline: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 9px max(14px, calc((100vw - 880px) / 2)) calc(9px + env(safe-area-inset-bottom)); border-top: 1px solid #d5e2e9; background: #f9fcfd; box-shadow: 0 -6px 22px #102e4420; }
+.manager-controls { display: flex; align-items: center; min-height: 40px; margin: 0 0 12px; }
+.removed-users { margin-top: 18px; padding: 12px; border: 1px solid #dbe6ec; border-radius: 10px; }
+.removed-users summary { cursor: pointer; color: #355b70; font-weight: 700; }
+.removed-users .issue-list { margin-top: 12px; }
+.danger-button { margin-inline-start: 8px; color: #b3152b; border-color: #e8b5bd; background: #fff3f4; }
+.manager-controls .back-to-queue { margin: 0; }
+.review-tabs { display: flex; gap: 10px; margin-bottom: 14px; }
+.review-tabs a { flex: 1; padding: 12px; border: 1px solid #c8dce7; border-radius: 10px; background: #fff; color: #17668f; font-weight: 700; text-align: center; text-decoration: none; }
+.review-tabs a[aria-current="page"] { color: #fff; background: #176b96; }
+#manager-edit-history details { margin-top: 9px; padding: 10px; border: 1px solid #dbe6ec; border-radius: 9px; overflow-wrap: anywhere; }
+#manager-edit-history summary { cursor: pointer; font-weight: 700; }
+.manager-nav-link { display: grid; place-items: center; min-height: 54px; padding: 7px 5px; border: 1px solid #cbdce5; border-radius: 12px; background: #fff; color: #355b70; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.25; text-decoration: none; }
+.manager-nav-link[aria-current="page"] { color: #fff; background: #176b96; border-color: #176b96; }
+.manager-nav-link:focus-visible { outline: 3px solid #6fb1cf; }
+.manager-action-row p { margin: 0; min-height: 40px; padding: 10px; border: 1px solid #dce6eb; border-radius: 9px; background: #f4f7f8; color: #334f60; font-size: 12px; line-height: 1.5; }
+.user-form { display: grid; gap: 12px; margin: 16px 0; }
+.credentials-panel { margin: 12px 0; padding: 12px; border-radius: 10px; background: #eaf5f4; color: #163d40; overflow-wrap: anywhere; }
+.credentials-panel p { margin: 8px 0 0; }
+@media (max-width: 620px) { .manager-nav { gap: 5px; padding-inline: 8px; } .manager-nav-link { font-size: 11px; padding-inline: 3px; } }
+
+.manager-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.manager-home-intro p { margin-bottom: 0; color: #526b7e; }
+.manager-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.manager-home-tile { display: flex; flex-direction: column; gap: 8px; min-height: 105px; padding: 19px; border: 1px solid #c8dce7; border-radius: 15px; background: #fff; color: #173b5d; text-decoration: none; box-shadow: var(--shadow); }
+.manager-home-tile strong { font-size: 18px; }
+.manager-home-tile span { color: #607686; font-size: 13px; }
+.manager-home-tile:hover,.manager-home-tile:focus-visible { border-color: #176b96; outline: none; background: #f3f9fc; }
+.manager-note-editor { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid #dbe6ec; border-radius: 9px; }
+.manager-note-editor summary { cursor: pointer; font-weight: 700; color: #17668f; }
+.manager-note-editor textarea { display: block; box-sizing: border-box; width: 100%; min-height: 70px; margin: 9px 0; padding: 9px; border: 1px solid #cbdce5; border-radius: 8px; font: inherit; }
+.manager-note-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 9px 0; }
+.management-link { margin-top: 16px; min-height: auto; }
+.fault-nav { margin: 4px 0 16px; }
+.fault-nav[hidden] { display: none; }
+@media (max-width: 620px) { .manager-home-grid { grid-template-columns: 1fr; gap: 9px; } .manager-home-tile { min-height: 78px; padding: 14px; } .manager-home-tile strong { font-size: 16px; } }
+
+.report-choice { display: flex; align-items: center; gap: 18px; margin: 18px 0; padding: 10px 14px; border: 1px solid #dbe6ec; border-radius: 10px; }
+.list-search { margin: 0 0 16px; max-width: 420px; }
+.list-search input { box-sizing: border-box; font-size: 16px; }
+.report-filters,.report-output { min-width: 0; overflow: hidden; }
+.report-filters .manager-grid { gap: 18px 14px; margin-block: 16px; align-items: start; }
+.report-filters .input-field,.report-filters .manager-grid > div { min-width: 0; }
+.report-filters .input-field input,.report-filters .input-field select { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; line-height: 1.4; }
+.report-filters .input-field input[type="datetime-local"] { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.report-kind-field { margin: 16px 0 20px; max-width: 520px; font-size: 14px; }
+.report-subject-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px; margin: 16px 0; }
+.report-subject-fields[hidden],.report-technician-aircraft-fields[hidden] { display: none; }
+#report-squadron-summary[hidden] { display: none; }
+#report-squadron-summary { justify-self: start; }
+#report-technician-all { grid-column: 1 / -1; justify-self: start; }
+#report-view-dates[hidden],#report-form-status[hidden],#report-aircraft-fields-picker[hidden] { display: none; }
+#report-all-dates-field[hidden] { display: none; }
+.report-all-dates { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; font-weight: 700; color: #274457; cursor: pointer; }
+.report-all-dates input { width: 19px; height: 19px; accent-color: #168b79; }
+.report-subject-fields > .input-field { min-width: 0; }
+.report-multi-aircraft { grid-column: 1 / -1; min-width: 0; }
+.report-multi-aircraft .field-label { margin: 0 0 6px; }
+.report-multi-aircraft details { border: 1px solid #dbe6ec; border-radius: 10px; background: #fbfdfe; }
+.report-multi-aircraft summary { padding: 11px 14px; cursor: pointer; color: #203a4d; font-size: 14px; font-weight: 600; }
+.report-multi-aircraft-panel { padding: 12px; border-top: 1px solid #dbe6ec; }
+.report-multi-aircraft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.report-aircraft-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 6px; max-height: 240px; overflow-y: auto; }
+.report-aircraft-options label { display: flex; align-items: center; gap: 7px; padding: 8px; border: 1px solid #e1e9ed; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.report-aircraft-options label[hidden] { display: none; }
+.report-technician-picker { flex: 1 1 220px; }
+.report-technician-picker .input-field { display: block; margin-bottom: 12px; }
+.report-technician-picker input[type="search"] { width: 100%; box-sizing: border-box; font-size: 16px; }
+.report-aircraft-options input { flex: none; width: 17px; height: 17px; accent-color: #168b79; }
+.report-help { clear: both; margin: 18px 0 0; color: #536b7b; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.report-output #report-period,.report-output #report-count { margin: 8px 0 0; line-height: 1.6; overflow-wrap: anywhere; }
+.report-output #report-count { margin-top: 3px; }
+.report-choice legend { padding: 0 6px; font-weight: 700; }
+.report-choice label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+#report-aircraft-fields .replaced-toggle { margin: 5px 0 10px; padding: 10px; }
+.report-dates { margin: 14px 0; }
+.report-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 12px 0 20px; }
+.report-stat { display: grid; gap: 3px; padding: 12px; border-radius: 10px; background: #eef6fa; text-align: center; }
+.report-stat strong { color: #14678f; font-size: 21px; }
+.report-stat span { font-size: 11px; }
+.report-stat { min-width: 0; }
+.report-stat span { overflow-wrap: anywhere; line-height: 1.4; }
+.report-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.report-entry { min-width: 0; padding: 16px; border: 1px solid #dbe6ec; border-radius: 12px; background: #f8fbfd; }
+.report-entry-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.report-entry h3 { margin: 0; color: #173b5d; font-size: 16px; }
+.report-entry-status { flex: none; padding: 4px 8px; border-radius: 20px; background: #e4f3ed; color: #176d57; font-size: 11px; font-weight: 700; }
+.report-entry-description { margin: 10px 0; min-height: 20px; color: #385467; overflow-wrap: anywhere; }
+.report-entry-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 12px; margin: 0 0 12px; }
+.report-entry-details div { min-width: 0; }
+.report-entry-details dt { color: #6c7c8b; font-size: 11px; }
+.report-entry-details dd { margin: 0; color: #203a4d; font-size: 12px; overflow-wrap: anywhere; }
+.report-entry .secondary-button { min-height: 32px; padding: 5px 10px; }
+.report-entry-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-aircraft-group { grid-column: 1 / -1; margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: #eaf4f8; color: #173b5d; font-size: 16px; }
+.report-technician-header { grid-column: 1 / -1; display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.report-technician-header[hidden] { display: none; }
+.report-technician-header label { flex: 1 1 220px; min-width: 0; }
+.report-technician-header button { flex: 0 1 auto; min-height: 42px; }
+.report-confirm { width: min(92vw, 480px); padding: 24px; border: 1px solid #cbdde7; border-radius: 16px; color: #173b5d; box-shadow: 0 18px 50px #102c4560; }
+.report-confirm::backdrop { background: #102c4599; }
+.report-confirm h2 { margin: 0 0 12px; }
+.report-confirm div { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.report-export { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.report-export button:disabled { opacity: .5; cursor: not-allowed; }
+.aircraft-picker-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 9px; margin-top: 16px; }
+.constants-picker-fields { display: grid; gap: 16px; }
+.constants-help { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.constants-picker-fields .aircraft-picker-list { margin-top: 0; }
+.aircraft-picker-list button { width: 100%; }
+#constants-editor .constants-grid { margin: 15px 0; }
+#constants-editor .manager-constant-row input { font-size: 16px; }
+@media (max-width: 720px) {
+  .report-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .report-results { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .report-choice { flex-wrap: wrap; gap: 10px 18px; }
+  .report-filters .manager-grid { gap: 14px; }
+  .report-subject-fields { grid-template-columns: 1fr; }
+  .report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-entry-details { grid-template-columns: 1fr; }
+  .list-search { max-width: none; }
+}
+@media print {
+  body { background: #fff; }
+  .topbar,.manager-nav,#manager-controls,.report-filters,.report-export,#report-download-status,#report-results a,#report-results button,#app-skeleton { display: none !important; }
+  main { width: 100%; margin: 0; padding: 0; }
+  main > [data-manager-view]:not(#view-reports) { display: none !important; }
+  #view-reports,.report-output { display: block !important; }
+  .report-output { border: 0; box-shadow: none; padding: 0; }
+  .report-results { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .report-entry { padding: 9px; break-inside: avoid; }
+  .report-entry-description { margin: 6px 0; }
+  .report-entry-details { gap: 5px; }
+  .report-output #report-period { margin-bottom: 8px; }
+  @page { size: A4 portrait; margin: 12mm; }
+}

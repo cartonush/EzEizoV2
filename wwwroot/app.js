@@ -1,83 +1,631 @@
-(() => {
-  'use strict';
-  const role = new URLSearchParams(location.search).get('role') === 'mechanic' ? 'mechanic' : 'manager';
-  const app = document.querySelector('#app'), nav = document.querySelector('#nav');
-  const back = document.querySelector('#back'), logout = document.querySelector('#logout');
-  const pending = new Map();
-  let account = null, page = 'login', previous = 'home', tickets = [], current = null;
-  const actions = [
-    'חתום על כלים רלוונטיים ושג לנקודת עבודה','זמן הגעה לדת״ק',
-    'קבל אישור עבודה על המטוס מר״צ חימוש / מפקד דת״ק',
-    'בצע ביקורת כלים עם ר״צ / מפקד תורן - קוד שכיח 310',
-    'וודא מטוס בטוח לאחזקה לפי כרך בטיחות המטוס',
-    'לפתרון התקלה פעל עפ״י תהליך מרכזי דרג א׳',
-    'עדכן ר״צ / מפקד דת״ק בסטטוס המטוס',
-    'בצע ביקורת כלים בסיום העבודה - קוד שכיח 310',
-    'בצע בדיקה להיעדר גופים זרים במקום העבודה - קוד שכיח 3100',
-    'זכה את הכלים שנלקחו מהגף',
-    'הצמד תג בר תיקון למכלול / צב״ד תקול', 'זמן סיום התקלה'
-  ];
-  const aircraft = {
-    '101':'101,502,503,506,511,512,514,516,519,520,522,523,527,528,530,531,524,536,538,539,542,543,546,547,551,554,557,558',
-    '105':'601,603,610,615,619,624,628,630,633,638,642,647,648,651,652,656,664,666,667,673,676,678,682,687',
-    '109':'020,022,023,027,034,036,039,041,045,046,050,055,057,061,063,069,072,074,075,079,083,088,612,637',
-    'מנ״ט':'000'
+import "./sheet-data.js?v=1.6.3";
+import { gate, revealApp, watchIssues, watchKeyLoads, getIssue, submitForReview, approveIssue, reopenIssue } from "./firebase-sync.js?v=1.6.3";
+import { attachSignaturePad } from "./signature-canvas.js?v=1.6.3";
+import { validateTreatment } from "./mechanic-validation.js?v=1.6.3";
+import { attachTimeNow } from "./time-now.js?v=1.6.3";
+import { issueTimeline } from "./lifecycle.js?v=1.6.3";
+import { createEditLock } from "./edit-lock.js?v=1.6.3";
+
+const managerClosedView = location.pathname.toLowerCase().endsWith("/metis/closed.html");
+const currentUser = await gate(managerClosedView ? "manager" : "technician");
+let cloudIssues = [];
+let keyLoads = [];
+let keyLoadError = "";
+const selectedId = new URLSearchParams(window.location.search).get("id");
+let remoteIssue = null;
+if (selectedId) {
+  try { remoteIssue = await getIssue(selectedId); }
+  catch (error) { const list = document.querySelector("#mechanic-issues"); list.textContent = `טעינת התקלה נכשלה: ${error.message}`; list.dataset.state = "error"; }
+}
+const sheet = EzEizoData.normalizeSheet(remoteIssue?.sheet || EzEizoData.defaultSheet);
+const selectedSheet = Boolean(remoteIssue && (managerClosedView ? ["closed", "pendingReview"].includes(remoteIssue.status) : remoteIssue.assigneeUid === currentUser.uid));
+document.querySelector("#sheet-form").hidden = !selectedSheet || (!managerClosedView && remoteIssue?.status === "open");
+document.querySelector("#mechanic-back").hidden = !selectedSheet && !managerClosedView;
+document.querySelector(".queue-card").hidden = selectedSheet;
+const ACTIONS = sheet.actions;
+const STORAGE_KEY = selectedSheet && sheet.id !== "example" ? `fault-sheet-v2:${sheet.id}` : "fault-sheet-v1";
+const actionList = document.querySelector("#action-list");
+const repairField = document.querySelector("#repair-description");
+const unitsToggle = document.querySelector("#units-toggle");
+const unitsArea = document.querySelector("#units-area");
+let editLock = null;
+if (selectedSheet && !managerClosedView && remoteIssue.status === "open") {
+  const notice = document.createElement("section");
+  notice.className = "card edit-lock-notice";
+  notice.setAttribute("role", "status");
+  notice.setAttribute("aria-live", "polite");
+  const message = document.createElement("strong");
+  const retry = document.createElement("button"); retry.className = "secondary-button"; retry.type = "button"; retry.textContent = "בדוק שוב";
+  retry.addEventListener("click", () => editLock?.acquire());
+  notice.append(message, retry);
+  document.querySelector("#sheet-form").before(notice);
+  editLock = createEditLock({ kind: "issue", serialOrId: sheet.serial, formId: sheet.id, user: { uid: currentUser.uid, name: remoteIssue.assigneeName }, onChange: ({ held, message: info }) => {
+    notice.hidden = held;
+    message.textContent = info;
+    document.querySelector("#sheet-form").hidden = !held;
+    if (held) setupSignaturePads();
+  } });
+  window.addEventListener("pagehide", () => editLock?.dispose());
+  void editLock.acquire();
+}
+const TABLES = {
+  removed: [
+    { key: "name", label: "שם יחידה", placeholder: "בחר יחידה", options: ["MLPRF", "PSP", "DMT"] },
+    { key: "serial", label: "מס״ד", placeholder: "מס״ד" }
+  ],
+  installed: [
+    { key: "name", label: "שם יחידה", placeholder: "בחר יחידה", options: ["MLPRF", "PSP", "DMT"] },
+    { key: "serial", label: "מס״ד", placeholder: "מס״ד" }
+  ],
+  tools: [
+    { key: "toolName", label: "שם כלי", placeholder: "שם כלי" },
+    { key: "toolNumber", label: "מספר כלי", placeholder: "מספר כלי" },
+    { key: "notes", label: "הערות", placeholder: "הערות", optional: true }
+  ],
+  taken: [
+    { key: "description", label: "תיאור קשיח / נצרך", placeholder: "תיאור קשיח / נצרך" },
+    { key: "removedFrom", label: "הוסר מרכיב / אזור", placeholder: "מרכיב / אזור" },
+    { key: "quantityIn", label: "כמות בכניסה", placeholder: "כמות", type: "number" },
+    { key: "quantityOut", label: "כמות ביציאה", placeholder: "כמות", type: "number" },
+    { key: "notes", label: "הערות", placeholder: "הערות", optional: true }
+  ],
+  rejected: [
+    { key: "description", label: "תיאור הקשיח", placeholder: "תיאור הקשיח" },
+    { key: "quantity", label: "כמות", placeholder: "כמות", type: "number" },
+    { key: "mascha", label: "מסחא", placeholder: "מסחא" },
+    { key: "reason", label: "סיבת הפסילה", placeholder: "סיבת הפסילה" }
+  ]
+};
+const defaultState = {
+  repair: "", technicianNotes: [], actions: ACTIONS.map(() => false), action11Result: "", arrivalTime: "", completionTime: "", closedAt: "",
+  unitsEnabled: false, removed: [], installed: [], constantsEnabled: false,
+  toolsEnabled: false, tools: [], entryEnabled: false, interimEnabled: false, finalEnabled: false,
+  takenEnabled: false, taken: [], rejectedEnabled: false, rejected: [],
+  entryInspectorNumber: "", interimInspectorNumber: "", interimToolsName: "", finalInspectorNumber: "", finalLeadName: "", departureTime: "",
+  takenFullName: "", takenPersonalNumber: "", takenRank: "",
+  safetyTechnicianSignature: "", technicianDeclarationSignature: "",
+  entryTechnicianSignature: "", entryInspectorSignature: "", interimTechnicianSignature: "", interimInspectorSignature: "", interimToolsSignature: "",
+  finalTechnicianSignature: "", finalInspectorSignature: "", finalLeadSignature: "", takenSignature: ""
+};
+let state = loadState();
+if (["closed", "pendingReview"].includes(remoteIssue?.status) && remoteIssue.closed?.state) {
+  state = { ...defaultState, ...remoteIssue.closed.state };
+} else if (remoteIssue?.status === "open" && remoteIssue.reopenedAt && state.reopenMarker !== remoteIssue.reopenedAt) {
+  state = { ...defaultState, ...remoteIssue.closed.state, closedAt: "", reopenMarker: remoteIssue.reopenedAt };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+state.completionTime = state.completionTime || "";
+state.arrivalTime = state.arrivalTime || "";
+if (!Array.isArray(state.actions)) state.actions = ACTIONS.map(() => false);
+if (!Array.isArray(state.technicianNotes)) state.technicianNotes = [];
+state.action11Result = ["done", "notRequired"].includes(state.action11Result) ? state.action11Result : state.actions[10] ? "done" : "";
+state.actions[10] = Boolean(state.action11Result);
+state.actions[1] = Boolean(state.arrivalTime) || Boolean(remoteIssue?.status === "closed" && state.actions[1]);
+state.actions[ACTIONS.length - 1] = Boolean(state.completionTime);
+
+function loadState() {
+  try { return { ...defaultState, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") }; }
+  catch { return { ...defaultState }; }
+}
+
+function saveState() {
+  if (managerClosedView) return;
+  if (state.closedAt) return;
+  const status = document.querySelector("#save-state");
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch { status.textContent = "שמירת הטיוטה במכשיר נכשלה. השאר את הטופס פתוח ופנה מקום באחסון."; status.dataset.state = "error"; return; }
+  delete status.dataset.state;
+  status.textContent = "נשמר עכשיו במכשיר";
+  window.clearTimeout(saveState.timer);
+  saveState.timer = window.setTimeout(() => { status.textContent = "נשמר אוטומטית במכשיר"; }, 1400);
+}
+
+function renderSheetDetails() {
+  if (managerClosedView) {
+    const timeline = document.querySelector("#lifecycle-events");
+    timeline.replaceChildren(...issueTimeline(remoteIssue).map(({ label, at }) => {
+      const item = document.createElement("li");
+      const name = document.createElement("strong"); name.textContent = label;
+      const time = document.createElement("time"); time.dateTime = at; time.textContent = new Date(at).toLocaleString("he-IL");
+      item.append(name, time); return item;
+    }));
+  }
+  const times = document.querySelector("#closed-times");
+  if (times) {
+    times.hidden = !["closed", "pendingReview"].includes(remoteIssue?.status);
+    if (!times.hidden) {
+      const format = (value) => value ? new Date(value).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "—";
+      document.querySelector("#opened-at").textContent = format(remoteIssue.createdAt);
+      document.querySelector("#closed-at").textContent = format(remoteIssue.reviewedAt || remoteIssue.closed?.state?.closedAt);
+      document.querySelector("#closed-at").previousElementSibling.textContent = remoteIssue.status === "pendingReview" ? "שעת הגשת הטכנאי" : "שעת סגירה";
+    }
+  }
+  document.querySelector("#workshop-detail").hidden = !sheet.workshop;
+  document.querySelectorAll("[data-sheet-field]").forEach((element) => {
+    element.textContent = sheet[element.dataset.sheetField] || "—";
+  });
+  document.querySelector("#fault-description").value = sheet.fault;
+  document.querySelector("#dispatch-briefing").hidden = !sheet.dispatcherSignature;
+  if (sheet.dispatcherSignature) document.querySelector("#dispatcher-signature-display").src = sheet.dispatcherSignature;
+  const grid = document.querySelector("#constants-grid");
+  grid.replaceChildren();
+  Object.entries(sheet.constants).forEach(([groupName, entries]) => {
+    const group = document.createElement("section");
+    group.className = "constant-group";
+    const heading = document.createElement("h3");
+    heading.textContent = groupName;
+    const list = document.createElement("dl");
+    entries.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const description = document.createElement("dd");
+      term.textContent = label;
+      description.textContent = value;
+      row.append(term, description);
+      list.append(row);
+    });
+    group.append(heading, list);
+    grid.append(group);
+  });
+}
+
+function renderTechnicianNotes() {
+  const box = document.querySelector("#combined-notes");
+  let prefix = sheet.managerNotes ? `${sheet.managerNotes}\n\n` : "";
+  box.value = prefix + state.technicianNotes.join("\n");
+  box.updateManagerNotes = (notes) => {
+    sheet.managerNotes = notes;
+    prefix = notes ? `${notes}\n\n` : "";
+    box.value = prefix + state.technicianNotes.join("\n");
   };
-  function escape(value) { return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function call(action,payload={}) {
-    return new Promise((resolve,reject)=>{
-      const id = crypto.randomUUID(); pending.set(id,{resolve,reject});
-      window.chrome.webview.postMessage({id,action,payload});
+  box.readOnly = managerClosedView || Boolean(state.closedAt);
+  box.addEventListener("beforeinput", (event) => {
+    if (box.selectionStart < prefix.length) event.preventDefault();
+  });
+  box.addEventListener("input", () => {
+    if (!box.value.startsWith(prefix)) { box.value = prefix + state.technicianNotes.join("\n"); box.setSelectionRange(box.value.length, box.value.length); return; }
+    const notes = box.value.slice(prefix.length);
+    state.technicianNotes = notes ? [notes] : [];
+    saveState();
+  });
+  box.addEventListener("click", () => { if (box.selectionStart < prefix.length) box.setSelectionRange(prefix.length, prefix.length); });
+}
+
+function renderActions() {
+  actionList.replaceChildren();
+  ACTIONS.forEach((label, index) => {
+    const row = document.createElement("li");
+    row.className = `action-row${state.actions[index] ? " done" : ""}`;
+    const number = document.createElement("span");
+    number.className = "action-number";
+    number.textContent = String(index + 1).padStart(2, "0");
+    const text = document.createElement("span");
+    text.className = "action-text";
+    text.textContent = label;
+    if (index === 10) {
+      row.classList.add("has-choice");
+      row.classList.toggle("not-required", state.action11Result === "notRequired");
+      const choices = document.createElement("div");
+      choices.className = "action-choices";
+      choices.setAttribute("role", "radiogroup");
+      choices.setAttribute("aria-label", "פעולה 11: בוצעה או לא נדרשה");
+      [["done", "✓", "בוצעה"], ["notRequired", "X", "לא נדרשה"]].forEach(([value, symbol, description]) => {
+        const option = document.createElement("label");
+        option.className = `action-choice ${value === "notRequired" ? "choice-x" : "choice-done"}`;
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = `action-11-${sheet.id}`;
+        radio.value = value;
+        radio.checked = state.action11Result === value;
+        radio.setAttribute("aria-label", `פעולה 11 ${description}`);
+        radio.addEventListener("change", () => {
+          state.action11Result = value;
+          state.actions[index] = true;
+          row.classList.add("done");
+          row.classList.toggle("not-required", value === "notRequired");
+          updateProgress();
+          saveState();
+        });
+        const mark = document.createElement("span"); mark.textContent = symbol;
+        option.append(radio, mark); choices.append(option);
+      });
+      row.append(number, text, choices);
+    } else if (index === 1 || index === ACTIONS.length - 1) {
+      const isArrival = index === 1;
+      const timePicker = document.createElement("input");
+      timePicker.className = "time-picker";
+      timePicker.type = "time";
+      timePicker.step = "60";
+      timePicker.value = isArrival ? state.arrivalTime : state.completionTime;
+      timePicker.dir = "ltr";
+      timePicker.setAttribute("aria-label", isArrival ? "בחר שעת הגעה לדת״ק" : "בחר שעת סיום תקלה");
+      timePicker.addEventListener("change", () => {
+        if (isArrival) state.arrivalTime = timePicker.value;
+        else state.completionTime = timePicker.value;
+        state.actions[index] = Boolean(timePicker.value);
+        row.classList.toggle("done", state.actions[index]);
+        updateProgress();
+        saveState();
+      });
+      row.append(number, text, timePicker);
+    } else {
+      const checkbox = document.createElement("input");
+      checkbox.className = "action-check";
+      checkbox.type = "checkbox";
+      checkbox.checked = Boolean(state.actions[index]);
+      checkbox.setAttribute("aria-label", `סמן פעולה ${index + 1} כהושלמה`);
+      checkbox.addEventListener("change", () => {
+        state.actions[index] = checkbox.checked;
+        row.classList.toggle("done", checkbox.checked);
+        updateProgress();
+        saveState();
+      });
+      row.append(number, text, checkbox);
+    }
+    actionList.append(row);
+  });
+  updateProgress();
+}
+
+function updateProgress() {
+  const complete = state.actions.filter(Boolean).length;
+  document.querySelector("#action-progress").textContent = `${complete} מתוך ${ACTIONS.length}`;
+}
+
+function renderIssueList() {
+  const list = document.querySelector("#mechanic-issues");
+  list.replaceChildren();
+  delete list.dataset.state;
+  if (managerClosedView) {
+    if (!selectedSheet) list.textContent = "התקלה הסגורה לא נמצאה. חזור לרשימת התקלות הסגורות.";
+    return;
+  }
+  const issues = cloudIssues.filter((item) => item.status === "open").map((item) => ({ type: "issue", createdAt: item.createdAt, data: item.sheet }));
+  const loads = keyLoads.filter((item) => item.status === "open").map((item) => ({ type: "keys", createdAt: item.createdAt, data: item }));
+  const tasks = [...issues, ...loads].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  if (!tasks.length) list.textContent = "אין משימות פתוחות כרגע.";
+  tasks.forEach(({ type, data: item }) => {
+    const card = document.createElement("a");
+    card.className = "issue-item";
+    card.href = type === "keys" ? `./keys.html#work/${encodeURIComponent(item.id)}` : `?id=${encodeURIComponent(item.id)}`;
+    const title = document.createElement("strong");
+    title.textContent = type === "keys" ? `הטענת מפתחות ${item.serial || ""} · טייסת ${item.squadron} · דת״ק ${item.shelter}` : `תקלה ${item.serial || "ללא מספר"} · מטוס ${item.aircraft || "—"} · ${item.location || "—"}`;
+    const info = document.createElement("span");
+    info.textContent = type === "keys" ? `מטוסים: ${item.aircraftIds.join(", ")} · ${item.date.split("-").reverse().join("/")} · פתוחה` : `${item.fault || "ללא תיאור"} · פתוחה`;
+    card.append(title, info);
+    list.append(card);
+  });
+  if (keyLoadError) {
+    const warning = document.createElement("p");
+    warning.className = "copy-status";
+    warning.dataset.state = "error";
+    warning.textContent = `לא ניתן לטעון הטענות מפתחות: ${keyLoadError}`;
+    list.append(warning);
+  }
+}
+
+function closureRecord() {
+  return {
+    id: sheet.id, serial: sheet.serial, location: sheet.location, aircraft: sheet.aircraft,
+    systemCode: sheet.systemCode, systemName: sheet.systemName,
+    technicians: sheet.technicians, fault: sheet.fault,
+    managerNotes: sheet.managerNotes || "", technicianNotes: state.technicianNotes,
+    closedAt: state.closedAt, arrivalTime: state.arrivalTime, completionTime: state.completionTime,
+    repair: state.repair.slice(0, 1200),
+    actionsComplete: state.actions.every(Boolean) && Boolean(state.action11Result),
+    removedCount: state.removed.filter((row) => row.name || row.serial).length,
+    installedCount: state.installed.filter((row) => row.name || row.serial).length,
+    toolsCount: state.tools.filter((row) => row.toolName || row.toolNumber || row.notes).length,
+    takenCount: state.taken.filter((row) => row.description).length,
+    rejectedCount: state.rejected.filter((row) => row.description).length
+  };
+}
+
+function showClosed() {
+  if (!selectedSheet) return;
+  document.querySelector("#sheet-form").classList.add("is-closed");
+  document.querySelector("#sheet-form").querySelectorAll("input, textarea, select, button").forEach((element) => {
+    if (element.closest("#review-panel")) return;
+    element.disabled = true;
+  });
+  document.querySelectorAll("canvas[data-signature]").forEach((canvas) => { canvas.style.pointerEvents = "none"; });
+  document.querySelector("#close-sheet").hidden = true;
+  const message = document.querySelector("#close-message");
+  delete message.dataset.state;
+  message.textContent = remoteIssue?.status === "closed" ? `הדף נסגר ב־${new Date(remoteIssue.reviewedAt || state.closedAt).toLocaleString("he-IL")}. ${managerClosedView ? "המנהל יכול להחזיר אותו לטכנאי לעריכה." : "אי אפשר לערוך אותו."}` : "הדף הועבר לבדיקת בודק הדף וממתין לחתימתו.";
+}
+
+if (managerClosedView && selectedSheet) {
+  document.querySelector(".brand-copy h1").textContent = remoteIssue.status === "pendingReview" ? "Metis · תקלה לסגירה" : "Metis · דף תקלה סגורה";
+  document.querySelector("#mechanic-back").href = remoteIssue.status === "pendingReview" ? "./#pending" : "./#closed";
+  const panel = document.querySelector("#manager-edit-panel");
+  panel.hidden = false;
+  document.querySelector("#manager-edit-open").addEventListener("click", async (event) => {
+    if (!window.confirm("להחזיר את התקלה לטכנאי לעריכה? כל הפרטים שמולאו יישמרו והוא יוכל לסגור שוב.")) return;
+    const button = event.currentTarget; button.disabled = true;
+    try { await reopenIssue(sheet.id, currentUser.uid); location.replace("./#open"); }
+    catch (error) { document.querySelector("#manager-edit-status").textContent = `ההחזרה נכשלה: ${error.message}`; button.disabled = false; }
+  });
+  const reviewPanel = document.querySelector("#review-panel");
+  reviewPanel.hidden = remoteIssue.status !== "pendingReview" && !remoteIssue.reviewerSignature;
+  if (!reviewPanel.hidden) {
+    const isPending = remoteIssue.status === "pendingReview";
+    const canvas = document.querySelector("#reviewer-signature");
+    let signature = "";
+    const clear = attachSignaturePad(canvas, {
+      initial: isPending ? "" : remoteIssue.reviewerSignature || "",
+      onChange: (value) => { signature = value; }
+    });
+    canvas.style.pointerEvents = isPending ? "auto" : "none";
+    document.querySelector("#clear-reviewer-signature").hidden = !isPending;
+    document.querySelector("#approve-sheet").hidden = !isPending;
+    document.querySelector("#clear-reviewer-signature").addEventListener("click", clear);
+    document.querySelector("#approve-sheet").addEventListener("click", async (event) => {
+      if (!signature) { document.querySelector("#review-status").textContent = "יש לחתום כבודק הדף לפני הסגירה."; return; }
+      const button = event.currentTarget; button.disabled = true;
+      try { await approveIssue(sheet.id, currentUser.uid, signature); location.replace("./#closed"); }
+      catch (error) { document.querySelector("#review-status").textContent = `הסגירה נכשלה: ${error.message}`; button.disabled = false; }
     });
   }
-  window.chrome.webview.addEventListener('message', event=>{
-    const result = event.data, request = pending.get(result.id);
-    if (!request) return;
-    pending.delete(result.id);
-    result.ok ? request.resolve(result.data) : request.reject(new Error(result.error || 'הפעולה נכשלה'));
+}
+
+async function submitTreatment() {
+  if (managerClosedView) return;
+  if (!editLock?.held) { document.querySelector("#close-message").textContent = "הטופס אינו נעול לעריכה עבורך. לחץ על בדוק שוב."; return; }
+  if (document.querySelector("#close-sheet").disabled) return;
+  const validation = validateTreatment(sheet, state, TABLES);
+  if (validation) {
+    const message = document.querySelector("#close-message");
+    message.textContent = validation.message;
+    message.dataset.state = "error";
+    const target = document.querySelector(validation.selector);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus({ preventScroll: true });
+    return;
+  }
+  const button = document.querySelector("#close-sheet");
+  button.disabled = true;
+  const closedAt = new Date().toISOString();
+  const closingState = { ...state, closedAt };
+  for (const [type, fields] of Object.entries(TABLES)) closingState[type] = compactRows(state[type], fields);
+  const record = { ...closureRecord(), closedAt, actionsComplete: true };
+  try {
+    await submitForReview(sheet.id, record, closingState, editLock.session);
+    Object.assign(state, closingState);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* The transaction has already saved the form on the server. */ }
+    showClosed();
+    editLock.dispose();
+    document.querySelector("#close-title").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (error) {
+    const message = document.querySelector("#close-message");
+    message.textContent = `השמירה נכשלה: ${error.message}. נסה שוב.`;
+    message.dataset.state = "error";
+    button.disabled = false;
+  }
+}
+document.querySelector("#close-sheet").addEventListener("click", submitTreatment);
+
+watchIssues((issues) => {
+  cloudIssues = issues;
+  renderIssueList();
+  const current = issues.find((item) => item.id === selectedId);
+  if (current?.status === "open" && current.sheet.managerNotes !== sheet.managerNotes) {
+    document.querySelector("#combined-notes").updateManagerNotes?.(current.sheet.managerNotes || "");
+  }
+  if (current?.status === "open" && current.reopenedAt && state.closedAt) {
+    location.reload();
+    return;
+  }
+  if (["closed", "pendingReview"].includes(current?.status) && !state.closedAt) {
+    state = { ...defaultState, ...current.closed.state };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    location.reload();
+  }
+}, (error) => { const list = document.querySelector("#mechanic-issues"); list.textContent = `לא ניתן לטעון תקלות: ${error.message}`; list.dataset.state = "error"; if (error.code === "unavailable") document.dispatchEvent(new Event("ezeizo:connection-lost")); }, managerClosedView ? null : currentUser.uid);
+
+if (!managerClosedView) watchKeyLoads((loads) => { keyLoads = loads; keyLoadError = ""; renderIssueList(); }, (error) => { keyLoadError = error.message; renderIssueList(); }, currentUser.uid);
+
+function rowHasValue(item, fields) {
+  return fields.some(({ key }) => String(item?.[key] ?? "").trim() !== "");
+}
+
+function compactRows(rows, fields) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => rowHasValue(item, fields))
+    .map((item) => Object.fromEntries(fields.map(({ key }) => [key, item[key] ?? ""])));
+}
+
+function normalizeRows(rows, fields, editable = true) {
+  const filledRows = compactRows(rows, fields);
+  return editable ? [...filledRows, Object.fromEntries(fields.map(({ key }) => [key, ""]))] : filledRows;
+}
+
+function renderRows(type, focusTarget = null) {
+  const fields = TABLES[type];
+  if (!fields) return;
+  state[type] = normalizeRows(state[type], fields, !managerClosedView && !state.closedAt);
+  const target = document.querySelector(`#${type}-rows`);
+  const rows = state[type];
+  target.replaceChildren();
+  rows.forEach((item, index) => {
+    const tr = document.createElement("tr");
+    fields.forEach((field) => {
+      const { key } = field;
+      const td = document.createElement("td");
+      const input = document.createElement(field.options ? "select" : "input");
+      if (field.options) {
+        input.append(new Option(field.placeholder, ""));
+        field.options.forEach((name) => input.append(new Option(name, name)));
+        if (item[key] && !field.options.includes(item[key])) input.append(new Option(`${item[key]} (ערך קודם)`, item[key]));
+      } else input.type = field.type || "text";
+      if (field.type === "number") input.step = "1";
+      input.value = item[key] || "";
+      input.placeholder = field.placeholder;
+      input.dataset.rowIndex = String(index);
+      input.dataset.field = key;
+      input.setAttribute("aria-label", `${field.label}, שורה ${index + 1}`);
+      input.addEventListener(field.options ? "change" : "input", () => {
+        const wasFilled = rowHasValue(rows[index], fields);
+        rows[index][key] = input.value;
+        const isFilled = rowHasValue(rows[index], fields);
+        const isLastRow = index === rows.length - 1;
+        if ((isFilled && isLastRow) || (wasFilled && !isFilled && !isLastRow)) {
+          const caret = field.options ? null : input.selectionStart;
+          renderRows(type, { index, key, caret });
+        }
+        saveState();
+      });
+      td.append(input);
+      tr.append(td);
+    });
+    const removeCell = document.createElement("td");
+    const remove = document.createElement("button");
+    remove.className = "remove-row";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "הסר שורה");
+    if (!rowHasValue(item, fields)) {
+      remove.hidden = true;
+      remove.tabIndex = -1;
+    }
+    remove.addEventListener("click", () => { rows.splice(index, 1); renderRows(type); saveState(); });
+    removeCell.append(remove);
+    tr.append(removeCell);
+    target.append(tr);
   });
-  function loading(){ app.innerHTML='<section class="card"><div class="skeleton"></div><div class="skeleton short"></div><div class="skeleton"></div></section>'; }
-  function message(error){ const box=app.querySelector('#message'); if(box){ box.textContent=error?.message || String(error); box.hidden=false; } }
-  function heading(kicker,title){ return `<div class="section-heading"><div><p class="section-kicker">${kicker}</p><h2>${title}</h2></div><span class="step-badge">01</span></div>`; }
-  function shell(target){ page=target; nav.hidden=role!=='manager'||!account; logout.hidden=!account; back.hidden=target==='login'||target==='home'||['new','open','closed','users'].includes(target)&&role==='manager';
-    nav.querySelectorAll('button').forEach(button=>button.setAttribute('aria-current',button.dataset.page===target?'page':'false'));
+  if (focusTarget) {
+    requestAnimationFrame(() => {
+      const input = target.querySelector(`[data-row-index="${focusTarget.index}"][data-field="${focusTarget.key}"]`);
+      if (!input) return;
+      input.focus({ preventScroll: true });
+      if (focusTarget.caret !== null) input.setSelectionRange(focusTarget.caret, focusTarget.caret);
+    });
   }
-  function login(){ account=null; shell('login'); app.innerHTML=`<section class="card auth-card">${heading('גישה למערכת',role==='manager'?'כניסה למנהל':'כניסה לטכנאי')}<p>התחבר באמצעות מספר אישי בן 7 ספרות.</p><form id="login-form"><label class="field-label" for="number">מספר אישי</label><input id="number" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required autocomplete="off" autofocus><div class="toolbar"><button class="primary-button">התחבר</button></div><p class="status" id="message" hidden></p></form></section>`;
-    app.querySelector('form').onsubmit=async e=>{e.preventDefault(); try{account=await call('login',{number:app.querySelector('#number').value}); await home();}catch(err){message(err);} };
-  }
-  async function home(){ shell('home');
-    if(role==='mechanic'){await list('open');return;}
-    loading(); try{ tickets=await call('faults'); const count=s=>tickets.filter(x=>x.status===s).length;
-      app.innerHTML=`<section class="card manager-home-intro">${heading('מערכת ניהול','שלום '+escape(account.name))}<p>דף מנהל מקומי · הנתונים נשמרים בתיקיית data במחשב.</p></section><div class="manager-home-grid"><button class="manager-home-tile" data-go="new"><strong>פתיחת תקלה חדשה</strong><span>יצירת משימה והקצאת טכנאים</span></button><button class="manager-home-tile" data-go="open"><strong>תקלות פתוחות</strong><span>${count('open')} טפסים פתוחים</span></button><button class="manager-home-tile" data-go="closed"><strong>תקלות סגורות</strong><span>${count('closed')} טפסים סגורים · ${count('pending_review')} ממתינים לסגירה</span></button><button class="manager-home-tile" data-go="users"><strong>ניהול משתמשים</strong><span>יצירת חשבונות טכנאים</span></button></div>`;
-      app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));
-    }catch(err){app.innerHTML=`<section class="card"><p class="status">${escape(err.message)}</p></section>`;}
-  }
-  async function users(){ shell('users'); loading(); try { const users=await call('users');
-    app.innerHTML=`<section class="card">${heading('ניהול','משתמשים')}<p>המנהל הראשי יוצר חשבונות טכנאים. חשבון המנהל הקיים נשמר במסד הנתונים.</p><form id="user-form" class="form-grid"><label>שם הטכנאי<input name="name" maxlength="100" required></label><label>מספר אישי<input name="number" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required></label><div class="full-field"><button class="primary-button">צור טכנאי</button></div></form><p class="status" id="message" hidden></p></section><section class="card">${heading('צוות','טכנאים פעילים')}${users.length?users.map(x=>`<div class="issue-card"><strong>${escape(x.name)}</strong><span>מספר אישי: ${escape(x.personalNumber)}</span></div>`).join(''):'<p class="empty">אין טכנאים פעילים.</p>'}</section>`;
-    app.querySelector('form').onsubmit=async e=>{e.preventDefault();try{await call('createUser',Object.fromEntries(new FormData(e.target)));await users();}catch(err){message(err);}};
-  }catch(err){app.innerHTML=`<section class="card"><p class="status">${escape(err.message)}</p></section>`;} }
-  async function newFault(){shell('new');loading();try{const users=await call('users');
-    app.innerHTML=`<section class="card">${heading('דף חדש','פתיחת תקלה')}<form id="new-form"><div class="form-grid"><label>טייסת<select name="squadron" id="squadron" required><option value="">בחר טייסת</option>${Object.keys(aircraft).map(x=>`<option>${escape(x)}</option>`).join('')}</select></label><label>מספר מטוס<select name="aircraft" id="aircraft" required><option value="">ראשית בחר טייסת</option></select></label><label class="full-field">תיאור תקלה<textarea name="description" required></textarea></label></div><fieldset class="assignee-fieldset"><legend>הקצאה לטכנאים · לפחות אחד</legend>${users.map((x,i)=>`<label class="assignee"><input type="checkbox" name="assignee" value="${escape(x.id)}"><span>${i===0?'מוביל התקלה · ':''}${escape(x.name)}</span></label>`).join('')||'<p class="empty">צור טכנאי בניהול משתמשים כדי לפתוח תקלה.</p>'}</fieldset><button class="primary-button">פתח תקלה</button><p class="status" id="message" hidden></p></form></section>`;
-    app.querySelector('#squadron').onchange=e=>{let options=(aircraft[e.target.value]||'').split(',').filter(Boolean); app.querySelector('#aircraft').innerHTML=`<option value="">בחר מטוס</option>`+options.map(x=>`<option>${x}</option>`).join('');};
-    app.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target), assignees=f.getAll('assignee');try{await call('createFault',{squadron:f.get('squadron'),aircraft:f.get('aircraft'),description:f.get('description'),assignees});await list('open');}catch(err){message(err);}};
-  }catch(err){app.innerHTML=`<section class="card"><p class="status">${escape(err.message)}</p></section>`;} }
-  async function list(kind){shell(kind);loading();try{tickets=await call('faults');const subset=tickets.filter(t=>role==='mechanic' ? t.status==='open' : kind==='open'?t.status==='open':t.status!=='open');
-    app.innerHTML=`<section class="card queue-card">${heading('רשימת תקלות',role==='mechanic'?'תקלות שהתקבלו':kind==='open'?'תקלות פתוחות':'תקלות סגורות וממתינות לסגירה')}<p class="section-note">בחר טופס כדי לצפות בפרטים שלו.</p><label class="field-label" for="search">חיפוש לפי מספר סידורי</label><input id="search" inputmode="numeric" placeholder="מספר תקלה"><div id="results"></div></section>`;
-    const draw=()=>{let q=app.querySelector('#search').value.replace(/^0+/,''), filtered=subset.filter(t=>!q||t.serial.replace(/^0+/,'').includes(q)); app.querySelector('#results').innerHTML=filtered.map(t=>`<button class="issue-card" data-id="${escape(t.id)}"><strong>תקלה ${escape(t.serial)} · מטוס ${escape(t.aircraft)} · ${escape(t.squadron)}</strong><span>${escape(t.description)} · ${t.status==='open'?'פתוח':t.status==='closed'?'סגור':'ממתין לסגירה'}</span></button>`).join('')||'<p class="empty">אין תקלות להצגה.</p>';
-      app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>showFault(subset.find(x=>x.id===b.dataset.id),kind));};
-    app.querySelector('#search').oninput=draw; draw();
-  }catch(err){app.innerHTML=`<section class="card"><p class="status">${escape(err.message)}</p></section>`;} }
-  async function showFault(ticket,origin){ current=ticket; previous=origin; shell('fault'); loading();try{const outcomes=await call('outcomes',{id:ticket.id}); const editable=role==='mechanic'&&ticket.status==='open';
-    app.innerHTML=`<section class="card">${heading('טופס תקלה', 'תקלה '+escape(ticket.serial))}<div class="details-grid"><div class="detail-item"><span>טייסת</span><strong>${escape(ticket.squadron)}</strong></div><div class="detail-item"><span>מטוס</span><strong>${escape(ticket.aircraft)}</strong></div><div class="detail-item"><span>סטטוס</span><strong>${ticket.status==='open'?'פתוח':ticket.status==='closed'?'סגור':'ממתין לסגירה'}</strong></div><div class="detail-item"><span>שעת פתיחה</span><strong>${escape(ticket.openedAt)}</strong></div></div></section><section class="card descriptions-card">${heading('תיאור','התקלה והתיקון')}<label class="field-label">תיאור תקלה <span class="locked-tag">לקריאה בלבד</span></label><textarea class="text-box locked" readonly>${escape(ticket.description)}</textarea><label class="field-label repair-label">תיאור תיקון</label><textarea class="text-box" id="repair" ${editable?'':'readonly'}>${escape(ticket.repair)}</textarea></section><section class="card">${heading('תהליך העבודה','פעולות לביצוע')}<ol class="action-list">${actions.map((a,i)=>`<li class="action-row"><span class="action-number">${String(i+1).padStart(2,'0')}</span><span class="action-text">${escape(a)}</span>${i===10?`<span class="action-choices"><label class="action-choice"><input type="radio" name="action11" value="V" ${outcomes[i]==='V'?'checked':''} ${editable?'':'disabled'}>V</label><label class="action-choice choice-x"><input type="radio" name="action11" value="X" ${outcomes[i]==='X'?'checked':''} ${editable?'':'disabled'}>X</label></span>`:`<input class="action-check" type="checkbox" data-action="${i}" ${outcomes[i]?'checked':''} ${editable?'':'disabled'}>`}</li>`).join('')}</ol></section><section class="card"><div class="toolbar">${editable?'<button class="secondary-button" id="save">שמור</button><button class="primary-button" id="close">שמירה וסגירה</button>':''}${role==='manager'&&ticket.status==='pending_review'?'<button class="primary-button" id="review">אשר סגירת תקלה</button>':''}</div><p class="status" id="message" hidden></p></section>`;
-    const save=async close=>{try{const values=actions.map((_,i)=>i===10?(app.querySelector('input[name=action11]:checked')?.value||''):app.querySelector(`[data-action="${i}"]`).checked?'V':'');await call('saveFault',{id:ticket.id,repair:app.querySelector('#repair').value,outcomes:values,close});await list('open');}catch(err){message(err);}};
-    if(editable){app.querySelector('#save').onclick=()=>save(false);app.querySelector('#close').onclick=()=>save(true);}
-    if(role==='manager'&&ticket.status==='pending_review')app.querySelector('#review').onclick=async()=>{try{await call('reviewFault',{id:ticket.id});await list('closed');}catch(err){message(err);}};
-  }catch(err){app.innerHTML=`<section class="card"><p class="status">${escape(err.message)}</p></section>`;} }
-  async function navigate(target){ if(!account){login();return;} if(target==='home')return home(); if(target==='new')return newFault(); if(target==='users')return users(); if(target==='open'||target==='closed')return list(target); }
-  nav.querySelectorAll('[data-page]').forEach(button=>button.onclick=()=>navigate(button.dataset.page));
-  back.onclick=()=>current?list(previous):home();
-  logout.onclick=async()=>{try{await call('logout');}finally{login();}};
-  if(role==='mechanic'){document.querySelector('#header').classList.remove('manager-topbar');document.querySelector('#mark').textContent='ט';document.querySelector('#brand').textContent='גף אוויוניקה קרב';document.querySelector('#subtitle').textContent='דף טיפול בתקלה';}
-  else document.querySelector('#header').classList.add('manager-topbar');
-  login();
-})();
+}
+
+function bindToggleInputs() {
+  document.querySelectorAll("[data-toggle-state]").forEach((input) => {
+    const key = input.dataset.toggleState;
+    const target = document.getElementById(input.dataset.target);
+    input.checked = Boolean(state[key]);
+    target.hidden = !input.checked;
+    input.addEventListener("change", () => {
+      state[key] = input.checked;
+      target.hidden = !input.checked;
+      if (input.checked) setupSignaturePads(target);
+      saveState();
+    });
+  });
+}
+
+function bindStateFields() {
+  document.querySelectorAll("[data-state-field]").forEach((input) => {
+    const key = input.dataset.stateField;
+    input.value = state[key] || "";
+    const eventName = input.type === "time" ? "change" : "input";
+    input.addEventListener(eventName, () => {
+      if (key.endsWith("InspectorNumber") || key === "takenPersonalNumber") input.value = input.value.replace(/[^0-9]/g, "").slice(0, 7);
+      state[key] = input.value;
+      saveState();
+    });
+  });
+}
+
+function setupSignaturePads(root = document) {
+  root.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
+    if (canvas.dataset.initialized === "true" || canvas.clientWidth === 0) return;
+    canvas.dataset.initialized = "true";
+    const key = canvas.dataset.signature;
+    const context = canvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    context.scale(ratio, ratio);
+    context.lineWidth = 2;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = "#18334a";
+
+    if (state[key]) {
+      const image = new Image();
+      image.onload = () => context.drawImage(image, 0, 0, width, height);
+      image.src = state[key];
+    }
+
+    let drawing = false;
+    const point = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+    canvas.addEventListener("pointerdown", (event) => {
+      drawing = true;
+      canvas.setPointerCapture(event.pointerId);
+      const p = point(event);
+      context.beginPath();
+      context.moveTo(p.x, p.y);
+      context.lineTo(p.x + 0.1, p.y + 0.1);
+      context.stroke();
+      event.preventDefault();
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (!drawing) return;
+      const p = point(event);
+      context.lineTo(p.x, p.y);
+      context.stroke();
+      event.preventDefault();
+    });
+    const finish = () => {
+      if (!drawing) return;
+      drawing = false;
+      state[key] = canvas.toDataURL("image/png");
+      saveState();
+      if (key === "technicianDeclarationSignature" && !managerClosedView) submitTreatment();
+    };
+    canvas.addEventListener("pointerup", finish);
+    canvas.addEventListener("pointercancel", finish);
+    canvas.addEventListener("lostpointercapture", finish);
+  });
+}
+
+document.querySelectorAll("[data-clear-signature]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.clearSignature;
+    state[key] = "";
+    const canvas = document.querySelector(`canvas[data-signature="${key}"]`);
+    if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    saveState();
+  });
+});
+
+repairField.value = state.repair;
+document.querySelector("#repair-count").textContent = `${state.repair.length} / 1200`;
+repairField.addEventListener("input", () => {
+  state.repair = repairField.value;
+  document.querySelector("#repair-count").textContent = `${repairField.value.length} / 1200`;
+  saveState();
+});
+
+unitsToggle.checked = Boolean(state.unitsEnabled);
+unitsArea.hidden = !unitsToggle.checked;
+unitsToggle.addEventListener("change", () => {
+  state.unitsEnabled = unitsToggle.checked;
+  unitsArea.hidden = !state.unitsEnabled;
+  saveState();
+});
+
+renderSheetDetails();
+if (managerClosedView) document.querySelector("#save-state").textContent = "דף סגור · קריאה בלבד";
+renderTechnicianNotes();
+renderActions();
+Object.keys(TABLES).forEach((table) => renderRows(table));
+bindToggleInputs();
+bindStateFields();
+attachTimeNow();
+revealApp();
+setupSignaturePads();
+
+renderIssueList();
+if (selectedSheet && state.closedAt) showClosed();
+
