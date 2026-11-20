@@ -82,7 +82,18 @@ public sealed class Database
     private static OleDbCommand Command(OleDbConnection c, OleDbTransaction? tx, string sql, params object?[] values)
     {
         var cmd = new OleDbCommand(sql, c, tx);
-        foreach (var value in values) cmd.Parameters.AddWithValue("@p", value ?? DBNull.Value);
+        for (var i = 0; i < values.Length; i++)
+        {
+            var value = values[i];
+            var parameter = cmd.Parameters.Add("@p" + i, value switch
+            {
+                bool => OleDbType.Boolean,
+                int => OleDbType.Integer,
+                DateTime => OleDbType.DBTimeStamp,
+                _ => OleDbType.VarWChar
+            });
+            parameter.Value = value ?? DBNull.Value;
+        }
         return cmd;
     }
 
