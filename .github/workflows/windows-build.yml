@@ -82,5 +82,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
-          $tag = 'v2.0.0-preview.2'
-          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.0 Preview 2' --notes 'Offline Windows update with website styling. Preserve your existing data/EzEizo.accdb. Login only; first manager remains primary. See README.txt.' --prerelease
+          $tag = 'v2.0.0-preview.3'
+          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.0 Preview 3' --notes 'Windows update: fix STA COM initialization for WebView2 and Access. Preserve existing data/EzEizo.accdb. See README.txt.' --prerelease

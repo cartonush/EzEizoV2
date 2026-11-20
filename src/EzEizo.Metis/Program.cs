@@ -1,17 +1,28 @@
 using EzEizo.Core;
-ApplicationConfiguration.Initialize();
-if (args.Contains("--create-database") || args.Contains("--self-test"))
+
+internal static class Program
 {
-    try
+    [STAThread]
+    private static void Main(string[] args)
     {
-        if (args.Contains("--self-test")) SmokeTest.Run();
-        else new Database().Initialize();
-        return;
-    }
-    catch (Exception ex)
-    {
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "database-error.txt"), ex.ToString());
-        Environment.Exit(1);
+        // WebView2 and Access COM components require an STA application thread.
+        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            throw new InvalidOperationException("EzEizo requires an STA application thread.");
+        ApplicationConfiguration.Initialize();
+        if (args.Contains("--create-database") || args.Contains("--self-test"))
+        {
+            try
+            {
+                if (args.Contains("--self-test")) SmokeTest.Run();
+                else new Database().Initialize();
+                return;
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "database-error.txt"), ex.ToString());
+                Environment.Exit(1);
+            }
+        }
+        Application.Run(new MainWindow(AppRole.Manager));
     }
 }
-Application.Run(new MainWindow(AppRole.Manager));
