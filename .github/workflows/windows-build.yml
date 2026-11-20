@@ -44,10 +44,11 @@ jobs:
         shell: pwsh
         run: |
           $desktop = [Environment]::GetFolderPath('Desktop')
-          & dist/EzEizo/EzEizo-Metis.exe --create-database
-          if ($LASTEXITCODE -ne 0) {
+          $exe = (Resolve-Path 'dist/EzEizo/EzEizo-Metis.exe').Path
+          $result = Start-Process -FilePath $exe -ArgumentList '--create-database' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
             if (Test-Path dist/EzEizo/database-error.txt) { Get-Content dist/EzEizo/database-error.txt }
-            throw "Database generation failed: $LASTEXITCODE"
+            throw "Database generation failed: $($result.ExitCode)"
           }
           $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
           if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
