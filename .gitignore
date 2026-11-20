@@ -1,0 +1,12 @@
+*.accdb
+*.laccdb
+*.mdb
+*.bak
+*.pfx
+*.p12
+*.snk
+**/bin/
+**/obj/
+userdata/
+backups/
+signatures/
