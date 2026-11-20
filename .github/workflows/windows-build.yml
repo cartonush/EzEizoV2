@@ -44,23 +44,17 @@ jobs:
         shell: pwsh
         run: |
           $desktop = [Environment]::GetFolderPath('Desktop')
-          try {
-            $provider = [type]::GetTypeFromProgID('ADOX.Catalog')
-            if ($null -eq $provider) { throw 'Access Database Engine is not installed on this runner' }
-            & dist/EzEizo/EzEizo-Metis.exe --create-database
-            $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
-            if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
-            Copy-Item $generated dist/EzEizo/data/
-            Write-Host 'Created real EzEizo.accdb with all tables'
-          }
-          catch {
-            Write-Warning "ACCDB could not be prebuilt: $_. The EXEs create it on first run when Access Database Engine x64 is installed."
-          }
+          & dist/EzEizo/EzEizo-Metis.exe --create-database
+          if ($LASTEXITCODE -ne 0) { throw "Database generation failed: $LASTEXITCODE" }
+          $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
+          if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
+          Copy-Item $generated dist/EzEizo/data/
+          Write-Host 'Created real EzEizo.accdb with all tables'
       - name: Check output
         shell: pwsh
         run: |
           Get-ChildItem dist/EzEizo -Recurse | Select-Object FullName,Length
-          if (!(Test-Path dist/EzEizo/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/EzEizo-Mechanic.exe)) { throw 'Missing executable' }
+          if (!(Test-Path dist/EzEizo/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/EzEizo-Mechanic.exe) -or !(Test-Path dist/EzEizo/data/EzEizo.accdb)) { throw 'Missing executable or ACCDB' }
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-Windows-x64

@@ -24,15 +24,22 @@ public sealed class Database
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "signatures"));
         if (File.Exists(FilePath)) { using var check = Connect(); return; }
-        var provider = Type.GetTypeFromProgID("ADOX.Catalog")
+        var provider = Type.GetTypeFromProgID("DAO.DBEngine.120")
             ?? throw new InvalidOperationException("רכיב Microsoft Access Database Engine x64 חסר במחשב.");
         object? instance = null;
+        object? database = null;
         try
         {
             instance = Activator.CreateInstance(provider);
-            ((dynamic)instance!).Create(connectionString);
+            // dbVersion120 (128) creates a real ACCDB using the Access DAO engine.
+            database = ((dynamic)instance!).CreateDatabase(FilePath, ";LANGID=0x0409;CP=1252;COUNTRY=0", 128);
+            ((dynamic)database).Close();
         }
-        finally { if (instance is not null && Marshal.IsComObject(instance)) Marshal.FinalReleaseComObject(instance); }
+        finally
+        {
+            if (database is not null && Marshal.IsComObject(database)) Marshal.FinalReleaseComObject(database);
+            if (instance is not null && Marshal.IsComObject(instance)) Marshal.FinalReleaseComObject(instance);
+        }
 
         using var connection = Connect();
         foreach (var sql in Schema)
