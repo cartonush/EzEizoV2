@@ -104,6 +104,16 @@ public sealed class Database
         return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
     }
 
+    // The first manager account already present in Access is the primary administrator.
+    // Existing UserID values remain unchanged; this avoids migrating the user's database.
+    public bool IsPrimaryManager(Account account)
+    {
+        if (account.Role != "manager") return false;
+        using var c = Connect();
+        using var cmd = Command(c, null, "SELECT TOP 1 [UserID] FROM [Users] WHERE [Role]='manager' AND [Active]=True ORDER BY [CreatedAt],[UserID]");
+        return string.Equals(Convert.ToString(cmd.ExecuteScalar()), account.Id, StringComparison.OrdinalIgnoreCase);
+    }
+
     public Account? SignIn(string number, AppRole role)
     {
         if (!ValidPersonalNumber(number)) return null;
