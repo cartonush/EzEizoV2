@@ -9,7 +9,7 @@ on:
       - '.github/workflows/windows-build.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -54,6 +54,16 @@ jobs:
           if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
           Copy-Item $generated dist/EzEizo/data/
           Write-Host 'Created real EzEizo.accdb with all tables'
+      - name: Smoke test local manager and mechanic workflow
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/EzEizo/EzEizo-Metis.exe').Path
+          $result = Start-Process -FilePath $exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
+            if (Test-Path dist/EzEizo/database-error.txt) { Get-Content dist/EzEizo/database-error.txt }
+            throw "Smoke test failed: $($result.ExitCode)"
+          }
+          Write-Host 'Login, assignment, submission and review passed'
       - name: Check output
         shell: pwsh
         run: |
@@ -65,3 +75,11 @@ jobs:
           path: dist/EzEizo
           if-no-files-found: error
           retention-days: 30
+      - name: Publish downloadable Windows ZIP
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
+          $tag = 'v2.0.0-preview.1'
+          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.0 Preview 1' --notes 'Two offline Windows EXEs plus a blank ACCDB. Prototype: login, users, fault assignment and closure. See README.txt for scope and prerequisites.' --prerelease

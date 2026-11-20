@@ -1,8 +1,13 @@
 using EzEizo.Core;
 ApplicationConfiguration.Initialize();
-if (args.Contains("--create-database"))
+if (args.Contains("--create-database") || args.Contains("--self-test"))
 {
-    try { new Database().Initialize(); return; }
+    try
+    {
+        if (args.Contains("--self-test")) SmokeTest.Run();
+        else new Database().Initialize();
+        return;
+    }
     catch (Exception ex)
     {
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "database-error.txt"), ex.ToString());
