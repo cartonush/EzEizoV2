@@ -164,6 +164,17 @@ public sealed partial class NativeWindow : Form
         BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254),
         ForeColor = Color.FromArgb(21, 43, 64)
     };
+    private static Panel DetailTile(string title, string value, int width = 176)
+    {
+        var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
+            Margin = new Padding(0, 0, 10, 10), Padding = new Padding(10) };
+        tile.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 25,
+            ForeColor = Muted, Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.MiddleRight });
+        tile.Controls.Add(new Label { Text = value, Dock = DockStyle.Bottom, Height = 31,
+            ForeColor = Navy, Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleRight, AutoEllipsis = true });
+        return tile;
+    }
     private void CenterCard()
     {
         if (activeCard is null || activeCard.IsDisposed) return;
@@ -173,8 +184,9 @@ public sealed partial class NativeWindow : Form
     }
     private void Present(FlowLayoutPanel stack, bool loading = false)
     {
-        foreach (Control previous in content.Controls) previous.Dispose();
+        var previousControls = content.Controls.Cast<Control>().ToArray();
         content.Controls.Clear();
+        foreach (var previous in previousControls) previous.Dispose();
         var card = new NativeCard { Padding = new Padding(3) };
         stack.Dock = DockStyle.Fill;
         card.Controls.Add(stack);
@@ -502,12 +514,41 @@ public sealed partial class NativeWindow : Form
             var stack = Stack();
             stack.Controls.Add(Button("חזרה לרשימה", async (_, _) => await OpenList(page)));
             var sheet = page == "issues" ? doc["sheet"] ?? doc : doc;
+            stack.Controls.Add(Label("פרטי אירוע", 29));
             stack.Controls.Add(Label($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}", 60, true));
-            foreach (var (title, key) in new[] { ("טייסת", "squadron"), ("דת״ק", "shelter"), ("מטוס", "aircraft"), ("מערכת", "systemName"), ("תיאור תקלה", "fault"), ("הערות מנהל", "managerNotes") })
-                if (sheet[key] is not null) stack.Controls.Add(Label($"{title}: {sheet[key]}", key == "fault" ? 75 : 38));
+            if (doc["createdAt"] is not null)
+                stack.Controls.Add(Label($"שעת פתיחה: {doc["createdAt"]}     שעת סגירה: {doc["reviewedAt"] ?? doc["completedAt"] ?? "—"}", 46));
+            var details = new FlowLayoutPanel { Width = 780, Height = page == "issues" ? 165 : 84,
+                WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
+            foreach (var (title, key) in new[] { ("טייסת", "squadron"), ("דת״ק", "shelter"), ("מספר מטוס", "aircraft"),
+                       ("קוד מערכת", "systemCode"), ("שם מערכת", "systemName"), ("חליפת ל״א", "ewSystem") })
+                if (sheet[key] is not null) details.Controls.Add(DetailTile(title, sheet[key]?.ToString() ?? ""));
+            stack.Controls.Add(details);
+            if (sheet["fault"] is not null)
+            {
+                stack.Controls.Add(Label("תיאור תקלה", 35, true));
+                stack.Controls.Add(Label(sheet["fault"]?.ToString() ?? "", 76));
+            }
+            if (sheet["managerNotes"] is not null)
+            {
+                stack.Controls.Add(Label("הערות מנהל", 35, true));
+                stack.Controls.Add(Label(sheet["managerNotes"]?.ToString() ?? "", 68));
+            }
             if (page == "keys")
-                foreach (var row in doc["rows"] as JsonArray ?? new())
-                    stack.Controls.Add(Label($"מטוס {row?["aircraft"]} · ארז כחול: {row?["blue"]} · שחק: {row?["shach"]}"));
+            {
+                var rows = doc["rows"] as JsonArray ?? new();
+                var grid = new DataGridView { Width = 740, Height = Math.Min(300, 45 + rows.Count * 38),
+                    ReadOnly = true, RowHeadersVisible = false, AllowUserToAddRows = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, BackgroundColor = Color.White };
+                grid.Columns.Add("aircraft", "מספר מטוס");
+                grid.Columns.Add("blue", "ארז כחול");
+                grid.Columns.Add("shach", "שחק");
+                grid.Columns.Add("notes", "הערות");
+                foreach (var row in rows)
+                    grid.Rows.Add(row?["aircraft"]?.ToString(), row?["blue"]?.ToString() == "true" ? "✓" : "—",
+                        row?["shach"]?.ToString() == "true" ? "✓" : "—", row?["notes"]?.ToString());
+                stack.Controls.Add(grid);
+            }
             await AddDocumentActions(stack, page, doc);
             Present(stack);
             status.Text = "הטופס נטען מתוך Access";
