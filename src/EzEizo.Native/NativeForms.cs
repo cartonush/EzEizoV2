@@ -80,6 +80,20 @@ public sealed partial class NativeWindow
         return pad;
     }
     private static void Section(FlowLayoutPanel stack, string title) => stack.Controls.Add(Label(title, 55, true));
+    private static FlowLayoutPanel EditorBar(FlowLayoutPanel stack)
+    {
+        var bar = new FlowLayoutPanel { Width = 745, Height = 65, WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight, BackColor = Color.White,
+            Padding = new Padding(8, 8, 8, 0), Margin = new Padding(0, 0, 0, 15) };
+        stack.Controls.Add(bar);
+        return bar;
+    }
+    private static Label EditorStatus() => new()
+    {
+        Text = "הנתונים נשמרים במסד המקומי לאחר לחיצה על שמירה",
+        Width = 335, Height = 44, TextAlign = ContentAlignment.MiddleCenter,
+        ForeColor = Navy, Font = new Font("Segoe UI", 9)
+    };
 
     private async Task AddDocumentActions(FlowLayoutPanel stack, string page, JsonNode doc)
     {
@@ -206,6 +220,7 @@ public sealed partial class NativeWindow
             Object(doc["closed"]?["state"]?.DeepClone());
         var controls = new Dictionary<string, NativeSignature>();
         Section(stack, "טופס טיפול בתקלה");
+        var faultBar = EditorBar(stack);
         controls["safetyTechnicianSignature"] = Signature(stack, "בדיקת המטוס בטוח לאחזקה טרם התהליך: אין קסטות מוץ / נורים וכפט״ים מורכבים על המטוס. חתימת הטכנאי", state, "safetyTechnicianSignature", true);
         Field(stack, "תיאור תיקון", state, "repair", true);
         stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
@@ -268,12 +283,13 @@ public sealed partial class NativeWindow
         controls["technicianDeclarationSignature"] = Signature(stack,
             "הנני מאשר שכל הפרטים הרשומים שלמים, נכונים ומדויקים. הנני מאשר שעדכנתי במערכות ממוכנות / בספר המטוס את מספרי המכשירים שפורקו והורכבו. הנני מאשר שהעברתי את המכשירים התקולים בצירוף תגי בר תיקון ממולאים בצורה מושלמת. הדף בלשון זכר אך מתייחס לשני המינים. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
-        stack.Controls.Add(Button("שמירה", async (_, _) =>
+        faultBar.Controls.Add(Button("שמירה", async (_, _) =>
         {
             try { CaptureSignatures(); await Work(() => { store.SaveDraft(key, state.ToJsonString(), user); return true; }); status.Text = "הטיוטה נשמרה במסד המשותף."; }
             catch (Exception ex) { Error(ex); }
         }));
-        stack.Controls.Add(Button("איפוס טופס", async (_, _) =>
+        faultBar.Controls.Add(EditorStatus());
+        faultBar.Controls.Add(Button("איפוס טופס", async (_, _) =>
         {
             if (MessageBox.Show(this, "לנקות את כל נתוני הטיוטה?", "איפוס", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
             try { await Work(() => { store.RemoveDraft(key, user); return true; }); await ReleaseForm(); await OpenDocument("issues", id); }
@@ -420,6 +436,7 @@ public sealed partial class NativeWindow
         while (completed.Count < rows.Count) completed.Add(new JsonObject());
         if (work["aircraft"] is null) work["aircraft"] = completed;
         Section(stack, "רשימת מטוסים להטענה");
+        var keyBar = EditorBar(stack);
         for (var i = 0; i < rows.Count; i++)
         {
             var index = i; var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
@@ -474,12 +491,13 @@ public sealed partial class NativeWindow
         takenDeclaration.Visible = takenToggle.Checked;
         takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
         void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
-        stack.Controls.Add(Button("שמירה", async (_, _) =>
+        keyBar.Controls.Add(Button("שמירה", async (_, _) =>
         {
             try { Capture(); await Work(() => store.Update("keyLoads", id, "draft", Json(new JsonObject { ["session"] = activeSession, ["work"] = work.DeepClone() }), user)); status.Text = "הטיוטה נשמרה במסד המשותף."; }
             catch (Exception ex) { Error(ex); }
         }));
-        stack.Controls.Add(Button("איפוס טופס", async (_, _) =>
+        keyBar.Controls.Add(EditorStatus());
+        keyBar.Controls.Add(Button("איפוס טופס", async (_, _) =>
         {
             if (MessageBox.Show(this, "לנקות את מילוי הטופס?", "איפוס", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
             try { await Work(() => store.Update("keyLoads", id, "draft", Json(new JsonObject { ["session"] = activeSession, ["work"] = new JsonObject() }), user)); await ReleaseForm(); await OpenDocument("keys", id); }
