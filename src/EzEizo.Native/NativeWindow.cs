@@ -182,8 +182,13 @@ public sealed partial class NativeWindow : Form
         if (activeCard is null || activeCard.IsDisposed) return;
         var desired = currentPage == "login" ? 600 : 850;
         activeCard.Width = Math.Min(desired, Math.Max(520, content.ClientSize.Width - 32));
-        activeCard.Height = Math.Max(200, content.ClientSize.Height - 20);
-        activeCard.Location = new Point((content.ClientSize.Width - activeCard.Width) / 2, 10);
+        var desiredHeight = currentPage switch
+        {
+            "login" => 455, "home" => 520, "management" => 470,
+            "issues" or "keys" or "queue" => 530, _ => content.ClientSize.Height - 32
+        };
+        activeCard.Height = Math.Min(Math.Max(200, desiredHeight), content.ClientSize.Height - 32);
+        activeCard.Location = new Point((content.ClientSize.Width - activeCard.Width) / 2, 16);
     }
     private void Present(FlowLayoutPanel stack, bool loading = false)
     {
