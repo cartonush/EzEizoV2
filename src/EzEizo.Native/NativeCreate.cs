@@ -199,12 +199,16 @@ public sealed partial class NativeWindow
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
             Section(stack, "הטענת מפתחות");
-            var fields = FieldGrid(); fields.Height = 285; stack.Controls.Add(fields);
+            var fields = FieldGrid(); fields.Height = 248; stack.Controls.Add(fields);
             var date = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Value = DateTime.Today };
             var dateCell = FieldCell(); fields.Controls.Add(dateCell); AddField(dateCell, "תאריך", date);
             var time = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
             var timeCell = FieldCell(); fields.Controls.Add(timeCell); AddField(timeCell, "שעה", time);
-            timeCell.Controls.Add(Button("השעה עכשיו", (_, _) => time.Value = DateTime.Now)); timeCell.Height = 154;
+            var nowButton = Button("השעה עכשיו", (_, _) => time.Value = DateTime.Now);
+            nowButton.Height = 32;
+            nowButton.Margin = Padding.Empty;
+            timeCell.Controls.Add(nowButton);
+            timeCell.Height = 129;
             var squadCell = FieldCell(); fields.Controls.Add(squadCell);
             var squadron = Choice(squadCell, "טייסת", ["101", "105", "109"]);
             var shelterCell = FieldCell(); fields.Controls.Add(shelterCell);
