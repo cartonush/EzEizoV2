@@ -107,6 +107,10 @@ internal sealed class NativeHeader : Panel
 {
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Manager { get; set; }
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string Heading { get; set; } = "";
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string Subtitle { get; set; } = "";
     public NativeHeader()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
@@ -120,6 +124,22 @@ internal sealed class NativeHeader : Panel
             Manager ? Color.FromArgb(18, 82, 120) : Color.FromArgb(16, 58, 93),
             LinearGradientMode.Horizontal);
         e.Graphics.FillRectangle(gradient, ClientRectangle);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        var left = Width - 595;
+        const TextFormatFlags flags = TextFormatFlags.RightToLeft | TextFormatFlags.Right |
+            TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+        using var eyebrowFont = new Font("Segoe UI", 9, FontStyle.Bold);
+        using var headingFont = new Font("Segoe UI", 17, FontStyle.Bold);
+        using var subtitleFont = new Font("Segoe UI", 10);
+        TextRenderer.DrawText(e.Graphics, "כנף 1 - טייסת תחזוקה", eyebrowFont,
+            new Rectangle(left, 5, 500, 17), Color.FromArgb(176, 203, 221), flags);
+        TextRenderer.DrawText(e.Graphics, Heading, headingFont,
+            new Rectangle(left, 23, 500, 27), Color.White, flags);
+        TextRenderer.DrawText(e.Graphics, Subtitle, subtitleFont,
+            new Rectangle(left, 52, 500, 18), Color.FromArgb(195, 216, 229), flags);
     }
 }
 
