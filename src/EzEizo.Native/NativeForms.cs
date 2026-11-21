@@ -261,7 +261,10 @@ public sealed partial class NativeWindow
             toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
         }
         ToolReviews(stack, state, controls);
-        TakenDeclaration(stack, state, controls);
+        var takenDeclaration = TakenDeclaration(stack, state, controls);
+        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
+        takenDeclaration.Visible = takenToggle.Checked;
+        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
         controls["technicianDeclarationSignature"] = Signature(stack,
             "הנני מאשר שכל הפרטים הרשומים שלמים, נכונים ומדויקים. הנני מאשר שעדכנתי במערכות ממוכנות / בספר המטוס את מספרי המכשירים שפורקו והורכבו. הנני מאשר שהעברתי את המכשירים התקולים בצירוף תגי בר תיקון ממולאים בצורה מושלמת. הדף בלשון זכר אך מתייחס לשני המינים. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
@@ -395,13 +398,16 @@ public sealed partial class NativeWindow
         stack.Controls.Add(time);
         stack.Controls.Add(Button("השעה עכשיו", (_, _) => { time.Value = DateTime.Now; state[key] = time.Value.ToString("HH:mm"); }));
     }
-    private static void TakenDeclaration(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
+    private static FlowLayoutPanel TakenDeclaration(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
     {
-        Section(stack, "חתימה על קשיחים שנלקחו");
-        Field(stack, "שם מלא", state, "takenFullName");
-        var number = Field(stack, "מספר אישי", state, "takenPersonalNumber"); Numeric(number);
-        Field(stack, "דרגה", state, "takenRank");
-        pads["takenSignature"] = Signature(stack, "חתימה", state, "takenSignature", true);
+        var group = new FlowLayoutPanel { Width = 750, Height = 500, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        Section(group, "חתימה על קשיחים שנלקחו");
+        Field(group, "שם מלא", state, "takenFullName");
+        var number = Field(group, "מספר אישי", state, "takenPersonalNumber"); Numeric(number);
+        Field(group, "דרגה", state, "takenRank");
+        pads["takenSignature"] = Signature(group, "חתימה", state, "takenSignature", true);
+        stack.Controls.Add(group);
+        return group;
     }
 
     private async Task KeyEditor(FlowLayoutPanel stack, JsonNode doc, Account user)
@@ -463,7 +469,10 @@ public sealed partial class NativeWindow
             var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
         }
         ToolReviews(stack, work, pads);
-        TakenDeclaration(stack, work, pads);
+        var takenDeclaration = TakenDeclaration(stack, work, pads);
+        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
+        takenDeclaration.Visible = takenToggle.Checked;
+        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
         void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
         stack.Controls.Add(Button("שמירה", async (_, _) =>
         {
