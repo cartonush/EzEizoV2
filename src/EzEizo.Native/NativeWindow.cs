@@ -7,6 +7,7 @@ namespace EzEizo.Core;
 // It is built alongside the existing release until every workflow has been ported and tested.
 public sealed partial class NativeWindow : Form
 {
+    internal string DiagnosticPage => currentPage;
     private static readonly Color Navy = Color.FromArgb(13, 48, 75);
     private static readonly Color Blue = Color.FromArgb(28, 109, 153);
     private static readonly Color Pale = Color.FromArgb(238, 245, 248);
@@ -159,8 +160,9 @@ public sealed partial class NativeWindow : Form
         if (!silent) Loading(page == "issues" ? "טוען תקלות…" : "טוען הטענות מפתחות…");
         try
         {
+            var version = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
             var data = await Work(() => store.List(page == "issues" ? "issues" : "keyLoads", user));
-            lastListVersion = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
+            lastListVersion = version;
             if (account != user || silent && currentPage != page) return;
             currentPage = page;
             refreshTimer.Start();
