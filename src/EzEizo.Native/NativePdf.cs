@@ -10,6 +10,12 @@ internal static class NativePdf
         string[]? Cells = null, bool TableHeader = false);
     private static string V(JsonNode? node, string name) => node?[name]?.ToString() ?? "";
     private static bool B(JsonNode? node, string name) => V(node, name).Equals("true", StringComparison.OrdinalIgnoreCase);
+    private static string DateText(string value) => DateTimeOffset.TryParse(value, out var date)
+        ? date.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : value;
+    private static string StatusText(JsonNode item) => V(item, "status") switch
+    {
+        "open" => "פתוח", "pendingReview" => "ממתין לסגירה", "closed" => "סגור", var value => value
+    };
 
     private static string FileName(JsonNode item)
     {
@@ -65,7 +71,7 @@ internal static class NativePdf
             var sheet = item["sheet"] ?? item;
             var aircraft = V(sheet, "aircraft");
             if (aircraft.Length == 0) aircraft = string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft")));
-            lines.Add(new($"{(item["sheet"] is null ? "הטענת מפתחות" : "תקלה")} {V(item, "serial")}   ·   טייסת {V(sheet, "squadron")}   ·   מטוס {aircraft}   ·   {V(item, "status")}   ·   {V(item, "createdAt")}"));
+            lines.Add(new($"{(item["sheet"] is null ? "הטענת מפתחות" : "תקלה")} {V(item, "serial")}   ·   טייסת {V(sheet, "squadron")}   ·   מטוס {aircraft}   ·   {StatusText(item)}   ·   {DateText(V(item, "createdAt"))}"));
         }
         Save(lines, path);
         return path;
@@ -75,11 +81,13 @@ internal static class NativePdf
         var key = item["sheet"] is null;
         var source = item["sheet"] ?? item;
         var state = key ? item["work"] ?? item["workDraft"] : item["closed"]?["state"];
+        var closedAt = V(item, "reviewedAt");
+        if (closedAt.Length == 0) closedAt = V(item, "completedAt");
         var lines = new List<Part>
         {
             new($"{(key ? "הטענת מפתחות" : "דף טיפול בתקלה")} {V(item, "serial")}", Heading: true),
-            new($"טייסת: {V(source, "squadron")}     דת״ק: {V(source, "shelter")}     סטטוס: {V(item, "status")}"),
-            new($"שעת פתיחה: {V(item, "createdAt")}     שעת סגירה: {V(item, "reviewedAt")}{V(item, "completedAt")}")
+            new($"טייסת: {V(source, "squadron")}     דת״ק: {V(source, "shelter")}     סטטוס: {StatusText(item)}"),
+            new($"שעת פתיחה: {DateText(V(item, "createdAt"))}     שעת סגירה: {DateText(closedAt)}")
         };
         if (key)
         {
@@ -118,6 +126,12 @@ internal static class NativePdf
                 if (spec.fields.Any(field => V(row, field.key).Length > 0))
                     lines.Add(new("", Cells: spec.fields.Select(x => V(row, x.key)).ToArray()));
         }
+        if (B(state, "takenEnabled"))
+        {
+            lines.Add(new("חתימה על קשיחים שנלקחו", Heading: true));
+            lines.Add(new($"שם מלא: {V(state, "takenFullName")}     מספר אישי: {V(state, "takenPersonalNumber")}     דרגה: {V(state, "takenRank")}"));
+            lines.Add(new("חתימה", V(state, "takenSignature")));
+        }
         foreach (var (title, keys) in new[]
         {
             ("ביקורת כניסה", new[] { "entryTechnicianSignature", "entryInspectorSignature" }),
@@ -136,6 +150,12 @@ internal static class NativePdf
                     "finalLeadSignature" => "חתימת ר״צ / מ״ע",
                     _ => name
                 }, V(state, name)));
+            if (title == "ביקורת כניסה")
+                lines.Add(new("מספר אישי של הבודק: " + V(state, "entryInspectorNumber")));
+            if (title == "ביקורת במהלך העבודה")
+                lines.Add(new($"מספר אישי של הבודק: {V(state, "interimInspectorNumber")}     שם פ. כלים / מ״ע: {V(state, "interimToolsName")}"));
+            if (title == "ביקורת בסיום העבודה")
+                lines.Add(new($"מספר אישי של הבודק: {V(state, "finalInspectorNumber")}     שם ר״צ / מ״ע: {V(state, "finalLeadName")}     שעת עזיבה: {V(state, "departureTime")}"));
         }
         if (!key) lines.Add(new("הצהרת הטכנאי", V(state, "technicianDeclarationSignature")));
         if (V(item, "reviewerSignature").Length > 0) lines.Add(new("חתימת בודק הדף", V(item, "reviewerSignature")));
