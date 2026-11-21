@@ -30,6 +30,7 @@ public sealed partial class NativeWindow : Form
     private string searchTerm = "";
     private string statusFilter = "הכל";
     private string listSection = "";
+    private Database.TechnicianRecord? historyPerson;
     private int? lastListVersion;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 10000 };
 
@@ -65,8 +66,10 @@ public sealed partial class NativeWindow : Form
         };
         backButton.Click += async (_, _) =>
         {
-            if (currentPage is "document" or "fault-editor" or "key-editor" or "edit-definition") await OpenList(documentSection);
+            if (currentPage == "document" && historyPerson is not null) await OpenUserHistory(historyPerson);
+            else if (currentPage is "document" or "fault-editor" or "key-editor" or "edit-definition") await OpenList(documentSection);
             else if (currentPage is "new-key" or "key-history") await OpenList("keys");
+            else if (currentPage == "user-history") await OpenUsers();
             else if (currentPage is "users" or "constants" or "reports") await OpenManagementHome();
             else await OpenList("issues");
         };
@@ -229,7 +232,7 @@ public sealed partial class NativeWindow : Form
         {
             "home" => 0, "issues" or "new-fault" or "fault-editor" => 1,
             "keys" or "new-key" or "key-editor" or "key-history" => 2,
-            "management" or "users" or "constants" or "reports" => 3,
+            "management" or "users" or "user-history" or "constants" or "reports" => 3,
             "document" or "edit-definition" => documentSection == "keys" ? 2 : 1, _ => -1
         };
         for (var i = 0; i < navButtons.Count; i++)
@@ -579,18 +582,19 @@ public sealed partial class NativeWindow : Form
             var users = await Work(() => database.AllTechnicians());
             currentPage = "users";
             var stack = Stack();
-            stack.Controls.Add(Label("ניהול משתמשים", 55, true));
+            Section(stack, "ניהול משתמשים");
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 780, Height = 320, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var list = new FlowLayoutPanel { Width = 950, Height = 320, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
             {
                 list.Controls.Clear();
                 foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
                 {
-                    var row = new FlowLayoutPanel { Width = 745, Height = 54, WrapContents = false };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 310, Height = 45, TextAlign = ContentAlignment.MiddleLeft });
+                    var row = new FlowLayoutPanel { Width = 850, Height = 54, WrapContents = false };
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 280, Height = 45, TextAlign = ContentAlignment.MiddleLeft });
+                    row.Controls.Add(Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)));
                     row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
@@ -607,7 +611,7 @@ public sealed partial class NativeWindow : Form
             }
             search.TextChanged += (_, _) => Render();
             Render();
-            stack.Controls.Add(Label("יצירת טכנאי", 45, true));
+            Section(stack, "יצירת טכנאי");
             var name = Input("שם מלא", 100); stack.Controls.Add(name);
             var number = Input("מספר אישי · 7 ספרות", 7); stack.Controls.Add(number);
             var password = Input("סיסמה · 6 ספרות", 6, true); stack.Controls.Add(password);
@@ -628,9 +632,45 @@ public sealed partial class NativeWindow : Form
         catch (Exception ex) { Error(ex); }
     }
 
+    private async Task OpenUserHistory(Database.TechnicianRecord person)
+    {
+        if (role != AppRole.Manager || account is null) return;
+        var user = account;
+        Loading("טוען טפסים של טכנאי…");
+        try
+        {
+            var (issues, keys) = await Work(() => (store.List("issues", user), store.List("keyLoads", user)));
+            currentPage = "user-history";
+            historyPerson = person;
+            var stack = Stack();
+            Section(stack, "טפסים סגורים · " + person.Name);
+            var documents = issues.Where(x => V(x, "status") == "closed" &&
+                    (x["assigneeUids"] as JsonArray)?.Any(id => id?.ToString() == person.Id) == true)
+                .Select(x => (page: "issues", doc: x))
+                .Concat(keys.Where(x => V(x, "status") == "closed" &&
+                    (x["teamUids"] as JsonArray)?.Any(id => id?.ToString() == person.Id) == true)
+                    .Select(x => (page: "keys", doc: x)))
+                .OrderByDescending(x => V(x.doc, "completedAt")).ToArray();
+            stack.Controls.Add(Label($"{documents.Length} טפסים סגורים · מספרי הטפסים נשמרים גם לאחר הסרת המשתמש.", 48));
+            foreach (var (page, doc) in documents)
+            {
+                var id = V(doc, "id");
+                var serial = V(doc, "serial");
+                var button = (NativeButton)Button($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · {DisplayDate(V(doc, "completedAt"))}",
+                    async (_, _) => await OpenDocument(page, id));
+                button.Secondary = true; button.Width = 800; button.Height = 58;
+                stack.Controls.Add(button);
+            }
+            Present(stack);
+            status.Text = $"היסטוריית הטפסים של {person.Name}";
+        }
+        catch (Exception ex) { Error(ex); }
+    }
+
     private async Task OpenDocument(string page, string id)
     {
         if (account is null) return;
+        if (currentPage != "user-history") historyPerson = null;
         refreshTimer.Stop();
         Loading("טוען טופס…");
         try
