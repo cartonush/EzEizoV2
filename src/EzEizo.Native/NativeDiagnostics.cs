@@ -69,6 +69,37 @@ public static class NativeDiagnostics
         window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
         screenshot.Save(Path.Combine(AppContext.BaseDirectory, file));
     }
+    public static void VerifyTechnicianUi()
+    {
+        new Database().CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        using var window = new NativeWindow(AppRole.Mechanic);
+        var stage = 0;
+        var started = DateTime.UtcNow;
+        string? failure = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 150 };
+        timer.Tick += (_, _) =>
+        {
+            try
+            {
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(45))
+                { failure = "Technician UI timed out on " + window.DiagnosticPage; window.Close(); return; }
+                var controls = Descendants(window).ToArray();
+                if (stage == 0 && window.DiagnosticPage == "login")
+                {
+                    Capture(window, "native-technician-login.png");
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = "7654321";
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = "123456";
+                    controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
+                    stage = 1;
+                }
+                if (stage == 1 && window.DiagnosticPage == "queue")
+                { Capture(window, "native-technician-queue.png"); stage = 2; window.Close(); }
+            }
+            catch (Exception ex) { failure = ex.ToString(); window.Close(); }
+        };
+        timer.Start(); Application.Run(window);
+        if (stage != 2) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
+    }
     public static void VerifyPdf()
     {
         var db = new Database();
