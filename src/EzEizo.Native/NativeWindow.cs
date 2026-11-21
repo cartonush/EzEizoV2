@@ -155,13 +155,16 @@ public sealed partial class NativeWindow : Form
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
-            var nav = new FlowLayoutPanel { Width = 780, Height = 65, WrapContents = false, FlowDirection = FlowDirection.LeftToRight };
+            var nav = new FlowLayoutPanel { Width = 780, Height = role == AppRole.Manager ? 116 : 65, WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
             nav.Controls.Add(Button("תקלות", async (_, _) => await OpenList("issues")));
             nav.Controls.Add(Button("מפתחות", async (_, _) => await OpenList("keys")));
+            if (role == AppRole.Manager) nav.Controls.Add(Button(page == "issues" ? "פתיחת תקלה" : "הטענת מפתחות", async (_, _) =>
+            {
+                if (page == "issues") await ShowCreateFault(); else await ShowCreateKey();
+            }));
             if (role == AppRole.Manager) nav.Controls.Add(Button("משתמשים", async (_, _) => await OpenUsers()));
             nav.Controls.Add(Button("רענון", async (_, _) => await OpenList(page)));
             nav.Controls.Add(Button("התנתק", async (_, _) => { await ReleaseForm(); account = null; Login(); }));
-            nav.Width = 970;
             stack.Controls.Add(nav);
             stack.Controls.Add(Label(page == "issues" ? "תקלות" : "הטענות מפתחות", 55, true));
             var search = Input("חפש מספר סידורי", 20);
