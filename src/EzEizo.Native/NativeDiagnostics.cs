@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace EzEizo.Core;
 
 public static class NativeDiagnostics
@@ -12,6 +14,9 @@ public static class NativeDiagnostics
     }
     public static void VerifyUi()
     {
+        // The packaged template has only a manager. Add a throwaway technician to
+        // exercise the user list and history page without changing the ZIP template.
+        new Database().CreateAccount("טכנאי תצוגה", "7412589", "mechanic", "123456");
         using var window = new NativeWindow(AppRole.Manager);
         var stage = 0;
         var started = DateTime.UtcNow;
@@ -47,6 +52,8 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 3 && window.DiagnosticPage == "new-fault")
                 {
+                    foreach (var title in new[] { "נתוני התקלה", "תיאור תקלה", "קבועים", "12 משימות חובה", "פתיחת התקלה" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title)) throw new InvalidOperationException("Missing fault section: " + title);
                     Capture(window, "native-new-fault.png");
                     controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 4;
                 }
@@ -57,7 +64,22 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 5 && window.DiagnosticPage == "new-key")
                 {
+                    foreach (var title in new[] { "הטענת מפתחות", "רשימת הטענה", "משימות לביצוע" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title)) throw new InvalidOperationException("Missing key section: " + title);
+                    var keyGrid = controls.OfType<DataGridView>().Single(x => x.Columns.Contains("blue") && x.Columns.Contains("shach"));
+                    if (keyGrid.Columns["blue"].FillWeight != keyGrid.Columns["shach"].FillWeight)
+                        throw new InvalidOperationException("Key check columns must have equal width.");
                     Capture(window, "native-new-key.png");
+                    var page = controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.AutoScroll && x.BackColor == Color.FromArgb(242, 246, 248));
+                    if (page is not null)
+                    {
+                        if (page.HorizontalScroll.Visible)
+                            throw new InvalidOperationException($"Key form has unwanted horizontal scrolling: {page.DisplayRectangle.Width} > {page.ClientSize.Width}");
+                        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height / 2);
+                        window.Update(); Capture(window, "native-new-key-middle.png");
+                        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height);
+                        window.Update(); Capture(window, "native-new-key-bottom.png");
+                    }
                     controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 6;
                 }
                 else if (stage == 6 && window.DiagnosticPage == "management")
@@ -68,19 +90,28 @@ public static class NativeDiagnostics
                 else if (stage == 7 && window.DiagnosticPage == "users")
                 {
                     Capture(window, "native-users.png");
-                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 8;
+                    controls.OfType<Button>().First(x => x.Text == "טפסים סגורים").PerformClick(); stage = 8;
                 }
-                else if (stage == 8 && window.DiagnosticPage == "management")
-                { controls.OfType<Button>().First(x => x.Text.StartsWith("הפקת דוחות")).PerformClick(); stage = 9; }
-                else if (stage == 9 && window.DiagnosticPage == "reports")
+                else if (stage == 8 && window.DiagnosticPage == "user-history")
+                {
+                    if (!controls.OfType<Label>().Any(x => x.Text.Contains("טפסים סגורים")))
+                        throw new InvalidOperationException("Per-technician closed forms are missing.");
+                    Capture(window, "native-user-history.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 9;
+                }
+                else if (stage == 9 && window.DiagnosticPage == "users")
+                { controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 10; }
+                else if (stage == 10 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("הפקת דוחות")).PerformClick(); stage = 11; }
+                else if (stage == 11 && window.DiagnosticPage == "reports")
                 {
                     Capture(window, "native-reports.png");
-                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 10;
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 12;
                 }
-                else if (stage == 10 && window.DiagnosticPage == "management")
-                { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 11; }
-                else if (stage == 11 && window.DiagnosticPage == "constants")
-                { Capture(window, "native-constants.png"); stage = 12; window.Close(); }
+                else if (stage == 12 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 13; }
+                else if (stage == 13 && window.DiagnosticPage == "constants")
+                { Capture(window, "native-constants.png"); stage = 14; window.Close(); }
             }
             catch (Exception ex)
             {
@@ -92,7 +123,7 @@ public static class NativeDiagnostics
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 12) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 14) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
     }
     private static void Capture(Form window, string file)
     {
@@ -114,7 +145,25 @@ public static class NativeDiagnostics
     }
     public static void VerifyTechnicianUi()
     {
-        new Database().CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        var db = new Database();
+        var technician = db.CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        var second = db.CreateAccount("טכנאי בדיקה נוסף", "7654322", "mechanic", "123456");
+        var initial = Path.Combine(Database.DataDirectory, "initial-manager.txt");
+        var secret = File.ReadAllLines(initial).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
+        var manager = db.Authenticate("9862436", secret, AppRole.Manager)
+            ?? throw new InvalidOperationException("The manager template is missing.");
+        var store = new OfflineStore();
+        using var issue = JsonDocument.Parse("""{"fault":"בדיקת ממשק תקלה","squadron":"105","shelter":"14","aircraft":"603","systemName":"מכם | FCR","systemCode":"74A","constants":{},"actions":[]}""");
+        using var assignment = JsonDocument.Parse(JsonSerializer.Serialize(new[] { new { uid = technician.Id, name = technician.Name } }));
+        store.CreateIssues(issue.RootElement, assignment.RootElement, manager);
+        using var key = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            squadron = "105", shelter = "14", date = DateTime.Today.ToString("yyyy-MM-dd"),
+            time = DateTime.Now.ToString("HH:mm"), period = "11-12/26",
+            teamUids = new[] { technician.Id, second.Id }, teamNames = new[] { technician.Name, second.Name },
+            rows = new[] { new { aircraft = "603", blue = true, shach = true, notes = "בדיקת ממשק" } }
+        }));
+        store.CreateKey(key.RootElement, manager);
         using var window = new NativeWindow(AppRole.Mechanic);
         var stage = 0;
         var started = DateTime.UtcNow;
@@ -124,7 +173,7 @@ public static class NativeDiagnostics
         {
             try
             {
-                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(45))
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(90))
                 { failure = "Technician UI timed out on " + window.DiagnosticPage; window.Close(); return; }
                 var controls = Descendants(window).ToArray();
                 if (stage == 0 && window.DiagnosticPage == "login")
@@ -136,12 +185,49 @@ public static class NativeDiagnostics
                     stage = 1;
                 }
                 else if (stage == 1 && window.DiagnosticPage == "queue")
-                { Capture(window, "native-technician-queue.png"); stage = 2; window.Close(); }
+                {
+                    Capture(window, "native-technician-queue.png");
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("תקלה ")).PerformClick(); stage = 2;
+                }
+                else if (stage == 2 && window.DiagnosticPage == "fault-editor")
+                {
+                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות אחזקה", "יחידות שפורקו והורכבו", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title))
+                            throw new InvalidOperationException("Fault editor is missing: " + title);
+                    Capture(window, "native-technician-fault.png");
+                    CaptureScrolledPage(window, "native-technician-fault-bottom.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 3;
+                }
+                else if (stage == 3 && window.DiagnosticPage == "queue")
+                {
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("הטענת מפתחות ")).PerformClick(); stage = 4;
+                }
+                else if (stage == 4 && window.DiagnosticPage == "key-editor")
+                {
+                    var grid = controls.OfType<DataGridView>().FirstOrDefault(x => x.Columns.Contains("blue") && x.Columns.Contains("shach"));
+                    if (grid?.Rows.Count != 1) throw new InvalidOperationException("Technician key table is missing or malformed.");
+                    foreach (var title in new[] { "ביצוע הטענת מפתחות", "פעולות לביצוע", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title))
+                            throw new InvalidOperationException("Key editor is missing: " + title);
+                    Capture(window, "native-technician-key.png");
+                    CaptureScrolledPage(window, "native-technician-key-bottom.png");
+                    stage = 5; window.Close();
+                }
             }
             catch (Exception ex) { failure = ex.ToString(); window.Close(); }
         };
         timer.Start(); Application.Run(window);
-        if (stage != 2) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
+        if (stage != 5) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
+    }
+    private static void CaptureScrolledPage(NativeWindow window, string file)
+    {
+        var page = Descendants(window).OfType<FlowLayoutPanel>()
+            .FirstOrDefault(x => x.AutoScroll && x.BackColor == Color.FromArgb(242, 246, 248));
+        if (page is null) throw new InvalidOperationException("The document has no scrollable card page.");
+        if (page.HorizontalScroll.Visible)
+            throw new InvalidOperationException("The document has unwanted horizontal scrolling.");
+        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height);
+        window.Update(); Capture(window, file);
     }
     public static void VerifyPdf()
     {

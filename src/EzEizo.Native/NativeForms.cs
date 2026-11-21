@@ -84,7 +84,8 @@ public sealed partial class NativeWindow
     }
     private static void Section(FlowLayoutPanel stack, string title)
     {
-        var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White, Margin = new Padding(0, 12, 0, 8) };
+        var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White,
+            Tag = "section-heading", Margin = new Padding(0, 0, 0, 8) };
         heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
         heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
@@ -173,25 +174,59 @@ public sealed partial class NativeWindow
     {
         var state = page == "issues" ? doc["closed"]?["state"] : doc["work"] ?? doc["workDraft"];
         if (state is null) { stack.Controls.Add(Label("טרם נשמר מילוי של טכנאי בטופס זה.")); return; }
-        Section(stack, "מילוי הטכנאי");
+        Section(stack, page == "issues" ? "טופס טיפול בתקלה" : "ביצוע הטענת מפתחות");
         if (page == "issues")
         {
+            var sheet = doc["sheet"] ?? doc;
+            stack.Controls.Add(Label("תיאור התקלה: " + V(sheet, "fault"), 75));
             stack.Controls.Add(Label("תיאור תיקון: " + V(state, "repair"), 85));
-            stack.Controls.Add(Label("הערת טכנאי: " + V(state, "technicianNote"), 60));
+            stack.Controls.Add(Label("הערות: " + V(sheet, "managerNotes") + " " + V(state, "technicianNote"), 75));
             stack.Controls.Add(Label("שעת הגעה: " + V(state, "arrivalTime") + "     שעת סיום: " + V(state, "completionTime")));
+            var constants = Object(sheet["constants"]);
+            if (constants.Count > 0)
+            {
+                Section(stack, "קבועים לפי מטוס");
+                foreach (var (group, entries) in constants)
+                {
+                    stack.Controls.Add(Label(group, 38, true));
+                    var row = string.Join("     ", (entries as JsonArray ?? new()).Select(x => $"{x?[0]}: {x?[1]}"));
+                    stack.Controls.Add(Label(row, Math.Max(45, 32 * (row.Length / 85 + 1))));
+                }
+            }
         }
         else
         {
             var aircraft = state["aircraft"] as JsonArray ?? new();
             var rows = doc["rows"] as JsonArray ?? new();
+            var grid = new DataGridView { Width = 745, Height = Math.Min(400, 52 + rows.Count * 47),
+                ReadOnly = true, RowHeadersVisible = false, AllowUserToAddRows = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "aircraft", HeaderText = "מס׳ מטוס", FillWeight = 25 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "notes", HeaderText = "הערות", FillWeight = 49 });
             for (var i = 0; i < rows.Count; i++)
-                stack.Controls.Add(Label($"מטוס {V(rows[i], "aircraft")} · ארז כחול: {(i < aircraft.Count && B(aircraft[i], "blueDone") ? "בוצע" : "—")} · שחק: {(i < aircraft.Count && B(aircraft[i], "shachDone") ? "בוצע" : "—")} · הערה: {V(i < aircraft.Count ? aircraft[i] : null, "technicianNote")}", 50));
+            {
+                var work = i < aircraft.Count ? aircraft[i] : null;
+                grid.Rows.Add(V(rows[i], "aircraft"), B(rows[i], "blue") ? B(work, "blueDone") ? "✓" : "□" : "—",
+                    B(rows[i], "shach") ? B(work, "shachDone") ? "✓" : "□" : "—",
+                    V(rows[i], "notes") + " " + V(work, "technicianNote"));
+            }
+            stack.Controls.Add(grid);
+            stack.Controls.Add(Label($"אחזקה נדרשת: הטענת מטוסים במסגרת שינוי מפתחות לחודשים {V(doc, "period")}", 55));
+            stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות EREZ 78 לאחר טעינה ושידור PTT בארז, SAK 7 / 34 בשחק.", 55));
+            stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים: מ.כ 2020 + חרב אש", 48));
         }
         var actions = state["actions"] as JsonArray ?? new();
         var titles = page == "issues" ? NativeCatalog.Actions : NativeCatalog.KeyActions;
         Section(stack, "פעולות אחזקה");
         for (var i = 0; i < titles.Length; i++)
-            stack.Controls.Add(Label($"{i + 1:D2}. {(i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□")} {titles[i]}", 48));
+        {
+            var mark = i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□";
+            if (page == "issues" && i == 10 && V(state, "action11Result") == "notRequired") mark = "X";
+            var time = page == "issues" && i is 1 or 11 ? " · " + V(state, i == 1 ? "arrivalTime" : "completionTime") : "";
+            stack.Controls.Add(Label($"{i + 1:D2}. {mark} {titles[i]}{time}", 48));
+        }
         foreach (var (kind, spec) in NativeCatalog.Tables)
         {
             var rows = state[kind] as JsonArray;
@@ -203,6 +238,23 @@ public sealed partial class NativeWindow
             foreach (var row in rows) grid.Rows.Add(spec.fields.Select(field => V(row, field.key)).ToArray());
             stack.Controls.Add(grid);
         }
+        if (B(state, "toolsEnabled"))
+        {
+            Section(stack, "ביקורות כלים");
+            foreach (var (name, prefix) in new[] { ("entry", "ביקורת כניסה"), ("interim", "ביקורת במהלך העבודה"), ("final", "ביקורת בסיום העבודה") })
+            {
+                if (!B(state, name + "Enabled")) continue;
+                stack.Controls.Add(Label(prefix, 42, true));
+                stack.Controls.Add(Label("מספר אישי של הבודק: " + V(state, name + "InspectorNumber") +
+                    (name == "final" ? "  ·  שעת עזיבה: " + V(state, "departureTime") : ""), 38));
+            }
+        }
+        if (B(state, "takenEnabled"))
+        {
+            Section(stack, "חתימה על קשיחים שנלקחו");
+            stack.Controls.Add(Label($"שם מלא: {V(state, "takenFullName")}   ·   מספר אישי: {V(state, "takenPersonalNumber")}   ·   דרגה: {V(state, "takenRank")}", 44));
+        }
+        Section(stack, "חתימות");
         foreach (var (name, label) in new[]
         {
             ("safetyTechnicianSignature", "בדיקת מטוס בטוח לאחזקה"),
@@ -210,8 +262,10 @@ public sealed partial class NativeWindow
             ("entryInspectorSignature", "ביקורת כניסה · חתימת בודק"),
             ("interimTechnicianSignature", "ביקורת במהלך העבודה · טכנאי"),
             ("interimInspectorSignature", "ביקורת במהלך העבודה · בודק"),
+            ("interimToolsSignature", "ביקורת במהלך העבודה · פ. כלים / מ״ע"),
             ("finalTechnicianSignature", "ביקורת בסיום · טכנאי"),
             ("finalInspectorSignature", "ביקורת בסיום · בודק"),
+            ("finalLeadSignature", "ביקורת בסיום · ר״צ / מ״ע"),
             ("takenSignature", "קשיחים שנלקחו"),
             ("technicianDeclarationSignature", "הצהרת הטכנאי")
         })
@@ -231,9 +285,12 @@ public sealed partial class NativeWindow
         var state = saved is not null ? Object(JsonNode.Parse(saved)) :
             Object(doc["closed"]?["state"]?.DeepClone());
         var controls = new Dictionary<string, NativeSignature>();
-        Section(stack, "טופס טיפול בתקלה");
+        Section(stack, "בדיקת בטיחות המטוס");
         var faultBar = EditorBar(stack);
         controls["safetyTechnicianSignature"] = Signature(stack, "בדיקת המטוס בטוח לאחזקה טרם התהליך: אין קסטות מוץ / נורים וכפט״ים מורכבים על המטוס. חתימת הטכנאי", state, "safetyTechnicianSignature", true);
+        Section(stack, "תקלה ותיקון");
+        stack.Controls.Add(Label("תיאור תקלה", 34, true));
+        stack.Controls.Add(Label(V(sheet, "fault"), 76));
         Field(stack, "תיאור תיקון", state, "repair", true);
         stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
         Field(stack, "הערת טכנאי", state, "technicianNote", true);
@@ -278,20 +335,26 @@ public sealed partial class NativeWindow
                 stack.Controls.Add(box);
             }
         }
+        Section(stack, "יחידות שפורקו והורכבו");
         foreach (var kind in NativeCatalog.Tables.Keys)
         {
-            if (kind == "installed") Section(stack, "יחידות שהורכבו");
+            if (kind == "tools") Section(stack, "כלים");
+            if (kind == "taken") Section(stack, "קשיחים שנלקחו");
+            if (kind == "rejected") Section(stack, "קשיחים שנפסלו");
             var toggle = kind == "installed" ? stack.Controls.OfType<CheckBox>().Last(x => x.Text == "יחידות שפורקו") :
                 Check(stack, NativeCatalog.Tables[kind].title, state, kind == "removed" ? "unitsEnabled" : kind + "Enabled");
             var table = Table(stack, state, kind);
             table.Visible = toggle.Checked;
             toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
+            if (kind == "tools") ToolReviews(stack, state, controls, toggle);
+            if (kind == "taken")
+            {
+                var declaration = TakenDeclaration(stack, state, controls);
+                declaration.Visible = toggle.Checked;
+                toggle.CheckedChanged += (_, _) => declaration.Visible = toggle.Checked;
+            }
         }
-        ToolReviews(stack, state, controls);
-        var takenDeclaration = TakenDeclaration(stack, state, controls);
-        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
-        takenDeclaration.Visible = takenToggle.Checked;
-        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
+        Section(stack, "הצהרת הטכנאי");
         controls["technicianDeclarationSignature"] = Signature(stack,
             "הנני מאשר שכל הפרטים הרשומים שלמים, נכונים ומדויקים. הנני מאשר שעדכנתי במערכות ממוכנות / בספר המטוס את מספרי המכשירים שפורקו והורכבו. הנני מאשר שהעברתי את המכשירים התקולים בצירוף תגי בר תיקון ממולאים בצורה מושלמת. הדף בלשון זכר אך מתייחס לשני המינים. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
@@ -361,8 +424,11 @@ public sealed partial class NativeWindow
         var spec = NativeCatalog.Tables[kind];
         var data = state[kind] as JsonArray ?? new JsonArray();
         if (state[kind] is null) state[kind] = data;
-        var grid = new DataGridView { Width = 740, Height = 185, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
+        var grid = new DataGridView { Width = 740, Height = Math.Min(360, 88 + data.Count * 42), AllowUserToAddRows = true, AllowUserToDeleteRows = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White };
+        grid.RowTemplate.Height = 41; grid.ColumnHeadersHeight = 42;
+        void FitRows() => grid.Height = Math.Min(360, Math.Max(88, grid.ColumnHeadersHeight + grid.Rows.Count * grid.RowTemplate.Height + 5));
+        grid.RowsAdded += (_, _) => FitRows(); grid.RowsRemoved += (_, _) => FitRows();
         foreach (var field in spec.fields)
         {
             if (field.key == "name" && kind is "removed" or "installed")
@@ -388,8 +454,13 @@ public sealed partial class NativeWindow
         return grid;
     }
 
-    private static void ToolReviews(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
+    private static void ToolReviews(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads, CheckBox toolsToggle)
     {
+        var reviews = new FlowLayoutPanel { Width = 745, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Visible = toolsToggle.Checked };
+        toolsToggle.CheckedChanged += (_, _) => reviews.Visible = toolsToggle.Checked;
+        stack.Controls.Add(reviews);
         foreach (var (title, toggle, fields) in new[]
         {
             ("ביקורת כניסה", "entryEnabled", new[] { ("entryTechnicianSignature", "חתימת טכנאי", true), ("entryInspectorSignature", "חתימת בודק", true), ("entryInspectorNumber", "מספר אישי של הבודק", false) }),
@@ -397,8 +468,9 @@ public sealed partial class NativeWindow
             ("ביקורת בסיום העבודה", "finalEnabled", new[] { ("finalTechnicianSignature", "חתימת טכנאי", true), ("finalInspectorNumber", "מספר אישי של הבודק", false), ("finalInspectorSignature", "חתימת בודק", true), ("finalLeadName", "שם ר״צ / מ״ע", false), ("finalLeadSignature", "חתימת ר״צ / מ״ע", true), ("departureTime", "שעת עזיבה", false) })
         })
         {
-            var box = Check(stack, title, state, toggle);
-            var group = new FlowLayoutPanel { Width = 750, Height = fields.Sum(f => f.Item3 ? 220 : 90), AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var box = Check(reviews, title, state, toggle);
+            var group = new FlowLayoutPanel { Width = 750, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (var (key, label, sign) in fields)
                 if (sign) pads[key] = Signature(group, label, state, key, true);
                 else if (key == "departureTime") TimeField(group, label, state, key);
@@ -408,7 +480,7 @@ public sealed partial class NativeWindow
                     if (key.EndsWith("InspectorNumber")) Numeric(input);
                 }
             group.Visible = box.Checked; box.CheckedChanged += (_, _) => group.Visible = box.Checked;
-            stack.Controls.Add(group);
+            reviews.Controls.Add(group);
         }
     }
 
@@ -428,7 +500,8 @@ public sealed partial class NativeWindow
     }
     private static FlowLayoutPanel TakenDeclaration(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
     {
-        var group = new FlowLayoutPanel { Width = 750, Height = 500, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var group = new FlowLayoutPanel { Width = 750, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
         Section(group, "חתימה על קשיחים שנלקחו");
         Field(group, "שם מלא", state, "takenFullName");
         var number = Field(group, "מספר אישי", state, "takenPersonalNumber"); Numeric(number);
@@ -447,20 +520,55 @@ public sealed partial class NativeWindow
         var completed = work["aircraft"] as JsonArray ?? new JsonArray();
         while (completed.Count < rows.Count) completed.Add(new JsonObject());
         if (work["aircraft"] is null) work["aircraft"] = completed;
-        Section(stack, "רשימת מטוסים להטענה");
+        Section(stack, "ביצוע הטענת מפתחות");
         var keyBar = EditorBar(stack);
+        stack.Controls.Add(Label($"{V(doc, "date")} · {V(doc, "time")} · טייסת {V(doc, "squadron")} · דת״ק {V(doc, "shelter")}", 40));
+        var loadingGrid = new DataGridView { Width = 745, Height = Math.Min(440, 50 + rows.Count * 54),
+            RowHeadersVisible = false, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+        loadingGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "aircraft", HeaderText = "מס׳ מטוס", ReadOnly = true, FillWeight = 25 });
+        loadingGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 13 });
+        loadingGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 13 });
+        loadingGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "notes", HeaderText = "הערות", FillWeight = 49 });
+        loadingGrid.RowTemplate.Height = 49; loadingGrid.ColumnHeadersHeight = 44;
         for (var i = 0; i < rows.Count; i++)
         {
-            var index = i; var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
-            stack.Controls.Add(Label($"מטוס {row?["aircraft"]} · הערת מנהל: {row?["notes"]}", 45, true));
-            if (B(row, "blue")) Check(stack, "ארז כחול בוצע", state, "blueDone");
-            if (B(row, "shach")) Check(stack, "שחק בוצע", state, "shachDone");
-            Field(stack, "הערת טכנאי (לא חובה)", state, "technicianNote", true);
+            var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
+            var managerNote = V(row, "notes"); var technicianNote = V(state, "technicianNote");
+            loadingGrid.Rows.Add(V(row, "aircraft"), B(state, "blueDone"), B(state, "shachDone"),
+                managerNote + (managerNote.Length > 0 && technicianNote.Length > 0 ? Environment.NewLine : "") + technicianNote);
+            loadingGrid.Rows[i].Cells["blue"].ReadOnly = !B(row, "blue");
+            loadingGrid.Rows[i].Cells["shach"].ReadOnly = !B(row, "shach");
+            loadingGrid.Rows[i].Cells["blue"].Style.BackColor = B(row, "blue") ? Color.White : Pale;
+            loadingGrid.Rows[i].Cells["shach"].Style.BackColor = B(row, "shach") ? Color.White : Pale;
         }
+        loadingGrid.CurrentCellDirtyStateChanged += (_, _) =>
+        { if (loadingGrid.IsCurrentCellDirty) loadingGrid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+        loadingGrid.CellEndEdit += (_, e) =>
+        {
+            if (e.ColumnIndex != loadingGrid.Columns["notes"].Index) return;
+            var prefix = V(rows[e.RowIndex], "notes");
+            var entered = loadingGrid.Rows[e.RowIndex].Cells["notes"].Value?.ToString() ?? "";
+            var added = prefix.Length > 0 && entered.StartsWith(prefix, StringComparison.Ordinal)
+                ? entered[prefix.Length..].TrimStart('\r', '\n', ' ') : entered;
+            Object(completed[e.RowIndex])["technicianNote"] = added;
+            loadingGrid.Rows[e.RowIndex].Cells["notes"].Value = prefix + (prefix.Length > 0 && added.Length > 0 ? Environment.NewLine : "") + added;
+        };
+        loadingGrid.CellValueChanged += (_, e) =>
+        {
+            if (e.RowIndex < 0) return;
+            var name = loadingGrid.Columns[e.ColumnIndex].Name;
+            if (name == "blue" || name == "shach")
+                Object(completed[e.RowIndex])[name == "blue" ? "blueDone" : "shachDone"] = loadingGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value is true;
+        };
+        stack.Controls.Add(loadingGrid);
         stack.Controls.Add(Label($"אחזקה נדרשת: הטענת מטוסים במסגרת שינוי מפתחות לחודשים {V(doc, "period")}", 55));
         stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות EREZ 78 לאחר טעינה ושידור PTT בארז, SAK 7 / 34 בשחק.", 55));
         stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים: מ.כ 2020 + חרב אש", 48));
         Section(stack, "פעולות לביצוע");
+        var taskToggle = Button("הצג משימות לביצוע", (sender, _) => { });
+        stack.Controls.Add(taskToggle);
+        var taskGroup = new FlowLayoutPanel { Width = 745, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false };
         var actions = work["actions"] as JsonArray ?? new JsonArray();
         while (actions.Count < 12) actions.Add(false);
         actions[0] = true; if (work["actions"] is null) work["actions"] = actions;
@@ -470,8 +578,11 @@ public sealed partial class NativeWindow
             var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", Width = 745, Height = 48,
                 Checked = i == 0 || bool.TryParse(actions[i]?.ToString(), out var b) && b, Enabled = i != 0 };
             box.CheckedChanged += (_, _) => actions[index] = box.Checked;
-            stack.Controls.Add(box);
+            taskGroup.Controls.Add(box);
         }
+        taskToggle.Click += (_, _) => { taskGroup.Visible = !taskGroup.Visible;
+            taskToggle.Text = taskGroup.Visible ? "הסתר משימות" : "הצג משימות לביצוע"; };
+        stack.Controls.Add(taskGroup);
         stack.Controls.Add(Label("חתימת משלח המשימה"));
         stack.Controls.Add(new NativeSignature(V(doc, "dispatcherSignature")) { Enabled = false });
         var infoButton = Button("מידע לעזר הטכנאי · הצג / הסתר", (_, _) => { });
@@ -494,14 +605,17 @@ public sealed partial class NativeWindow
         var pads = new Dictionary<string, NativeSignature>();
         foreach (var kind in new[] { "tools", "taken", "rejected" })
         {
+            Section(stack, NativeCatalog.Tables[kind].title);
             var box = Check(stack, NativeCatalog.Tables[kind].title, work, kind + "Enabled");
             var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
+            if (kind == "tools") ToolReviews(stack, work, pads, box);
+            if (kind == "taken")
+            {
+                var declaration = TakenDeclaration(stack, work, pads);
+                declaration.Visible = box.Checked;
+                box.CheckedChanged += (_, _) => declaration.Visible = box.Checked;
+            }
         }
-        ToolReviews(stack, work, pads);
-        var takenDeclaration = TakenDeclaration(stack, work, pads);
-        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
-        takenDeclaration.Visible = takenToggle.Checked;
-        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
         void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
         keyBar.Controls.Add(Button("שמירה", async (_, _) =>
         {
