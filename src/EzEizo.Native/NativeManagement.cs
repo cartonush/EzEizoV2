@@ -208,7 +208,8 @@ public sealed partial class NativeWindow
                         var sheet = item["sheet"] ?? item; var kind = item["sheet"] is null ? "מפתחות" : "תקלה";
                         results.Rows.Add(kind, V(item, "serial"), V(sheet, "squadron"),
                             V(sheet, "aircraft").Length > 0 ? V(sheet, "aircraft") : string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft"))),
-                            V(item, "status"), V(item, "createdAt"));
+                            V(item, "status") switch { "open" => "פתוח", "pendingReview" => "ממתין לסגירה", "closed" => "סגור", var state => state },
+                            DisplayDate(V(item, "createdAt")));
                     }
                     status.Text = $"נמצאו {found.Length} טפסים.";
                 }
