@@ -139,12 +139,21 @@ jobs:
             if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
             throw 'Native manager login or navigation failed'
           }
+      - name: Smoke test technician login and task queue
+        shell: pwsh
+        run: |
+          $mechanic = (Resolve-Path dist/native-preview/program/EzEizo-Native-Mechanic.exe).Path
+          $result = Start-Process -FilePath $mechanic -ArgumentList '--ui-smoke-tech' -PassThru
+          if (!$result.WaitForExit(60000) -or $result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'Native technician login or queue failed'
+          }
       - name: Save UI screenshot outside the distributable package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/screenshots | Out-Null
           $screens = Get-ChildItem dist/native-preview/program/native-*.png
-          if ($screens.Count -lt 5) { throw 'Missing native UI screenshots' }
+          if ($screens.Count -lt 8) { throw 'Missing native UI screenshots' }
           Copy-Item $screens.FullName dist/screenshots/
           Remove-Item $screens.FullName
       - uses: actions/upload-artifact@v4
