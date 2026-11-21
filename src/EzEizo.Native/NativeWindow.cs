@@ -6,7 +6,7 @@ namespace EzEizo.Core;
 // Native Windows UI backed by the local Access store; no embedded browser.
 public sealed partial class NativeWindow : Form
 {
-    internal string DiagnosticPage => currentPage;
+    internal string DiagnosticPage => readyPage;
     private static readonly Color Navy = Color.FromArgb(13, 48, 75);
     private static readonly Color Blue = Color.FromArgb(28, 109, 153);
     private static readonly Color Pale = Color.FromArgb(238, 245, 248);
@@ -29,6 +29,7 @@ public sealed partial class NativeWindow : Form
     private readonly List<NativeButton> navButtons = [];
     private Account? account;
     private string currentPage = "";
+    private string readyPage = "";
     private string searchTerm = "";
     private string statusFilter = "הכל";
     private int? lastListVersion;
@@ -128,6 +129,7 @@ public sealed partial class NativeWindow : Form
     }
     private void Loading(string message)
     {
+        readyPage = "";
         status.Text = message;
         var container = Stack();
         container.Controls.Add(Label(message, 46, true));
@@ -210,6 +212,7 @@ public sealed partial class NativeWindow : Form
             navButtons[i].Invalidate();
         }
         LayoutBottomNav();
+        if (!loading) readyPage = currentPage;
     }
     private void LayoutBottomNav()
     {
