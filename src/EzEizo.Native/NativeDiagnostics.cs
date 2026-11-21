@@ -100,8 +100,10 @@ public static class NativeDiagnostics
         try
         {
             window.Update();
-            using var graphics = Graphics.FromImage(screenshot);
-            graphics.CopyFromScreen(window.PointToScreen(Point.Empty), Point.Empty, window.Size);
+            using (var graphics = Graphics.FromImage(screenshot))
+                graphics.CopyFromScreen(window.PointToScreen(Point.Empty), Point.Empty, window.Size);
+            if (screenshot.GetPixel(window.Width / 2, window.Height / 2).ToArgb() == Color.Black.ToArgb())
+                window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
         }
         catch
         {
