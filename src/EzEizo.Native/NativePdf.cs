@@ -6,7 +6,8 @@ namespace EzEizo.Core;
 
 internal static class NativePdf
 {
-    private sealed record Part(string Text, string? Signature = null, bool Heading = false);
+    private sealed record Part(string Text, string? Signature = null, bool Heading = false,
+        string[]? Cells = null, bool TableHeader = false);
     private static string V(JsonNode? node, string name) => node?[name]?.ToString() ?? "";
     private static bool B(JsonNode? node, string name) => V(node, name).Equals("true", StringComparison.OrdinalIgnoreCase);
 
@@ -84,10 +85,14 @@ internal static class NativePdf
         {
             lines.Add(new($"תאריך: {V(item, "date")}     שעה: {V(item, "time")}     צוות: {string.Join(" · ", (item["teamNames"] as JsonArray ?? new()).Select(x => x?.ToString()))}"));
             lines.Add(new("רשימת הטענה", Heading: true));
+            lines.Add(new("", Cells: ["מס׳ מטוס", "ארז כחול", "שחק", "הערות"], TableHeader: true));
             var aircraft = state?["aircraft"] as JsonArray ?? new();
             var rows = item["rows"] as JsonArray ?? new();
             for (var i = 0; i < rows.Count; i++)
-                lines.Add(new($"מטוס {V(rows[i], "aircraft")} | ארז כחול: {(B(rows[i], "blue") ? B(i < aircraft.Count ? aircraft[i] : null, "blueDone") ? "בוצע" : "נדרש" : "—")} | שחק: {(B(rows[i], "shach") ? B(i < aircraft.Count ? aircraft[i] : null, "shachDone") ? "בוצע" : "נדרש" : "—")} | הערות: {V(rows[i], "notes")} {V(i < aircraft.Count ? aircraft[i] : null, "technicianNote")} "));
+                lines.Add(new("", Cells: [V(rows[i], "aircraft"),
+                    B(rows[i], "blue") ? B(i < aircraft.Count ? aircraft[i] : null, "blueDone") ? "בוצע" : "נדרש" : "—",
+                    B(rows[i], "shach") ? B(i < aircraft.Count ? aircraft[i] : null, "shachDone") ? "בוצע" : "נדרש" : "—",
+                    V(rows[i], "notes") + " " + V(i < aircraft.Count ? aircraft[i] : null, "technicianNote")]));
         }
         else
         {
@@ -108,10 +113,10 @@ internal static class NativePdf
             var rows = state?[name] as JsonArray;
             if (rows is null || rows.Count == 0) continue;
             lines.Add(new(spec.title, Heading: true));
-            lines.Add(new(string.Join(" | ", spec.fields.Select(x => x.label))));
+            lines.Add(new("", Cells: spec.fields.Select(x => x.label).ToArray(), TableHeader: true));
             foreach (var row in rows)
                 if (spec.fields.Any(field => V(row, field.key).Length > 0))
-                    lines.Add(new(string.Join(" | ", spec.fields.Select(x => V(row, x.key)))));
+                    lines.Add(new("", Cells: spec.fields.Select(x => V(row, x.key)).ToArray()));
         }
         foreach (var (title, keys) in new[]
         {
@@ -122,7 +127,15 @@ internal static class NativePdf
         {
             if (!keys.Any(k => V(state, k).Length > 0)) continue;
             lines.Add(new(title, Heading: true));
-            foreach (var name in keys) if (V(state, name).Length > 0) lines.Add(new(name, V(state, name)));
+            foreach (var name in keys) if (V(state, name).Length > 0)
+                lines.Add(new(name switch
+                {
+                    "entryTechnicianSignature" or "interimTechnicianSignature" or "finalTechnicianSignature" => "חתימת טכנאי",
+                    "entryInspectorSignature" or "interimInspectorSignature" or "finalInspectorSignature" => "חתימת בודק",
+                    "interimToolsSignature" => "חתימת פ. כלים / מ״ע",
+                    "finalLeadSignature" => "חתימת ר״צ / מ״ע",
+                    _ => name
+                }, V(state, name)));
         }
         if (!key) lines.Add(new("הצהרת הטכנאי", V(state, "technicianDeclarationSignature")));
         if (V(item, "reviewerSignature").Length > 0) lines.Add(new("חתימת בודק הדף", V(item, "reviewerSignature")));
@@ -143,11 +156,29 @@ internal static class NativePdf
             if (e.Graphics is null) return;
             using var textFont = new Font("Arial", 10);
             using var titleFont = new Font("Arial", 13, FontStyle.Bold);
+            using var tableFont = new Font("Arial", 8.5f);
+            using var tableHeaderFont = new Font("Arial", 8.5f, FontStyle.Bold);
             using var format = new StringFormat(StringFormatFlags.DirectionRightToLeft) { Alignment = StringAlignment.Near };
             var x = e.MarginBounds.Left; var y = e.MarginBounds.Top;
             while (index < parts.Count)
             {
                 var part = parts[index];
+                if (part.Cells is { Length: > 0 } cells)
+                {
+                    var height = Math.Max(34, cells.Max(cell => (int)Math.Ceiling(
+                        e.Graphics.MeasureString(cell ?? "", tableFont, e.MarginBounds.Width / cells.Length - 12, format).Height) + 12));
+                    if (y + height > e.MarginBounds.Bottom && y > e.MarginBounds.Top) break;
+                    var cellWidth = e.MarginBounds.Width / (float)cells.Length;
+                    for (var cellIndex = 0; cellIndex < cells.Length; cellIndex++)
+                    {
+                        var rect = new RectangleF(e.MarginBounds.Right - (cellIndex + 1) * cellWidth, y, cellWidth, height);
+                        e.Graphics.FillRectangle(part.TableHeader ? Brushes.LightBlue : Brushes.White, rect);
+                        e.Graphics.DrawRectangle(Pens.LightGray, rect.X, rect.Y, rect.Width, rect.Height);
+                        e.Graphics.DrawString(cells[cellIndex] ?? "", part.TableHeader ? tableHeaderFont : tableFont,
+                            Brushes.Black, new RectangleF(rect.X + 5, rect.Y + 5, rect.Width - 10, rect.Height - 10), format);
+                    }
+                    y += height; index++; continue;
+                }
                 var font = part.Heading ? titleFont : textFont;
                 var width = e.MarginBounds.Width;
                 var measured = e.Graphics.MeasureString(part.Text, font, width, format);
