@@ -81,6 +81,33 @@ jobs:
               throw 'Simultaneous Access startup failed'
             }
           }
+      - name: Package a clean Access template and launchers
+        shell: pwsh
+        run: |
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $db = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
+          Remove-Item $db -Force
+          $initial = Join-Path $desktop 'EzEizo/data/initial-manager.txt'
+          if (Test-Path $initial) { Remove-Item $initial -Force }
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--seed-template' -Wait -PassThru
+          if ($result.ExitCode -ne 0 -or !(Test-Path $db)) { throw 'Clean ACCDB template creation failed' }
+          New-Item -ItemType Directory -Force dist/native-preview/data | Out-Null
+          Copy-Item $db dist/native-preview/data/EzEizo.accdb
+          Set-Content -Path dist/native-preview/Metis.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Metis.exe"') -Encoding ASCII
+          Set-Content -Path dist/native-preview/Mechanic.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Mechanic.exe"') -Encoding ASCII
+          if (Test-Path dist/native-preview/program/wwwroot) { throw 'Native package contains the old website' }
+      - name: Launch both native windows
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/native-preview/program/EzEizo-Native-Mechanic.exe).Path
+          $processes = @((Start-Process $manager -PassThru), (Start-Process $mechanic -PassThru))
+          Start-Sleep -Seconds 10
+          foreach ($process in $processes) {
+            if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
+            $process.Kill()
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-experiment
