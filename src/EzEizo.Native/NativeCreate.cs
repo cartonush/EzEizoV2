@@ -56,7 +56,9 @@ public sealed partial class NativeWindow
             var constants = await Work(() => store.Constants(user));
             currentPage = "new-fault"; refreshTimer.Stop();
             var stack = Stack();
-            Section(stack, "פתיחת תקלה חדשה");
+            Section(stack, "יצירת תקלה");
+            stack.Controls.Add(Label("מלא את פרטי האירוע ופתח תקלה חדשה. היא תקבל מספר סידורי ותופיע ברשימה.", 48));
+            Section(stack, "נתוני התקלה");
             var squadron = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
             var shelter = Choice(stack, "דת״ק", []);
             var workshop = Choice(stack, "מוסך", ["מוסך א", "מוסך ב", "כנפ״ת"]);
@@ -71,13 +73,44 @@ public sealed partial class NativeWindow
             };
             shelter.SelectedIndexChanged += (_, _) => workshop.Visible = ((Control)workshop.Tag!).Visible = Selected(shelter) == "מוסך";
             var system = Choice(stack, "שם מערכת", NativeCatalog.Systems);
+            var code = Input("קוד מערכת · מתמלא אוטומטית"); code.ReadOnly = true;
+            stack.Controls.Add(Label("קוד מערכת")); stack.Controls.Add(code);
+            system.SelectedIndexChanged += (_, _) =>
+            { var index = Array.IndexOf(NativeCatalog.Systems, Selected(system)); code.Text = index >= 0 ? NativeCatalog.Codes[index] : ""; };
             var ew = Choice(stack, "חליפת ל״א", NativeCatalog.Ew);
             ew.Enabled = false;
             aircraft.SelectedIndexChanged += (_, _) => { ew.Enabled = Selected(aircraft).Length > 0; if (ew.Enabled) ew.SelectedIndex = 1; };
+            Section(stack, "תיאור תקלה");
             stack.Controls.Add(Label("תיאור התקלה"));
             var fault = Input("תיאור התקלה", 2000); fault.Multiline = true; fault.Height = 90; stack.Controls.Add(fault);
             stack.Controls.Add(Label("הערות מנהל (לא חובה)"));
             var notes = Input("הערות", 2000); notes.Multiline = true; notes.Height = 70; stack.Controls.Add(notes);
+            Section(stack, "קבועים");
+            stack.Controls.Add(Label("ערוך את הערכים שיופיעו לטכנאי. שמות הקבועים נשארים קבועים.", 40));
+            var constantGrid = new DataGridView { Width = 745, Height = 360, Visible = false,
+                AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            constantGrid.Columns.Add("group", "מערכת"); constantGrid.Columns.Add("name", "קבוע"); constantGrid.Columns.Add("value", "ערך");
+            constantGrid.Columns["group"].ReadOnly = true; constantGrid.Columns["name"].ReadOnly = true;
+            void LoadConstants()
+            {
+                constantGrid.Rows.Clear();
+                var selected = Object(constants.FirstOrDefault(x => V(x, "squadron") == Selected(squadron) && V(x, "aircraft") == Selected(aircraft))?["constants"] ?? SampleConstants());
+                foreach (var (group, entries) in selected)
+                    foreach (var entry in entries as JsonArray ?? new()) constantGrid.Rows.Add(group, entry?[0]?.ToString(), entry?[1]?.ToString());
+            }
+            squadron.SelectedIndexChanged += (_, _) => LoadConstants();
+            aircraft.SelectedIndexChanged += (_, _) => LoadConstants();
+            stack.Controls.Add(Button("הצג / הסתר קבועים", (_, _) => constantGrid.Visible = !constantGrid.Visible));
+            stack.Controls.Add(constantGrid);
+            Section(stack, "12 משימות חובה");
+            stack.Controls.Add(Label("הפעולות קבועות. פעולות 2 ו־12 מוצגות לטכנאי כשעת הגעה וסיום.", 43));
+            var actionList = new FlowLayoutPanel { Width = 745, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false };
+            for (var i = 0; i < NativeCatalog.Actions.Length; i++)
+                actionList.Controls.Add(Label($"{i + 1:D2}. {NativeCatalog.Actions[i]}", 47));
+            stack.Controls.Add(Button("הצג / הסתר משימות", (_, _) => actionList.Visible = !actionList.Visible));
+            stack.Controls.Add(actionList);
+            Section(stack, "פתיחת התקלה");
             var briefing = new CheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
             stack.Controls.Add(briefing);
             var signature = new NativeSignature();
@@ -94,7 +127,14 @@ public sealed partial class NativeWindow
                     if (people.Length == 0 || string.IsNullOrWhiteSpace(fault.Text)) throw new ArgumentException("יש להזין תיאור תקלה ולבחור לפחות טכנאי אחד.");
                     if (!briefing.Checked || !signature.HasSignature) throw new ArgumentException("יש לאשר את התדריך ולחתום כמשלח המשימה.");
                     var index = Array.IndexOf(NativeCatalog.Systems, sys);
-                    var matching = constants.FirstOrDefault(x => V(x, "squadron") == sq && V(x, "aircraft") == plane)?["constants"]?.DeepClone() ?? SampleConstants();
+                    constantGrid.EndEdit();
+                    var matching = new JsonObject();
+                    foreach (DataGridViewRow row in constantGrid.Rows)
+                    {
+                        var group = row.Cells["group"].Value?.ToString() ?? "";
+                        if (matching[group] is null) matching[group] = new JsonArray();
+                        ((JsonArray)matching[group]!).Add(Strings([row.Cells["name"].Value?.ToString() ?? "", row.Cells["value"].Value?.ToString() ?? ""]));
+                    }
                     var sheet = new JsonObject
                     {
                         ["squadron"] = sq, ["shelter"] = sh, ["workshop"] = sh == "מוסך" ? Selected(workshop) : "",
@@ -127,7 +167,7 @@ public sealed partial class NativeWindow
             var technicians = await Work(() => database.Technicians());
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
-            Section(stack, "הטענת מפתחות חדשה");
+            Section(stack, "הטענת מפתחות");
             var date = new DateTimePicker { Width = 200, Format = DateTimePickerFormat.Short, Value = DateTime.Today };
             stack.Controls.Add(Label("תאריך")); stack.Controls.Add(date);
             var time = new DateTimePicker { Width = 200, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
@@ -136,13 +176,27 @@ public sealed partial class NativeWindow
             var squadron = Choice(stack, "טייסת", ["101", "105", "109"]);
             var shelter = Choice(stack, "דת״ק", []);
             var team = Team(stack, technicians);
-            var grid = new DataGridView { Width = 745, Height = 240, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
+            Section(stack, "רשימת הטענה");
+            stack.Controls.Add(Label("חפש ובחר מטוס מהטייסת וסמן לפחות סוג מפתח אחד. שורה נוספת נפתחת אוטומטית.", 46));
+            var grid = new DataGridView { Width = 745, Height = 90, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false };
-            var aircraft = new DataGridViewComboBoxColumn { Name = "aircraft", HeaderText = "מספר מטוס", FlatStyle = FlatStyle.Flat };
+            var aircraft = new DataGridViewComboBoxColumn { Name = "aircraft", HeaderText = "מספר מטוס", FlatStyle = FlatStyle.Flat,
+                FillWeight = 30, DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton };
             grid.Columns.Add(aircraft);
-            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 35 });
-            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 35 });
-            grid.Columns.Add("notes", "הערות");
+            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "notes", HeaderText = "הערות", FillWeight = 35 });
+            grid.Columns.Add(new DataGridViewButtonColumn { Name = "remove", HeaderText = "", Text = "מחק", UseColumnTextForButtonValue = true, FillWeight = 9 });
+            grid.RowTemplate.Height = 43;
+            grid.ColumnHeadersHeight = 43;
+            grid.RowsAdded += (_, _) => grid.Height = Math.Min(430, Math.Max(90, grid.ColumnHeadersHeight + grid.Rows.Count * grid.RowTemplate.Height + 6));
+            grid.RowsRemoved += (_, _) => grid.Height = Math.Min(430, Math.Max(90, grid.ColumnHeadersHeight + grid.Rows.Count * grid.RowTemplate.Height + 6));
+            grid.CellContentClick += (_, e) => { if (e.RowIndex >= 0 && e.ColumnIndex == grid.Columns["remove"].Index && !grid.Rows[e.RowIndex].IsNewRow) grid.Rows.RemoveAt(e.RowIndex); };
+            grid.EditingControlShowing += (_, e) =>
+            {
+                if (grid.CurrentCell?.OwningColumn.Name == "aircraft" && e.Control is ComboBox combo)
+                { combo.AutoCompleteMode = AutoCompleteMode.SuggestAppend; combo.AutoCompleteSource = AutoCompleteSource.ListItems; }
+            };
             squadron.SelectedIndexChanged += (_, _) =>
             {
                 var sq = Selected(squadron);
@@ -150,12 +204,31 @@ public sealed partial class NativeWindow
                 grid.Rows.Clear(); aircraft.Items.Clear();
                 if (NativeCatalog.Squadrons.TryGetValue(sq, out selected)) aircraft.Items.AddRange(selected.aircraft.Cast<object>().ToArray());
             };
-            stack.Controls.Add(Label("רשימת הטענה", 45, true)); stack.Controls.Add(grid);
+            stack.Controls.Add(grid);
+            var required = Label("", 50);
+            date.ValueChanged += (_, _) => required.Text = $"אחזקה נדרשת לביצוע: הטענת מטוסים במסגרת ביצוע שינוי מפתחות לחודשים {date.Value:MM}-{date.Value.AddMonths(1):MM/yy}";
+            required.Text = $"אחזקה נדרשת לביצוע: הטענת מטוסים במסגרת ביצוע שינוי מפתחות לחודשים {date.Value:MM}-{date.Value.AddMonths(1):MM/yy}";
+            stack.Controls.Add(required);
+            stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות: EREZ 78 לאחר טעינה ולאחר שידור PTT בארז, SAK 7 / 34 בשחק.", 52));
+            stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים נדרשים: מ.כ 2020 + חרב אש", 48));
+            Section(stack, "משימות לביצוע");
+            stack.Controls.Add(Label("המשימה הראשונה תאושר ותיחתם בידי משלח המשימה בעת פתיחת הדף.", 44));
             var briefing = new CheckBox { Width = 745, Height = 60, Text = "תדריך בטיחות וניהול סיכונים הועבר ונחתם ע״י משלח המשימה." };
             stack.Controls.Add(briefing);
             stack.Controls.Add(Label("חתימת משלח המשימה"));
             var signature = new NativeSignature(); stack.Controls.Add(signature);
             stack.Controls.Add(Button("נקה חתימה", (_, _) => signature.Clear()));
+            var taskList = new FlowLayoutPanel { Width = 745, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, Visible = false };
+            for (var i = 0; i < NativeCatalog.KeyActions.Length; i++)
+                taskList.Controls.Add(Label($"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", 47));
+            stack.Controls.Add(Button("הצג את 12 המשימות לביצוע", (sender, _) =>
+            {
+                taskList.Visible = !taskList.Visible;
+                ((Button)sender!).Text = taskList.Visible ? "הסתר את 12 המשימות" : "הצג את 12 המשימות לביצוע";
+            }));
+            stack.Controls.Add(taskList);
             stack.Controls.Add(Button("פתח הטענה", async (_, _) =>
             {
                 try
