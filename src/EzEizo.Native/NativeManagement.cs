@@ -187,6 +187,33 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
+            stack.Controls.Add(Button("הורד טופס שנבחר PDF", async (_, _) =>
+            {
+                try
+                {
+                    var index = results.CurrentRow?.Index ?? -1;
+                    if (index < 0 || index >= found.Length) throw new ArgumentException("בחר שורה מתוך תוצאות החיפוש.");
+                    status.Text = "מפיק את הטופס ל־PDF…";
+                    var item = found[index]; var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    var path = await Work(() => NativePdf.SaveForm(item, desktop));
+                    status.Text = $"הטופס נשמר: {path}";
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
+            stack.Controls.Add(Button("הורד את תוצאות החיפוש", async (_, _) =>
+            {
+                try
+                {
+                    if (found.Length == 0) throw new ArgumentException("אין טפסים להורדה.");
+                    if (found.Length > 5 && MessageBox.Show(this, "פעולה זו עלולה לקחת מעט זמן, האם ברצונך להמשיך?", "הורדה", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+                    var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    var snapshot = found; var reportName = Selected(report);
+                    status.Text = $"מפיק {snapshot.Length} טפסים לקובץ ZIP…";
+                    var file = await Work(() => NativePdf.SaveArchive(snapshot, reportName, desktop));
+                    status.Text = $"קובץ התוצאות נשמר: {file}";
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
             content.Controls.Clear(); content.Controls.Add(stack);
             status.Text = "בחר דוח, סננים ותאריכים.";
         }
