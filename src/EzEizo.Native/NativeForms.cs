@@ -415,8 +415,11 @@ public sealed partial class NativeWindow
         var spec = NativeCatalog.Tables[kind];
         var data = state[kind] as JsonArray ?? new JsonArray();
         if (state[kind] is null) state[kind] = data;
-        var grid = new DataGridView { Width = 740, Height = 185, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
+        var grid = new DataGridView { Width = 740, Height = Math.Min(360, 88 + data.Count * 42), AllowUserToAddRows = true, AllowUserToDeleteRows = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White };
+        grid.RowTemplate.Height = 41; grid.ColumnHeadersHeight = 42;
+        void FitRows() => grid.Height = Math.Min(360, Math.Max(88, grid.ColumnHeadersHeight + grid.Rows.Count * grid.RowTemplate.Height + 5));
+        grid.RowsAdded += (_, _) => FitRows(); grid.RowsRemoved += (_, _) => FitRows();
         foreach (var field in spec.fields)
         {
             if (field.key == "name" && kind is "removed" or "installed")
@@ -452,7 +455,8 @@ public sealed partial class NativeWindow
         })
         {
             var box = Check(stack, title, state, toggle);
-            var group = new FlowLayoutPanel { Width = 750, Height = fields.Sum(f => f.Item3 ? 220 : 90), AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var group = new FlowLayoutPanel { Width = 750, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (var (key, label, sign) in fields)
                 if (sign) pads[key] = Signature(group, label, state, key, true);
                 else if (key == "departureTime") TimeField(group, label, state, key);
@@ -482,7 +486,8 @@ public sealed partial class NativeWindow
     }
     private static FlowLayoutPanel TakenDeclaration(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
     {
-        var group = new FlowLayoutPanel { Width = 750, Height = 500, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var group = new FlowLayoutPanel { Width = 750, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
         Section(group, "חתימה על קשיחים שנלקחו");
         Field(group, "שם מלא", state, "takenFullName");
         var number = Field(group, "מספר אישי", state, "takenPersonalNumber"); Numeric(number);
