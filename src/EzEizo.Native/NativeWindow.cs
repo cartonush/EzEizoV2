@@ -106,11 +106,13 @@ public sealed partial class NativeWindow : Form
         };
         refreshTimer.Tick += async (_, _) =>
         {
-            if (account is null || currentPage is not ("issues" or "keys")) return;
+            if (account is null || currentPage is not ("issues" or "keys" or "queue")) return;
             var page = currentPage; var user = account;
             try
             {
-                var revision = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
+                var revision = await Work(() => page == "queue"
+                    ? HashCode.Combine(store.Version("issues"), store.Version("keyLoads"))
+                    : store.Version(page == "issues" ? "issues" : "keyLoads"));
                 if (account == user && currentPage == page && revision != lastListVersion) await OpenList(page, silent: true);
             }
             catch (Exception ex) { status.Text = "בדיקת עדכונים נכשלה: " + ex.Message; }
@@ -182,7 +184,7 @@ public sealed partial class NativeWindow : Form
         bottomNav.Visible = !loading && account is not null && role == AppRole.Manager;
         logoutButton.Visible = !loading && account is not null;
         backButton.Visible = !loading && account is not null &&
-            currentPage is not ("home" or "management" or "issues" or "keys");
+            currentPage is not ("home" or "management" or "issues" or "keys" or "queue");
         var section = currentPage switch
         {
             "home" => 0, "issues" or "new-fault" or "fault-editor" => 1,
@@ -284,7 +286,7 @@ public sealed partial class NativeWindow : Form
                     throw new UnauthorizedAccessException("מספר אישי או סיסמה שגויים.");
                 account = found;
                 if (role == AppRole.Manager) await OpenHome();
-                else await OpenList("issues");
+                else await OpenList("queue");
             }
             catch (Exception ex) { status.Text = "מספר אישי או סיסמה שגויים."; if (ex is not UnauthorizedAccessException) Error(ex); }
             finally { submit!.Enabled = true; }
@@ -300,6 +302,7 @@ public sealed partial class NativeWindow : Form
         if (activeFormId is not null) await ReleaseForm();
         var user = account;
         if (user is null) { Login(); return; }
+        if (role == AppRole.Mechanic) { await OpenTechnicianQueue(silent); return; }
         if (!silent) Loading(page == "issues" ? "טוען תקלות…" : "טוען הטענות מפתחות…");
         try
         {
@@ -370,6 +373,57 @@ public sealed partial class NativeWindow : Form
             Render();
             Present(stack);
             status.Text = $"{data.Count} טפסים · עודכן {DateTime.Now:HH:mm:ss}";
+        }
+        catch (Exception ex) { Error(ex); }
+    }
+
+    private async Task OpenTechnicianQueue(bool silent = false)
+    {
+        var user = account;
+        if (user is null) { Login(); return; }
+        if (!silent) Loading("טוען משימות צוות…");
+        try
+        {
+            var (issues, keys, version) = await Work(() =>
+                (store.List("issues", user), store.List("keyLoads", user),
+                 HashCode.Combine(store.Version("issues"), store.Version("keyLoads"))));
+            if (account != user || silent && currentPage != "queue") return;
+            currentPage = "queue"; lastListVersion = version; refreshTimer.Start();
+            var stack = Stack();
+            stack.Controls.Add(Label("משימות שהתקבלו", 30));
+            stack.Controls.Add(Label("רשימת משימות", 58, true));
+            stack.Controls.Add(Label("בחר תקלה או הטענת מפתחות פתוחה מהרשימה כדי למלא את הטופס שלה.", 52));
+            var search = Input("חפש מספר טופס", 20);
+            stack.Controls.Add(search);
+            var cards = new FlowLayoutPanel { Width = 780, Height = 520, AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            stack.Controls.Add(cards);
+            void Render()
+            {
+                cards.Controls.Clear();
+                var tasks = issues.Where(x => x["status"]?.ToString() == "open")
+                    .Select(x => (page: "issues", doc: x))
+                    .Concat(keys.Where(x => x["status"]?.ToString() == "open").Select(x => (page: "keys", doc: x)))
+                    .Where(x => (x.doc["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (tasks.Length == 0) cards.Controls.Add(Label("אין משימות פתוחות במכשיר הזה.", 58));
+                foreach (var (page, doc) in tasks)
+                {
+                    var id = doc["id"]?.ToString() ?? "";
+                    var serial = doc["serial"]?.ToString() ?? "";
+                    var sheet = doc["sheet"] ?? doc;
+                    var aircraft = page == "issues" ? sheet["aircraft"]?.ToString() ?? ""
+                        : string.Join(", ", (doc["rows"] as JsonArray ?? new()).Select(x => x?["aircraft"]?.ToString()));
+                    var card = (NativeButton)Button(
+                        $"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · מטוס {aircraft}{Environment.NewLine}{sheet["squadron"]} · משימה פתוחה",
+                        async (_, _) => await OpenDocument(page, id));
+                    card.Secondary = true; card.Width = 735; card.Height = 80;
+                    cards.Controls.Add(card);
+                }
+            }
+            search.TextChanged += (_, _) => Render();
+            Render(); Present(stack);
+            status.Text = $"{issues.Count + keys.Count} דפים משויכים · עודכן {DateTime.Now:HH:mm:ss}";
         }
         catch (Exception ex) { Error(ex); }
     }
