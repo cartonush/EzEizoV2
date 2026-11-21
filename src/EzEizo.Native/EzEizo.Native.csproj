@@ -23,6 +23,7 @@
     <Compile Include="NativeManagement.cs" />
     <Compile Include="NativePdf.cs" />
     <Compile Include="NativeDiagnostics.cs" />
+    <Compile Include="NativeStartup.cs" />
     <Compile Include="NativeTheme.cs" />
   </ItemGroup>
 </Project>
