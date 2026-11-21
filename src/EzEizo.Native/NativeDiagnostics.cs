@@ -179,9 +179,11 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 2 && window.DiagnosticPage == "fault-editor")
                 {
-                    if (!controls.OfType<Label>().Any(x => x.Text == "פעולות אחזקה"))
-                        throw new InvalidOperationException("Fault editor is missing its actions.");
+                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות אחזקה", "יחידות שפורקו והורכבו", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title))
+                            throw new InvalidOperationException("Fault editor is missing: " + title);
                     Capture(window, "native-technician-fault.png");
+                    CaptureScrolledPage(window, "native-technician-fault-bottom.png");
                     controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 3;
                 }
                 else if (stage == 3 && window.DiagnosticPage == "queue")
@@ -192,13 +194,28 @@ public static class NativeDiagnostics
                 {
                     var grid = controls.OfType<DataGridView>().FirstOrDefault(x => x.Columns.Contains("blue") && x.Columns.Contains("shach"));
                     if (grid?.Rows.Count != 1) throw new InvalidOperationException("Technician key table is missing or malformed.");
-                    Capture(window, "native-technician-key.png"); stage = 5; window.Close();
+                    foreach (var title in new[] { "ביצוע הטענת מפתחות", "פעולות לביצוע", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title))
+                            throw new InvalidOperationException("Key editor is missing: " + title);
+                    Capture(window, "native-technician-key.png");
+                    CaptureScrolledPage(window, "native-technician-key-bottom.png");
+                    stage = 5; window.Close();
                 }
             }
             catch (Exception ex) { failure = ex.ToString(); window.Close(); }
         };
         timer.Start(); Application.Run(window);
         if (stage != 5) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
+    }
+    private static void CaptureScrolledPage(NativeWindow window, string file)
+    {
+        var page = Descendants(window).OfType<FlowLayoutPanel>()
+            .FirstOrDefault(x => x.AutoScroll && x.BackColor == Color.FromArgb(242, 246, 248));
+        if (page is null) throw new InvalidOperationException("The document has no scrollable card page.");
+        if (page.HorizontalScroll.Visible)
+            throw new InvalidOperationException("The document has unwanted horizontal scrolling.");
+        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height);
+        window.Update(); Capture(window, file);
     }
     public static void VerifyPdf()
     {
