@@ -105,6 +105,7 @@ internal sealed class NativeCard : Panel
 
 internal sealed class NativeHeader : Panel
 {
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Manager { get; set; }
     public NativeHeader()
     {
@@ -124,6 +125,7 @@ internal sealed class NativeHeader : Panel
 
 internal sealed class NativeBrandMark : Control
 {
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Manager { get; set; }
     public NativeBrandMark()
     {
