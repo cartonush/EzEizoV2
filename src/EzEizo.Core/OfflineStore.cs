@@ -140,6 +140,14 @@ public sealed class OfflineStore
         }
         return result;
     }
+    public string? ReadDraft(string key, Account actor)
+    {
+        CheckDraftKey(key);
+        using var c = Open();
+        var owner = DraftOwner(c, key, actor);
+        using var cmd = Cmd(c, null, "SELECT [Payload] FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", owner, key);
+        return cmd.ExecuteScalar() as string;
+    }
     private static string DraftOwner(OleDbConnection c, string key, Account actor)
     {
         if (!key.StartsWith("fault-sheet-v2:")) return actor.Id;
