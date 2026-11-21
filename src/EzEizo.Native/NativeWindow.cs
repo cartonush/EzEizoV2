@@ -122,7 +122,7 @@ public sealed class NativeWindow : Form
                 return;
             }
             var digits = number.Text; var secret = password.Text;
-            submit.Enabled = false;
+            submit!.Enabled = false;
             status.Text = "בודק פרטי כניסה במסד המקומי…";
             try
             {
@@ -133,7 +133,7 @@ public sealed class NativeWindow : Form
                 await OpenList("issues");
             }
             catch (Exception ex) { status.Text = "מספר אישי או סיסמה שגויים."; if (ex is not UnauthorizedAccessException) Error(ex); }
-            finally { submit.Enabled = true; }
+            finally { submit!.Enabled = true; }
         });
         stack.Controls.Add(submit);
         content.Controls.Add(stack);
