@@ -46,6 +46,29 @@ internal static class NativePdf
         }
         finally { try { Directory.Delete(temporary, true); } catch { /* Temporary cleanup can be retried by Windows. */ } }
     }
+    internal static string SaveReport(IEnumerable<JsonNode> items, string reportType, string folder)
+    {
+        Directory.CreateDirectory(folder);
+        var safeType = string.Concat(reportType.Where(ch => !Path.GetInvalidFileNameChars().Contains(ch)));
+        var path = Unique(folder, $"דוח - {safeType} - {DateTime.Now:dd-MM-yyyy HH-mm}.pdf");
+        var entries = items.ToArray();
+        var lines = new List<Part>
+        {
+            new($"דוח - {reportType}", Heading: true),
+            new($"תאריך הפקה: {DateTime.Now:dd/MM/yyyy HH:mm}     טפסים: {entries.Length}"),
+            new($"תקלות: {entries.Count(x => x["sheet"] is not null)}     הטענות מפתחות: {entries.Count(x => x["sheet"] is null)}"),
+            new("טפסים בדוח", Heading: true)
+        };
+        foreach (var item in entries)
+        {
+            var sheet = item["sheet"] ?? item;
+            var aircraft = V(sheet, "aircraft");
+            if (aircraft.Length == 0) aircraft = string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft")));
+            lines.Add(new($"{(item["sheet"] is null ? "הטענת מפתחות" : "תקלה")} {V(item, "serial")}   ·   טייסת {V(sheet, "squadron")}   ·   מטוס {aircraft}   ·   {V(item, "status")}   ·   {V(item, "createdAt")}"));
+        }
+        Save(lines, path);
+        return path;
+    }
     private static List<Part> Build(JsonNode item)
     {
         var key = item["sheet"] is null;
