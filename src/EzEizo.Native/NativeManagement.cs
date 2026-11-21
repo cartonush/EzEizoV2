@@ -117,26 +117,49 @@ public sealed partial class NativeWindow
             var report = Choice(stack, "סוג הדוח", ["יומן פעילות", "יומן טייסת", "היסטוריית מטוס", "היסטוריית תקלות טכנאי", "תקלות פתוחות", "דפים ממתינים לסגירה", "תקלות סגורות"]);
             var squadrons = new CheckedListBox { Width = 440, Height = 100, CheckOnClick = true };
             squadrons.Items.AddRange(NativeCatalog.Squadrons.Keys.Cast<object>().ToArray());
-            stack.Controls.Add(Label("טייסות")); stack.Controls.Add(squadrons);
+            var squadCaption = Label("טייסות"); stack.Controls.Add(squadCaption); stack.Controls.Add(squadrons);
             var planes = new CheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
-            stack.Controls.Add(Label("מטוסים")); stack.Controls.Add(planes);
-            squadrons.ItemCheck += (_, _) => BeginInvoke(new Action(() =>
+            var planeCaption = Label("מטוסים"); stack.Controls.Add(planeCaption); stack.Controls.Add(planes);
+            void RefreshPlanes()
             {
                 var old = planes.CheckedItems.Cast<string>().ToHashSet(); planes.Items.Clear();
                 foreach (var sq in squadrons.CheckedItems.Cast<string>())
                     foreach (var plane in NativeCatalog.Squadrons[sq].aircraft) planes.Items.Add($"{sq}/{plane}", old.Contains($"{sq}/{plane}"));
-            }));
-            stack.Controls.Add(Button("בחר את כל המטוסים", (_, _) => { for (var i = 0; i < planes.Items.Count; i++) planes.SetItemChecked(i, true); }));
-            stack.Controls.Add(Button("נקה בחירה", (_, _) => { for (var i = 0; i < planes.Items.Count; i++) planes.SetItemChecked(i, false); }));
+            }
+            squadrons.ItemCheck += (_, _) => BeginInvoke(new Action(RefreshPlanes));
+            var selectAll = Button("בחר את כל המטוסים", (_, _) =>
+            {
+                for (var i = 0; i < squadrons.Items.Count; i++) squadrons.SetItemChecked(i, true);
+                BeginInvoke(new Action(() => { RefreshPlanes(); for (var i = 0; i < planes.Items.Count; i++) planes.SetItemChecked(i, true); }));
+            });
+            var clearAll = Button("נקה בחירה", (_, _) => { for (var i = 0; i < planes.Items.Count; i++) planes.SetItemChecked(i, false); });
+            stack.Controls.Add(selectAll); stack.Controls.Add(clearAll);
             var people = new CheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
             foreach (var tech in technicians) people.Items.Add(new PersonChoice(new Account(tech.Id, tech.Name, tech.PersonalNumber, "mechanic")));
-            stack.Controls.Add(Label("טכנאים")); stack.Controls.Add(people);
+            var peopleCaption = Label("טכנאים"); stack.Controls.Add(peopleCaption); stack.Controls.Add(people);
+            var allDates = new CheckBox { Width = 440, Height = 40, Text = "כל התקופות" }; stack.Controls.Add(allDates);
             stack.Controls.Add(Label("מתאריך ושעה"));
             var from = new DateTimePicker { Width = 220, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now.AddDays(-1) };
             stack.Controls.Add(from);
             stack.Controls.Add(Label("עד תאריך ושעה"));
             var until = new DateTimePicker { Width = 220, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now };
             stack.Controls.Add(until);
+            allDates.CheckedChanged += (_, _) => { from.Enabled = !allDates.Checked; until.Enabled = !allDates.Checked; };
+            var formType = Choice(stack, "סוג טופס", ["תקלות והטענות מפתחות", "תקלות", "הטענות מפתחות"]);
+            formType.SelectedIndex = 1;
+            var stateFilter = Choice(stack, "סטטוס", ["כל המצבים", "פתוח", "ממתין לסגירה", "סגור"]);
+            stateFilter.SelectedIndex = 1;
+            void LayoutFilters()
+            {
+                var kind = report.SelectedIndex;
+                people.Visible = peopleCaption.Visible = kind == 4;
+                squadrons.Visible = squadCaption.Visible = kind != 0;
+                planes.Visible = planeCaption.Visible = selectAll.Visible = clearAll.Visible = kind != 0;
+                if (kind == 2) squadCaption.Text = "טייסת אחת ליומן טייסת";
+                else squadCaption.Text = "טייסות";
+            }
+            report.SelectedIndexChanged += (_, _) => LayoutFilters(); LayoutFilters();
+            Section(stack, "תצוגה מקדימה לדוח");
             var results = new DataGridView { Width = 745, Height = 360, ReadOnly = true, RowHeadersVisible = false,
                 AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
             results.Columns.Add("type", "סוג"); results.Columns.Add("serial", "מספר טופס"); results.Columns.Add("squad", "טייסת");
@@ -147,19 +170,24 @@ public sealed partial class NativeWindow
             {
                 try
                 {
-                    if (from.Value > until.Value) throw new ArgumentException("טווח התאריכים אינו תקין.");
+                    if (!allDates.Checked && from.Value > until.Value) throw new ArgumentException("טווח התאריכים אינו תקין.");
                     var selected = report.SelectedIndex;
                     if (selected < 1) throw new ArgumentException("בחר סוג דוח.");
                     var sq = squadrons.CheckedItems.Cast<string>().ToHashSet();
                     var ac = planes.CheckedItems.Cast<string>().ToHashSet();
                     var ids = people.CheckedItems.Cast<PersonChoice>().Select(x => x.User.Id).ToHashSet();
+                    if (selected == 2 && sq.Count != 1) throw new ArgumentException("ביומן טייסת יש לבחור טייסת אחת.");
                     if (selected == 3 && ac.Count != 1) throw new ArgumentException("בהיסטוריית מטוס יש לבחור מטוס יחיד.");
                     if (selected == 4 && ids.Count == 0) throw new ArgumentException("בחר טכנאי לדוח היסטוריית טכנאי.");
                     found = issues.Concat(keys).Where(item =>
                     {
                         var sheet = item["sheet"] ?? item;
                         var date = DateTime.TryParse(V(item, "createdAt"), out var parsed) ? parsed : DateTime.MinValue;
-                        if (date < from.Value || date > until.Value) return false;
+                        if (!allDates.Checked && (date < from.Value || date > until.Value)) return false;
+                        if (formType.SelectedIndex == 2 && item["sheet"] is null || formType.SelectedIndex == 3 && item["sheet"] is not null) return false;
+                        var itemStatus = V(item, "status");
+                        if (stateFilter.SelectedIndex > 1 && itemStatus != (stateFilter.SelectedIndex switch
+                            { 2 => "open", 3 => "pendingReview", 4 => "closed", _ => "" })) return false;
                         var squad = V(sheet, "squadron");
                         if (sq.Count > 0 && !sq.Contains(squad)) return false;
                         var aircraft = V(sheet, "aircraft");
@@ -178,9 +206,37 @@ public sealed partial class NativeWindow
                     foreach (var item in found)
                     {
                         var sheet = item["sheet"] ?? item; var kind = item["sheet"] is null ? "מפתחות" : "תקלה";
-                        results.Rows.Add(kind, V(item, "serial"), V(sheet, "squadron"), V(sheet, "aircraft"), V(item, "status"), V(item, "createdAt"));
+                        results.Rows.Add(kind, V(item, "serial"), V(sheet, "squadron"),
+                            V(sheet, "aircraft").Length > 0 ? V(sheet, "aircraft") : string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft"))),
+                            V(item, "status"), V(item, "createdAt"));
                     }
                     status.Text = $"נמצאו {found.Length} טפסים.";
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
+            stack.Controls.Add(Button("הורד PDF של הדוח", async (_, _) =>
+            {
+                try
+                {
+                    if (found.Length == 0) throw new ArgumentException("יש להציג תחילה דוח עם תוצאות.");
+                    status.Text = "מפיק PDF של הדוח…";
+                    var file = await Work(() => NativePdf.SaveReport(found, Selected(report), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)));
+                    status.Text = $"הדוח נשמר: {file}";
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
+            stack.Controls.Add(Button("הפק CSV", (_, _) =>
+            {
+                try
+                {
+                    if (results.Rows.Count == 0) throw new ArgumentException("אין תוצאות לייצוא.");
+                    var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    var file = Path.Combine(desktop, $"דוח - {Selected(report)} - {DateTime.Now:dd-MM-yyyy HH-mm}.csv");
+                    var records = new List<string> { "סוג,מספר טופס,טייסת,מטוס,סטטוס,תאריך" };
+                    foreach (DataGridViewRow row in results.Rows)
+                        records.Add(string.Join(",", row.Cells.Cast<DataGridViewCell>().Select(cell => "\"" + (cell.Value?.ToString() ?? "").Replace("\"", "\"\"") + "\"")));
+                    File.WriteAllLines(file, records, new System.Text.UTF8Encoding(true));
+                    status.Text = $"הקובץ נשמר: {file}";
                 }
                 catch (Exception ex) { Error(ex); }
             }));
