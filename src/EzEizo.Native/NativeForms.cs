@@ -346,7 +346,7 @@ public sealed partial class NativeWindow
             var table = Table(stack, state, kind);
             table.Visible = toggle.Checked;
             toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
-            if (kind == "tools") ToolReviews(stack, state, controls);
+            if (kind == "tools") ToolReviews(stack, state, controls, toggle);
             if (kind == "taken")
             {
                 var declaration = TakenDeclaration(stack, state, controls);
@@ -454,8 +454,13 @@ public sealed partial class NativeWindow
         return grid;
     }
 
-    private static void ToolReviews(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
+    private static void ToolReviews(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads, CheckBox toolsToggle)
     {
+        var reviews = new FlowLayoutPanel { Width = 745, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Visible = toolsToggle.Checked };
+        toolsToggle.CheckedChanged += (_, _) => reviews.Visible = toolsToggle.Checked;
+        stack.Controls.Add(reviews);
         foreach (var (title, toggle, fields) in new[]
         {
             ("ביקורת כניסה", "entryEnabled", new[] { ("entryTechnicianSignature", "חתימת טכנאי", true), ("entryInspectorSignature", "חתימת בודק", true), ("entryInspectorNumber", "מספר אישי של הבודק", false) }),
@@ -463,7 +468,7 @@ public sealed partial class NativeWindow
             ("ביקורת בסיום העבודה", "finalEnabled", new[] { ("finalTechnicianSignature", "חתימת טכנאי", true), ("finalInspectorNumber", "מספר אישי של הבודק", false), ("finalInspectorSignature", "חתימת בודק", true), ("finalLeadName", "שם ר״צ / מ״ע", false), ("finalLeadSignature", "חתימת ר״צ / מ״ע", true), ("departureTime", "שעת עזיבה", false) })
         })
         {
-            var box = Check(stack, title, state, toggle);
+            var box = Check(reviews, title, state, toggle);
             var group = new FlowLayoutPanel { Width = 750, AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (var (key, label, sign) in fields)
@@ -475,7 +480,7 @@ public sealed partial class NativeWindow
                     if (key.EndsWith("InspectorNumber")) Numeric(input);
                 }
             group.Visible = box.Checked; box.CheckedChanged += (_, _) => group.Visible = box.Checked;
-            stack.Controls.Add(group);
+            reviews.Controls.Add(group);
         }
     }
 
@@ -603,7 +608,7 @@ public sealed partial class NativeWindow
             Section(stack, NativeCatalog.Tables[kind].title);
             var box = Check(stack, NativeCatalog.Tables[kind].title, work, kind + "Enabled");
             var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
-            if (kind == "tools") ToolReviews(stack, work, pads);
+            if (kind == "tools") ToolReviews(stack, work, pads, box);
             if (kind == "taken")
             {
                 var declaration = TakenDeclaration(stack, work, pads);
