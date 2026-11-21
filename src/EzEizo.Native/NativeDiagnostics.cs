@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace EzEizo.Core;
 
 public static class NativeDiagnostics
@@ -131,7 +133,24 @@ public static class NativeDiagnostics
     }
     public static void VerifyTechnicianUi()
     {
-        new Database().CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        var db = new Database();
+        var technician = db.CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        var initial = Path.Combine(Database.DataDirectory, "initial-manager.txt");
+        var secret = File.ReadAllLines(initial).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
+        var manager = db.Authenticate("9862436", secret, AppRole.Manager)
+            ?? throw new InvalidOperationException("The manager template is missing.");
+        var store = new OfflineStore();
+        using var issue = JsonDocument.Parse("""{"fault":"בדיקת ממשק תקלה","squadron":"105","shelter":"14","aircraft":"603","systemName":"מכם | FCR","systemCode":"74A","constants":{},"actions":[]}""");
+        using var assignment = JsonDocument.Parse(JsonSerializer.Serialize(new[] { new { uid = technician.Id, name = technician.Name } }));
+        store.CreateIssues(issue.RootElement, assignment.RootElement, manager);
+        using var key = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            squadron = "105", shelter = "14", date = DateTime.Today.ToString("yyyy-MM-dd"),
+            time = DateTime.Now.ToString("HH:mm"), period = "11-12/26",
+            teamUids = new[] { technician.Id }, teamNames = new[] { technician.Name },
+            rows = new[] { new { aircraft = "603", blue = true, shach = true, notes = "בדיקת ממשק" } }
+        }));
+        store.CreateKey(key.RootElement, manager);
         using var window = new NativeWindow(AppRole.Mechanic);
         var stage = 0;
         var started = DateTime.UtcNow;
@@ -141,7 +160,7 @@ public static class NativeDiagnostics
         {
             try
             {
-                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(45))
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(90))
                 { failure = "Technician UI timed out on " + window.DiagnosticPage; window.Close(); return; }
                 var controls = Descendants(window).ToArray();
                 if (stage == 0 && window.DiagnosticPage == "login")
@@ -153,12 +172,32 @@ public static class NativeDiagnostics
                     stage = 1;
                 }
                 else if (stage == 1 && window.DiagnosticPage == "queue")
-                { Capture(window, "native-technician-queue.png"); stage = 2; window.Close(); }
+                {
+                    Capture(window, "native-technician-queue.png");
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("תקלה ")).PerformClick(); stage = 2;
+                }
+                else if (stage == 2 && window.DiagnosticPage == "fault-editor")
+                {
+                    if (!controls.OfType<Label>().Any(x => x.Text == "פעולות אחזקה"))
+                        throw new InvalidOperationException("Fault editor is missing its actions.");
+                    Capture(window, "native-technician-fault.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 3;
+                }
+                else if (stage == 3 && window.DiagnosticPage == "queue")
+                {
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("הטענת מפתחות ")).PerformClick(); stage = 4;
+                }
+                else if (stage == 4 && window.DiagnosticPage == "key-editor")
+                {
+                    var grid = controls.OfType<DataGridView>().FirstOrDefault(x => x.Columns.Contains("blue") && x.Columns.Contains("shach"));
+                    if (grid?.Rows.Count != 1) throw new InvalidOperationException("Technician key table is missing or malformed.");
+                    Capture(window, "native-technician-key.png"); stage = 5; window.Close();
+                }
             }
             catch (Exception ex) { failure = ex.ToString(); window.Close(); }
         };
         timer.Start(); Application.Run(window);
-        if (stage != 2) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
+        if (stage != 5) throw new InvalidOperationException(failure ?? "Technician UI did not complete.");
     }
     public static void VerifyPdf()
     {
