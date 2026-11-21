@@ -57,7 +57,13 @@ public static class NativeDiagnostics
                 }
                 if (stage == 5 && window.DiagnosticPage == "users") { Capture(window, "native-users.png"); stage = 6; window.Close(); }
             }
-            catch (Exception ex) { failure = ex.ToString(); window.Close(); }
+            catch (Exception ex)
+            {
+                failure = $"Stage {stage}, page {window.DiagnosticPage}, buttons: " +
+                    string.Join(" | ", Descendants(window).OfType<Button>().Select(x => x.Text)) +
+                    Environment.NewLine + ex;
+                window.Close();
+            }
         };
         timer.Start();
         Application.Run(window);
