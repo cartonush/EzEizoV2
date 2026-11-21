@@ -47,6 +47,8 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 3 && window.DiagnosticPage == "new-fault")
                 {
+                    foreach (var title in new[] { "נתוני התקלה", "תיאור תקלה", "קבועים", "12 משימות חובה", "פתיחת התקלה" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title)) throw new InvalidOperationException("Missing fault section: " + title);
                     Capture(window, "native-new-fault.png");
                     controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 4;
                 }
@@ -57,7 +59,20 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 5 && window.DiagnosticPage == "new-key")
                 {
+                    foreach (var title in new[] { "הטענת מפתחות", "רשימת הטענה", "משימות לביצוע" })
+                        if (!controls.OfType<Label>().Any(x => x.Text == title)) throw new InvalidOperationException("Missing key section: " + title);
+                    var keyGrid = controls.OfType<DataGridView>().Single(x => x.Columns.Contains("blue") && x.Columns.Contains("shach"));
+                    if (keyGrid.Columns["blue"].FillWeight != keyGrid.Columns["shach"].FillWeight)
+                        throw new InvalidOperationException("Key check columns must have equal width.");
                     Capture(window, "native-new-key.png");
+                    var page = controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.AutoScroll && x.BackColor == Color.FromArgb(242, 246, 248));
+                    if (page is not null)
+                    {
+                        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height / 2);
+                        window.Update(); Capture(window, "native-new-key-middle.png");
+                        page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height);
+                        window.Update(); Capture(window, "native-new-key-bottom.png");
+                    }
                     controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 6;
                 }
                 else if (stage == 6 && window.DiagnosticPage == "management")
