@@ -108,6 +108,15 @@ jobs:
             if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
             $process.Kill()
           }
+      - name: Smoke test native manager login and navigation
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--ui-smoke' -PassThru
+          if (!$result.WaitForExit(60000) -or $result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'Native manager login or navigation failed'
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-experiment
