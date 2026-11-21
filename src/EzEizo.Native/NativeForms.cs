@@ -285,9 +285,12 @@ public sealed partial class NativeWindow
         var state = saved is not null ? Object(JsonNode.Parse(saved)) :
             Object(doc["closed"]?["state"]?.DeepClone());
         var controls = new Dictionary<string, NativeSignature>();
-        Section(stack, "טופס טיפול בתקלה");
+        Section(stack, "בדיקת בטיחות המטוס");
         var faultBar = EditorBar(stack);
         controls["safetyTechnicianSignature"] = Signature(stack, "בדיקת המטוס בטוח לאחזקה טרם התהליך: אין קסטות מוץ / נורים וכפט״ים מורכבים על המטוס. חתימת הטכנאי", state, "safetyTechnicianSignature", true);
+        Section(stack, "תקלה ותיקון");
+        stack.Controls.Add(Label("תיאור תקלה", 34, true));
+        stack.Controls.Add(Label(V(sheet, "fault"), 76));
         Field(stack, "תיאור תיקון", state, "repair", true);
         stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
         Field(stack, "הערת טכנאי", state, "technicianNote", true);
@@ -332,20 +335,26 @@ public sealed partial class NativeWindow
                 stack.Controls.Add(box);
             }
         }
+        Section(stack, "יחידות שפורקו והורכבו");
         foreach (var kind in NativeCatalog.Tables.Keys)
         {
-            if (kind == "installed") Section(stack, "יחידות שהורכבו");
+            if (kind == "tools") Section(stack, "כלים");
+            if (kind == "taken") Section(stack, "קשיחים שנלקחו");
+            if (kind == "rejected") Section(stack, "קשיחים שנפסלו");
             var toggle = kind == "installed" ? stack.Controls.OfType<CheckBox>().Last(x => x.Text == "יחידות שפורקו") :
                 Check(stack, NativeCatalog.Tables[kind].title, state, kind == "removed" ? "unitsEnabled" : kind + "Enabled");
             var table = Table(stack, state, kind);
             table.Visible = toggle.Checked;
             toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
+            if (kind == "tools") ToolReviews(stack, state, controls);
+            if (kind == "taken")
+            {
+                var declaration = TakenDeclaration(stack, state, controls);
+                declaration.Visible = toggle.Checked;
+                toggle.CheckedChanged += (_, _) => declaration.Visible = toggle.Checked;
+            }
         }
-        ToolReviews(stack, state, controls);
-        var takenDeclaration = TakenDeclaration(stack, state, controls);
-        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
-        takenDeclaration.Visible = takenToggle.Checked;
-        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
+        Section(stack, "הצהרת הטכנאי");
         controls["technicianDeclarationSignature"] = Signature(stack,
             "הנני מאשר שכל הפרטים הרשומים שלמים, נכונים ומדויקים. הנני מאשר שעדכנתי במערכות ממוכנות / בספר המטוס את מספרי המכשירים שפורקו והורכבו. הנני מאשר שהעברתי את המכשירים התקולים בצירוף תגי בר תיקון ממולאים בצורה מושלמת. הדף בלשון זכר אך מתייחס לשני המינים. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
@@ -591,14 +600,17 @@ public sealed partial class NativeWindow
         var pads = new Dictionary<string, NativeSignature>();
         foreach (var kind in new[] { "tools", "taken", "rejected" })
         {
+            Section(stack, NativeCatalog.Tables[kind].title);
             var box = Check(stack, NativeCatalog.Tables[kind].title, work, kind + "Enabled");
             var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
+            if (kind == "tools") ToolReviews(stack, work, pads);
+            if (kind == "taken")
+            {
+                var declaration = TakenDeclaration(stack, work, pads);
+                declaration.Visible = box.Checked;
+                box.CheckedChanged += (_, _) => declaration.Visible = box.Checked;
+            }
         }
-        ToolReviews(stack, work, pads);
-        var takenDeclaration = TakenDeclaration(stack, work, pads);
-        var takenToggle = stack.Controls.OfType<CheckBox>().Last(x => x.Text == "קשיחים שנלקחו");
-        takenDeclaration.Visible = takenToggle.Checked;
-        takenToggle.CheckedChanged += (_, _) => takenDeclaration.Visible = takenToggle.Checked;
         void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
         keyBar.Controls.Add(Button("שמירה", async (_, _) =>
         {
