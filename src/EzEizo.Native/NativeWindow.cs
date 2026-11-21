@@ -155,7 +155,7 @@ public sealed partial class NativeWindow : Form
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
-            var nav = new FlowLayoutPanel { Width = 780, Height = role == AppRole.Manager ? 116 : 65, WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
+            var nav = new FlowLayoutPanel { Width = 780, Height = role == AppRole.Manager ? 176 : 65, WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
             nav.Controls.Add(Button("תקלות", async (_, _) => await OpenList("issues")));
             nav.Controls.Add(Button("מפתחות", async (_, _) => await OpenList("keys")));
             if (role == AppRole.Manager) nav.Controls.Add(Button(page == "issues" ? "פתיחת תקלה" : "הטענת מפתחות", async (_, _) =>
@@ -163,6 +163,9 @@ public sealed partial class NativeWindow : Form
                 if (page == "issues") await ShowCreateFault(); else await ShowCreateKey();
             }));
             if (role == AppRole.Manager) nav.Controls.Add(Button("משתמשים", async (_, _) => await OpenUsers()));
+            if (role == AppRole.Manager) nav.Controls.Add(Button("קבועים", async (_, _) => await OpenConstants()));
+            if (role == AppRole.Manager) nav.Controls.Add(Button("היסטוריית מפתחות", async (_, _) => await OpenKeyHistory()));
+            if (role == AppRole.Manager) nav.Controls.Add(Button("הפקת דוחות", async (_, _) => await OpenReports()));
             nav.Controls.Add(Button("רענון", async (_, _) => await OpenList(page)));
             nav.Controls.Add(Button("התנתק", async (_, _) => { await ReleaseForm(); account = null; Login(); }));
             stack.Controls.Add(nav);
