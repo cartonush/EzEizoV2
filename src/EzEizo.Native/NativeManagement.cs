@@ -115,6 +115,7 @@ public sealed partial class NativeWindow
             var stack = Stack();
             Section(stack, "הפקת דוחות");
             var report = Choice(stack, "סוג הדוח", ["יומן פעילות", "יומן טייסת", "היסטוריית מטוס", "היסטוריית תקלות טכנאי", "תקלות פתוחות", "דפים ממתינים לסגירה", "תקלות סגורות"]);
+            Section(stack, "סינון הדוח");
             var squadrons = new CheckedListBox { Width = 440, Height = 100, CheckOnClick = true };
             squadrons.Items.AddRange(NativeCatalog.Squadrons.Keys.Cast<object>().ToArray());
             var squadCaption = Label("טייסות"); stack.Controls.Add(squadCaption); stack.Controls.Add(squadrons);
