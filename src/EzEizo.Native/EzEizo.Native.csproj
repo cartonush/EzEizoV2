@@ -12,6 +12,8 @@
     <Compile Include="../EzEizo.Core/OfflineStore.cs" Link="OfflineStore.cs" />
     <Compile Include="../EzEizo.Core/Models.cs" Link="Models.cs" />
     <Compile Include="../EzEizo.Core/SharedDatabaseStartup.cs" Link="SharedDatabaseStartup.cs" />
+    <Compile Include="../EzEizo.Core/SmokeTest.cs" Link="SmokeTest.cs" />
+    <Compile Include="../EzEizo.Core/OfflineSmokeTest.cs" Link="OfflineSmokeTest.cs" />
     <Compile Include="NativeWindow.cs" />
     <Compile Include="NativeForms.cs" />
     <Compile Include="NativeCatalog.cs" />
@@ -19,5 +21,6 @@
     <Compile Include="NativeCreate.cs" />
     <Compile Include="NativeManagement.cs" />
     <Compile Include="NativePdf.cs" />
+    <Compile Include="NativeDiagnostics.cs" />
   </ItemGroup>
 </Project>
