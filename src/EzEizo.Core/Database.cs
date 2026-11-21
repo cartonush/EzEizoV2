@@ -135,7 +135,7 @@ public sealed class Database
         }
         catch (FormatException) { return null; }
     }
-    // Provision only on first launch. Never ship a reusable administrator password.
+    // Provision only on first launch. The offline demonstration template uses the requested six-digit password.
     public void EnsureDemoManager()
     {
         const string name = "רועי סויסה", number = "9862436";
@@ -179,7 +179,7 @@ public sealed class Database
             update.ExecuteNonQuery();
         }
     }
-    private static string NewInitialPassword() => RandomNumberGenerator.GetInt32(1_000_000).ToString("D6");
+    private static string NewInitialPassword() => "111111";
     private static void WriteInitialPassword(string number, string password)
     {
         Directory.CreateDirectory(DataDirectory);
