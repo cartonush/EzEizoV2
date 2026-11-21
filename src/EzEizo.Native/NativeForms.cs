@@ -86,9 +86,9 @@ public sealed partial class NativeWindow
     {
         var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White, Margin = new Padding(0, 12, 0, 8) };
         heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
-            TextAlign = ContentAlignment.MiddleRight, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
         heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
-            TextAlign = ContentAlignment.MiddleRight, ForeColor = Navy, Font = new Font("Segoe UI", 16, FontStyle.Bold) });
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = new Font("Segoe UI", 16, FontStyle.Bold) });
         heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
         stack.Controls.Add(heading);
     }
