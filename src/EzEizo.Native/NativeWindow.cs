@@ -322,17 +322,19 @@ public sealed partial class NativeWindow : Form
         stack.Controls.Add(Label("דף בית", 29));
         stack.Controls.Add(Label("שלום " + account.Name, 58, true));
         stack.Controls.Add(Label("בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.", 45));
-        var tiles = new FlowLayoutPanel { Width = 785, Height = 250, WrapContents = true };
+        var tiles = new FlowLayoutPanel { Width = 970, Height = 370, WrapContents = true };
         foreach (var (title, detail, action) in new (string, string, Func<Task>)[]
         {
             ("פתיחת תקלה", "יצירת דף טיפול חדש לטכנאים", ShowCreateFault),
-            ("תקלות פתוחות וסגורות", "מעקב וחתימת בודק הדף", () => OpenList("issues")),
+            ("תקלות פתוחות", "משימות טיפול פעילות", () => OpenList("issues")),
+            ("תקלות לסגירה וסגורות", "סקירה וחתימת בודק הדף", async () =>
+            { listSection = "issues"; statusFilter = "ממתין לסגירה"; await OpenList("issues"); }),
             ("מפתחות", "פתיחת הטענה, מעקב והיסטוריה", () => OpenList("keys")),
             ("ניהול", "משתמשים, דוחות וקבועים", OpenManagementHome)
         })
         {
             var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 375; tile.Height = 105;
+            tile.Secondary = true; tile.Width = 465; tile.Height = 105;
             tile.TileTitle = title; tile.TileDescription = detail;
             tiles.Controls.Add(tile);
         }
@@ -526,7 +528,7 @@ public sealed partial class NativeWindow : Form
             stack.Controls.Add(Label("בחר תקלה או הטענת מפתחות פתוחה מהרשימה כדי למלא את הטופס שלה.", 52));
             var search = Input("חפש מספר טופס", 20);
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 780, Height = 520, AutoScroll = true,
+            var cards = new FlowLayoutPanel { Width = 1010, Height = 520, AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
             void Render()
@@ -548,7 +550,7 @@ public sealed partial class NativeWindow : Form
                     var card = (NativeButton)Button(
                         $"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · מטוס {aircraft}{Environment.NewLine}{sheet["squadron"]} · משימה פתוחה",
                         async (_, _) => await OpenDocument(page, id));
-                    card.Secondary = true; card.Width = 735; card.Height = 80;
+                    card.Secondary = true; card.Width = 970; card.Height = 80;
                     cards.Controls.Add(card);
                 }
             }
