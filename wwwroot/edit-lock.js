@@ -1,4 +1,4 @@
-import { acquireEditLock, releaseEditLock, watchEditLock } from "./firebase-sync.js?v=1.6.3";
+import { acquireEditLock, releaseEditLock, watchEditLock } from "./access-sync.js?v=1.6.3";
 
 // The lease expires after a crashed window. A live editor renews it regularly.
 export function createEditLock({ kind, serialOrId, formId, user, onChange }) {
@@ -36,7 +36,7 @@ export function createEditLock({ kind, serialOrId, formId, user, onChange }) {
     } catch (error) {
       held = false;
       if (error.code === "unavailable") document.dispatchEvent(new Event("ezeizo:connection-lost"));
-      emit(error.code === "permission-denied" ? "לא ניתן לנעול את הטופס. יש לפרסם את כללי Firestore המעודכנים." : `אבדה התקשורת עם השרת או שנעילת העריכה נכשלה: ${error.message}. נסה להפעיל מחדש את האפליקציה או את המכשיר.`);
+      emit(`לא ניתן לנעול את הטופס במסד המקומי: ${error.message}. בדוק שהקובץ אינו פתוח בתוכנה אחרת ונסה שוב.`);
     } finally { acquiring = false; }
   }
   function dispose() {

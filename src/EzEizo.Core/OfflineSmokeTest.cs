@@ -10,6 +10,13 @@ public static class OfflineSmokeTest
     {
         var store = new OfflineStore();
         store.Initialize();
+        store.SaveDraft("ezeizo-metis-draft-v1", "טיוטה מקומית", manager);
+        if (new OfflineStore().Drafts(manager)["ezeizo-metis-draft-v1"] != "טיוטה מקומית" ||
+            new OfflineStore().Drafts(technician).ContainsKey("ezeizo-metis-draft-v1"))
+            throw new InvalidOperationException("טיוטות Access אינן מופרדות לפי משתמש.");
+        store.RemoveDraft("ezeizo-metis-draft-v1", manager);
+        if (store.Drafts(manager).ContainsKey("ezeizo-metis-draft-v1"))
+            throw new InvalidOperationException("מחיקת טיוטה נכשלה.");
         using var sheet = Document(new { fault = "פירוק והרכבה אנטנת מכם", squadron = "105", aircraft = "603", actions = Array.Empty<string>(), constants = new { } });
         using var assigned = Document(new[] { new { uid = technician.Id, name = technician.Name } });
         var serial = store.CreateIssues(sheet.RootElement, assigned.RootElement, manager);

@@ -39,6 +39,57 @@ public sealed class OfflineStore
             using var index = Cmd(c, null, "CREATE INDEX [IX_OfflineCollection] ON [OfflineDocuments] ([CollectionName])");
             index.ExecuteNonQuery();
         }
+        if (!names.Contains("OfflineDrafts"))
+        {
+            using var cmd = Cmd(c, null, "CREATE TABLE [OfflineDrafts] ([DraftID] TEXT(36) PRIMARY KEY, [UserID] TEXT(36), [DraftKey] TEXT(120), [Payload] MEMO, [UpdatedAt] DATETIME)");
+            cmd.ExecuteNonQuery();
+            using var index = Cmd(c, null, "CREATE UNIQUE INDEX [UX_OfflineDraft] ON [OfflineDrafts] ([UserID],[DraftKey])");
+            index.ExecuteNonQuery();
+        }
+    }
+    private static void CheckDraftKey(string key)
+    {
+        if (key.Length is < 1 or > 120 || !(key.StartsWith("ezeizo-") || key.StartsWith("fault-sheet-")))
+            throw new ArgumentException("מפתח טיוטה אינו תקין.");
+    }
+    public Dictionary<string, string> Drafts(Account actor)
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, null, "SELECT [DraftKey],[Payload] FROM [OfflineDrafts] WHERE [UserID]=?", actor.Id);
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<string, string>();
+        while (reader is not null && reader.Read()) result.Add(reader.GetString(0), reader.GetString(1));
+        return result;
+    }
+    public void SaveDraft(string key, string value, Account actor)
+    {
+        CheckDraftKey(key);
+        if (value.Length > 5_000_000) throw new ArgumentException("הטיוטה גדולה מדי.");
+        using var c = Open(); using var tx = c.BeginTransaction();
+        try
+        {
+            using var lookup = Cmd(c, tx, "SELECT [DraftID] FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", actor.Id, key);
+            var id = lookup.ExecuteScalar() as string;
+            if (id is null)
+            {
+                using var insert = Cmd(c, tx, "INSERT INTO [OfflineDrafts] ([DraftID],[UserID],[DraftKey],[Payload],[UpdatedAt]) VALUES (?,?,?,?,?)", Guid.NewGuid().ToString(), actor.Id, key, value, DateTime.Now);
+                insert.ExecuteNonQuery();
+            }
+            else
+            {
+                using var update = Cmd(c, tx, "UPDATE [OfflineDrafts] SET [Payload]=?,[UpdatedAt]=? WHERE [DraftID]=?", value, DateTime.Now, id);
+                update.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }
+        catch { tx.Rollback(); throw; }
+    }
+    public void RemoveDraft(string key, Account actor)
+    {
+        CheckDraftKey(key);
+        using var c = Open();
+        using var cmd = Cmd(c, null, "DELETE FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", actor.Id, key);
+        cmd.ExecuteNonQuery();
     }
     private static string Value(JsonNode? node, string key) => node?[key]?.ToString() ?? "";
     private static string Now() => DateTimeOffset.Now.ToString("o");

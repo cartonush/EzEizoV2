@@ -1,5 +1,6 @@
+import { draftState } from "./access-state.js";
 import "./sheet-data.js?v=1.6.3";
-import { gate, revealApp, watchIssues, watchKeyLoads, getIssue, submitForReview, approveIssue, reopenIssue } from "./firebase-sync.js?v=1.6.3";
+import { gate, revealApp, watchIssues, watchKeyLoads, getIssue, submitForReview, approveIssue, reopenIssue } from "./access-sync.js?v=1.6.3";
 import { attachSignaturePad } from "./signature-canvas.js?v=1.6.3";
 import { validateTreatment } from "./mechanic-validation.js?v=1.6.3";
 import { attachTimeNow } from "./time-now.js?v=1.6.3";
@@ -92,7 +93,7 @@ if (["closed", "pendingReview"].includes(remoteIssue?.status) && remoteIssue.clo
   state = { ...defaultState, ...remoteIssue.closed.state };
 } else if (remoteIssue?.status === "open" && remoteIssue.reopenedAt && state.reopenMarker !== remoteIssue.reopenedAt) {
   state = { ...defaultState, ...remoteIssue.closed.state, closedAt: "", reopenMarker: remoteIssue.reopenedAt };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  draftState.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 state.completionTime = state.completionTime || "";
 state.arrivalTime = state.arrivalTime || "";
@@ -104,7 +105,7 @@ state.actions[1] = Boolean(state.arrivalTime) || Boolean(remoteIssue?.status ===
 state.actions[ACTIONS.length - 1] = Boolean(state.completionTime);
 
 function loadState() {
-  try { return { ...defaultState, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") }; }
+  try { return { ...defaultState, ...JSON.parse(draftState.getItem(STORAGE_KEY) || "{}") }; }
   catch { return { ...defaultState }; }
 }
 
@@ -112,12 +113,16 @@ function saveState() {
   if (managerClosedView) return;
   if (state.closedAt) return;
   const status = document.querySelector("#save-state");
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch { status.textContent = "שמירת הטיוטה במכשיר נכשלה. השאר את הטופס פתוח ופנה מקום באחסון."; status.dataset.state = "error"; return; }
-  delete status.dataset.state;
-  status.textContent = "נשמר עכשיו במכשיר";
+  status.textContent = "שומר במסד המקומי…";
+  void draftState.setItem(STORAGE_KEY, JSON.stringify(state)).then(() => {
+    delete status.dataset.state;
+    status.textContent = "נשמר עכשיו במסד המקומי";
+  }).catch((error) => {
+    status.textContent = `שמירת הטיוטה במסד נכשלה: ${error.message}`;
+    status.dataset.state = "error";
+  });
   window.clearTimeout(saveState.timer);
-  saveState.timer = window.setTimeout(() => { status.textContent = "נשמר אוטומטית במכשיר"; }, 1400);
+  saveState.timer = window.setTimeout(() => { if (status.dataset.state !== "error") status.textContent = "נשמר אוטומטית במסד המקומי"; }, 1400);
 }
 
 function renderSheetDetails() {
@@ -392,7 +397,7 @@ async function submitTreatment() {
   try {
     await submitForReview(sheet.id, record, closingState, editLock.session);
     Object.assign(state, closingState);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* The transaction has already saved the form on the server. */ }
+    try { draftState.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* The submitted form is already saved in Access. */ }
     showClosed();
     editLock.dispose();
     document.querySelector("#close-title").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -418,7 +423,7 @@ watchIssues((issues) => {
   }
   if (["closed", "pendingReview"].includes(current?.status) && !state.closedAt) {
     state = { ...defaultState, ...current.closed.state };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    draftState.setItem(STORAGE_KEY, JSON.stringify(state));
     location.reload();
   }
 }, (error) => { const list = document.querySelector("#mechanic-issues"); list.textContent = `לא ניתן לטעון תקלות: ${error.message}`; list.dataset.state = "error"; if (error.code === "unavailable") document.dispatchEvent(new Event("ezeizo:connection-lost")); }, managerClosedView ? null : currentUser.uid);

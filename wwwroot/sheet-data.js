@@ -1,3 +1,4 @@
+import { draftState } from "./access-state.js";
 (function () {
   const defaultSheet = {
     id: "example",
@@ -91,13 +92,13 @@
   const ISSUES_KEY = "ezeizo-issues-v1";
   const CLOSED_KEY = "ezeizo-closed-v1";
   function readList(key) {
-    try { const value = JSON.parse(localStorage.getItem(key) || "[]"); return Array.isArray(value) ? value : []; }
+    try { const value = JSON.parse(draftState.getItem(key) || "[]"); return Array.isArray(value) ? value : []; }
     catch { return []; }
   }
   function upsert(key, item) {
     const list = readList(key).filter((entry) => entry && entry.id !== item.id);
     list.unshift(item);
-    localStorage.setItem(key, JSON.stringify(list));
+    draftState.setItem(key, JSON.stringify(list));
     return list;
   }
   function encodePayload(value) {

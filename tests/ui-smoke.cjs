@@ -41,6 +41,7 @@ const mock = () => {
     const page=await browser.newPage();
     await page.addInitScript(mock);
     const errors=[];
+    page.on('request',request=>{if(/^https?:/.test(request.url()) && new URL(request.url()).origin!==origin)errors.push(`External request: ${request.url()}`);});
     page.on('pageerror',e=>errors.push(e.message));
     page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
     await page.goto(`${origin}/index.html?role=manager`);
@@ -50,6 +51,9 @@ const mock = () => {
     await page.waitForURL('**/Metis/index.html');
     await page.locator('main:not([hidden])').waitFor();
     assert.match(await page.locator('body').innerText(),/פתיחת תקלה|ניהול/);
+    await page.goto(`${origin}/Metis/index.html#new`);
+    await page.locator('#view-new:not([hidden])').waitFor();
+    assert.doesNotMatch(await page.locator('body').innerText(),/Firestore|Firebase/);
     await page.goto(`${origin}/Metis/index.html#reports`);
     await page.locator('main:not([hidden])').waitFor();
     await page.goto(`${origin}/Metis/index.html#keys`);

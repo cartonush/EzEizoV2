@@ -1,5 +1,6 @@
+import { draftState } from "../access-state.js";
 import "../sheet-data.js?v=1.6.3";
-import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, changeTechnicianPassword, assignIssue, appendIssueManagerNote } from "../firebase-sync.js?v=1.6.3";
+import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, changeTechnicianPassword, assignIssue, appendIssueManagerNote } from "../access-sync.js?v=1.6.3";
 import { SQUADRONS, SYSTEMS, WORKSHOPS, EW_SYSTEMS, validateCatalogSelection } from "./catalog.js?v=1.6.3";
 import { resolveAssignees } from "./assignee-selection.js?v=1.6.3";
 import { attachSignaturePad } from "../signature-canvas.js?v=1.6.3";
@@ -25,20 +26,21 @@ function setStatus(selector, message, error = false) {
 
 function loadDraft() {
   try {
-    return EzEizoData.normalizeSheet(JSON.parse(localStorage.getItem(DRAFT_KEY))) || EzEizoData.normalizeSheet(EzEizoData.defaultSheet);
+    return EzEizoData.normalizeSheet(JSON.parse(draftState.getItem(DRAFT_KEY))) || EzEizoData.normalizeSheet(EzEizoData.defaultSheet);
   } catch {
     return EzEizoData.normalizeSheet(EzEizoData.defaultSheet);
   }
 }
 
 function saveDraft() {
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  localStorage.setItem(PICKER_KEY, JSON.stringify(selections));
-  draftStatus.textContent = "הטיוטה נשמרה במכשיר הזה";
+  draftStatus.textContent = "שומר טיוטה במסד המקומי…";
+  return Promise.all([draftState.setItem(DRAFT_KEY, JSON.stringify(draft)), draftState.setItem(PICKER_KEY, JSON.stringify(selections))])
+    .then(() => { draftStatus.textContent = "הטיוטה נשמרה במסד המקומי"; delete draftStatus.dataset.state; })
+    .catch((error) => { draftStatus.textContent = `שמירת הטיוטה נכשלה: ${error.message}`; draftStatus.dataset.state = "error"; });
 }
 
 function loadSelections() {
-  try { const value = JSON.parse(localStorage.getItem(PICKER_KEY) || "{}"); return value && typeof value === "object" && !Array.isArray(value) ? value : {}; }
+  try { const value = JSON.parse(draftState.getItem(PICKER_KEY) || "{}"); return value && typeof value === "object" && !Array.isArray(value) ? value : {}; }
   catch { return {}; }
 }
 

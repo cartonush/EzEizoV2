@@ -1,6 +1,7 @@
 // Offline adapter for the original website UI. Every persisted change goes through
 // the desktop host into the local Access database. There is no Firebase import.
 import {call,observe} from './offline-bridge.js';
+import {initializeDrafts} from './access-state.js';
 const iso=()=>new Date().toISOString();
 const list=(collection,filter)=>call('offline.list',{collection,filter});
 const update=(collection,id,operation,extra={})=>call('offline.update',{collection,id,operation,...extra});
@@ -9,6 +10,12 @@ let user=null;
 export async function gate(role){
   const data=await call('home');
   if(data.role!==(role==='manager'?'manager':'mechanic'))throw new Error('אין הרשאה למסך זה.');
+  await initializeDrafts();
+  document.addEventListener('ezeizo:storage-error', (event) => {
+    let notice=document.querySelector('#access-storage-error');
+    if(!notice){notice=document.createElement('p');notice.id='access-storage-error';notice.className='copy-status';notice.dataset.state='error';document.querySelector('main')?.prepend(notice);}
+    if(notice)notice.textContent=`שמירת הטיוטה במסד המקומי נכשלה: ${event.detail}. יש להשאיר את הטופס פתוח ולנסות שוב.`;
+  });
   user={uid:data.uid,name:data.name,email:data.email};
   const logout=document.createElement('button');logout.className='secondary-button auth-logout';logout.type='button';logout.textContent='התנתק';
   logout.onclick=async()=>{await call('logout');location.href=location.pathname.includes('/Metis/')?'../index.html?role=manager':'../index.html?role=mechanic';};

@@ -40,6 +40,14 @@ public sealed class MainWindow : Form
             {
                 if (!e.Uri.StartsWith("https://ezeizo.local/", StringComparison.OrdinalIgnoreCase)) e.Cancel = true;
             };
+            web.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            web.CoreWebView2.WebResourceRequested += (_, e) =>
+            {
+                if (Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri) &&
+                    ((uri.Scheme == "https" && uri.Host.Equals("ezeizo.local", StringComparison.OrdinalIgnoreCase)) ||
+                     uri.Scheme is "blob" or "data")) return;
+                e.Response = web.CoreWebView2.Environment.CreateWebResourceResponse(null, 403, "Offline application", "Content-Type: text/plain");
+            };
             web.Source = new Uri($"https://ezeizo.local/index.html?role={(role == AppRole.Manager ? "manager" : "mechanic")}");
         }
         catch (Exception ex)
@@ -89,6 +97,9 @@ public sealed class MainWindow : Form
                 "offline.changeTechnicianPassword" => ChangeTechnicianPassword(p),
                 "offline.setTechnicianActive" => SetTechnicianActive(p),
                 "offline.deleteTechnician" => DeleteTechnician(p),
+                "offline.drafts" => store.Drafts(RequireLogin()),
+                "offline.saveDraft" => SaveLocalDraft(p),
+                "offline.removeDraft" => RemoveLocalDraft(p),
                 _ => throw new InvalidOperationException("פעולה לא מוכרת.")
             };
             Reply(id, true, data, null);
@@ -178,6 +189,10 @@ public sealed class MainWindow : Form
     { RequireManager(); db.SetTechnicianActive(Get(p,"uid"),p.GetProperty("active").GetBoolean());return new { }; }
     private object DeleteTechnician(JsonElement p)
     { RequireManager();db.DeleteTechnician(Get(p,"uid"));return new { }; }
+    private object SaveLocalDraft(JsonElement p)
+    { store.SaveDraft(Get(p,"key"),Get(p,"value"),RequireLogin()); return new { }; }
+    private object RemoveLocalDraft(JsonElement p)
+    { store.RemoveDraft(Get(p,"key"),RequireLogin()); return new { }; }
 
     private void Reply(string id, bool ok, object? data, string? error)
     {

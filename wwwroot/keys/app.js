@@ -1,4 +1,5 @@
-import { gate, revealApp, watchKeyLoads, watchTechnicians, createKeyLoad, assignLegacyKeyLoadSerial, closeKeyLoad, reopenKeyLoad, appendKeyLoadManagerNote, saveKeyWorkDraft } from "../firebase-sync.js?v=1.6.3";
+import { draftState } from "../access-state.js";
+import { gate, revealApp, watchKeyLoads, watchTechnicians, createKeyLoad, assignLegacyKeyLoadSerial, closeKeyLoad, reopenKeyLoad, appendKeyLoadManagerNote, saveKeyWorkDraft } from "../access-sync.js?v=1.6.3";
 import { attachSignaturePad } from "../signature-canvas.js?v=1.6.3";
 import { KEY_SQUADRONS, KEY_TASKS, KEY_TABLES, aircraftFor, sheltersFor, periodFor, compactRows, validateRows, keyHistoryByAircraft } from "./data.js?v=1.6.3";
 import { attachTimeNow } from "../time-now.js?v=1.6.3";
@@ -18,7 +19,7 @@ const currentTime = () => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jer
 const draftKey = "ezeizo-key-draft-v1";
 const defaultDraft = () => ({ date: currentDate(), time: currentTime(), squadron: "", shelter: "", teamUids: ["", ""], rows: [] });
 let draft;
-try { draft = { ...defaultDraft(), ...JSON.parse(localStorage.getItem(draftKey) || "{}") }; } catch { draft = defaultDraft(); }
+try { draft = { ...defaultDraft(), ...JSON.parse(draftState.getItem(draftKey) || "{}") }; } catch { draft = defaultDraft(); }
 let loads = [], history = new Map(), technicians = [], activeLoad = null, selectedSquadron = "101", work = null;
 let editLock = null, lockedLoadId = "";
 let workLoadId = "", draftTimer = null, pendingDraft = Promise.resolve();
@@ -43,10 +44,10 @@ const matchesKeyNumber = (load, search) => {
   return /^\d{1,9}$/.test(digits) && load.serial === `K-${digits.padStart(9, "0")}`;
 };
 let dispatchSignature = "";
-const saveDraft = () => localStorage.setItem(draftKey, JSON.stringify(draft));
+const saveDraft = () => draftState.setItem(draftKey, JSON.stringify(draft));
 const saveWork = () => {
   if (activeLoad && activeLoad.status === "open" && editLock?.held) {
-    try { localStorage.setItem(`ezeizo-key-work:${activeLoad.id}`, JSON.stringify(work)); }
+    try { draftState.setItem(`ezeizo-key-work:${activeLoad.id}`, JSON.stringify(work)); }
     catch { setMessage("#work-status", "שמירת הטיוטה במכשיר נכשלה. השאר את הטופס פתוח ונסה לפנות מקום באחסון.", true); }
     clearTimeout(draftTimer);
     const id = activeLoad.id, snapshot = structuredClone(work), session = editLock.session;
@@ -155,7 +156,7 @@ $("#create-key-load").addEventListener("click", async () => {
   try {
     const created = await createKeyLoad({ date: draft.date, time: draft.time, squadron: draft.squadron, shelter: draft.shelter, teamUids, teamNames: teamUids.map((uid) => technicians.find((person) => person.uid === uid).name), rows, aircraftIds: rows.map((row) => row.aircraft), period: period.label, dispatcherSignature: dispatchSignature });
     draft = defaultDraft(); saveDraft(); renderCreateFields(); $("#key-briefed").checked = false; clearDispatch(); setMessage("#create-status", `הטענת המפתחות ${created.serial} נפתחה לצוות.`); location.hash = route("open");
-  } catch (error) { setMessage("#create-status", error.code === "permission-denied" ? "פתיחת ההטענה נכשלה: יש לפרסם את כללי Firestore המעודכנים למספור הטענות." : `פתיחת ההטענה נכשלה: ${error.message}`, true); }
+  } catch (error) { setMessage("#create-status", `פתיחת ההטענה נכשלה במסד המקומי: ${error.message}`, true); }
   finally { loading.hidden = true; button.disabled = false; }
 });
 function renderHistory() {
@@ -237,7 +238,7 @@ function readWork(load) {
   const saved = { ...defaultWork(load), ...(load.work || {}), ...(load.workDraft || {}) };
   if (load.status === "closed") return saved;
   if (load.workDraft) return saved;
-  try { return { ...saved, ...JSON.parse(localStorage.getItem(`ezeizo-key-work:${load.id}`) || "{}") }; }
+  try { return { ...saved, ...JSON.parse(draftState.getItem(`ezeizo-key-work:${load.id}`) || "{}") }; }
   catch { return saved; }
 }
 function renderWork() {
@@ -377,7 +378,7 @@ $("#complete-key-load").addEventListener("click", async () => {
   const error = validateWork(); if (error) return setMessage("#work-status", error, true);
   const button = $("#complete-key-load"); button.disabled = true;
   const clean = { ...work }; for (const [type, columns] of Object.entries(KEY_TABLES)) clean[type] = compactRows(work[type], columns);
-  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { localStorage.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The server already saved the completed form. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("./index.html"); }
+  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The completed form is saved in Access. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("./index.html"); }
   catch (failure) { setMessage("#work-status", `סגירת ההטענה נכשלה: ${failure.message}`, true); }
   finally { button.disabled = false; }
 });
@@ -389,7 +390,7 @@ $("#reopen-key-load").addEventListener("click", async () => {
     await reopenKeyLoad(activeLoad.id, user.uid);
     location.hash = route("open");
   } catch (error) {
-    const reason = error.code === "permission-denied" ? "יש לפרסם את כללי Firestore המעודכנים כדי לאפשר למנהל להחזיר הטענה לעריכה." : error.message;
+    const reason = error.message;
     setMessage("#reopen-key-status", `החזרת ההטענה נכשלה: ${reason}`, true);
   } finally { button.disabled = false; }
 });
@@ -460,7 +461,7 @@ async function numberLegacyLoads(items) {
     for (const item of pending) await assignLegacyKeyLoadSerial(item.id);
     status("");
   } catch (error) {
-    status(error.code === "permission-denied" ? "כדי למספר הטענות קיימות יש לפרסם את כללי Firestore המעודכנים." : `מספור הטענות נכשל: ${error.message}`, true);
+    status(`מספור ההטענות במסד המקומי נכשל: ${error.message}`, true);
   } finally { numberingLegacyLoads = false; }
 }
 watchKeyLoads((items) => { loads = items; if (manager) history = keyHistoryByAircraft(loads); loadsReady = true; if (embedded) { $("#keys-loading").hidden = true; $("#keys-content").hidden = false; } if (activeLoad) activeLoad = loads.find((item) => item.id === activeLoad.id); if (!manager && editLock?.held && activeLoad?.status === "open") { $("#work-manager-notes").textContent = activeLoad.managerNotes || ""; $("#work-manager-notes").hidden = !activeLoad.managerNotes; } else showView(); if (manager) void numberLegacyLoads(items); if (!embedded) revealApp(); }, (error) => {

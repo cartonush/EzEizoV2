@@ -95,7 +95,7 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem dist/EzEizo -Recurse | Select-Object FullName,Length
-          if (!(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/EzEizo-Mechanic.exe) -or !(Test-Path dist/EzEizo/wwwroot/Metis/management-pages.js) -or !(Test-Path dist/EzEizo/wwwroot/mechanic/index.html)) { throw 'Missing executable or UI assets' }
+          if (!(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/EzEizo-Mechanic.exe) -or !(Test-Path dist/EzEizo/wwwroot/Metis/management-pages.js) -or !(Test-Path dist/EzEizo/wwwroot/access-state.js) -or !(Test-Path dist/EzEizo/wwwroot/access-sync.js) -or !(Test-Path dist/EzEizo/wwwroot/mechanic/index.html)) { throw 'Missing executable or UI assets' }
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-Windows-x64
@@ -108,5 +108,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
-          $tag = 'v2.0.2-preview.1'
-          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.2 Preview 1' --notes 'Fix local navigation and add hashed six-character login. Bundle a fresh seeded Access template. Preserve your existing data/EzEizo.accdb on upgrades. See README.txt.' --prerelease
+          $tag = 'v2.0.3-preview.1'
+          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.3 Preview 1' --notes 'Keep published forms and unfinished drafts in local Access, block external resource requests, remove Firestore text. Bundle a fresh seeded template; preserve your existing ACCDB on upgrades. See README.txt.' --prerelease
