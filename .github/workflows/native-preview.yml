@@ -117,6 +117,17 @@ jobs:
             if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
             throw 'Native manager login or navigation failed'
           }
+      - name: Save UI screenshot outside the distributable package
+        shell: pwsh
+        run: |
+          if (!(Test-Path dist/native-preview/program/native-ui-screenshot.png)) { throw 'No native UI screenshot captured' }
+          Copy-Item dist/native-preview/program/native-ui-screenshot.png dist/native-ui-screenshot.png
+          Remove-Item dist/native-preview/program/native-ui-screenshot.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-native-ui-screenshot
+          path: dist/native-ui-screenshot.png
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-experiment
