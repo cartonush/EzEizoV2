@@ -46,11 +46,11 @@ public sealed partial class NativeWindow : Form
         Font = new Font("Segoe UI", 11);
         heading.Text = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         subtitle.Text = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.5.1";
+        Text += " · 2.5.2";
         var brand = new Label { Text = role == AppRole.Manager ? "מ" : "ט", Size = new Size(48, 48),
             TextAlign = ContentAlignment.MiddleCenter, ForeColor = Navy, BackColor = role == AppRole.Manager ?
                 Color.FromArgb(110, 204, 184) : Color.FromArgb(88, 195, 210), Font = new Font("Segoe UI", 22, FontStyle.Bold) };
-        var version = new Label { Text = "v2.5.1", Size = new Size(79, 35), ForeColor = Color.FromArgb(221, 238, 246),
+        var version = new Label { Text = "v2.5.2", Size = new Size(79, 35), ForeColor = Color.FromArgb(221, 238, 246),
             BackColor = Color.FromArgb(29, 73, 103), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
         header.Controls.AddRange([brand, eyebrow, heading, subtitle, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
@@ -101,8 +101,9 @@ public sealed partial class NativeWindow : Form
         worker.Start();
         Shown += async (_, _) =>
         {
+            NativeStartup.Mark(role.ToString(), "Window visible; initializing database");
             Loading("מכין את המסד המקומי…");
-            try { await Work(() => { SharedDatabaseStartup.Initialize(); return true; }); Login(); }
+            try { await Work(() => { SharedDatabaseStartup.Initialize(); return true; }); NativeStartup.Mark(role.ToString(), "Database ready"); Login(); }
             catch (Exception ex) { Error(ex); }
         };
         refreshTimer.Tick += async (_, _) =>
@@ -139,6 +140,7 @@ public sealed partial class NativeWindow : Form
     }
     private void Error(Exception ex)
     {
+        NativeStartup.Mark(role.ToString(), "ERROR: " + ex);
         status.Text = "הפעולה נכשלה";
         MessageBox.Show(this, ex.Message, "EzEizo", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
