@@ -641,7 +641,7 @@ public sealed partial class NativeWindow : Form
             currentPage = "document";
             var stack = Stack();
             var sheet = page == "issues" ? doc["sheet"] ?? doc : doc;
-            stack.Controls.Add(Label("פרטי אירוע", 29));
+            Section(stack, page == "issues" ? "נתוני התקלה" : "פרטי הטענת מפתחות");
             stack.Controls.Add(Label($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}", 60, true));
             if (doc["createdAt"] is not null)
                 stack.Controls.Add(Label($"שעת פתיחה: {DisplayDate(V(doc, "createdAt"))}     שעת סגירה: {DisplayDate(V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt"))}", 46));
@@ -651,12 +651,12 @@ public sealed partial class NativeWindow : Form
                        ("קוד מערכת", "systemCode"), ("שם מערכת", "systemName"), ("חליפת ל״א", "ewSystem") })
                 if (sheet[key] is not null) details.Controls.Add(DetailTile(title, sheet[key]?.ToString() ?? ""));
             stack.Controls.Add(details);
-            if (sheet["fault"] is not null)
+            if (role == AppRole.Manager && sheet["fault"] is not null)
             {
                 stack.Controls.Add(Label("תיאור תקלה", 35, true));
                 stack.Controls.Add(Label(sheet["fault"]?.ToString() ?? "", 76));
             }
-            if (sheet["managerNotes"] is not null)
+            if (role == AppRole.Manager && sheet["managerNotes"] is not null)
             {
                 stack.Controls.Add(Label("הערות מנהל", 35, true));
                 stack.Controls.Add(Label(sheet["managerNotes"]?.ToString() ?? "", 68));
