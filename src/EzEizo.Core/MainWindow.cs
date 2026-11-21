@@ -49,7 +49,7 @@ public sealed class MainWindow : Form
     {
         try
         {
-            var databaseReady = WithDatabase(() => { db.Initialize(); db.EnsureDemoManager(); store.Initialize(); return true; });
+            var databaseReady = WithDatabase(() => { SharedDatabaseStartup.Initialize(); return true; });
             var assets = Path.Combine(AppContext.BaseDirectory, "wwwroot");
             if (!File.Exists(Path.Combine(assets, "index.html")))
                 throw new FileNotFoundException("קובצי הממשק חסרים. יש להעתיק גם את תיקיית wwwroot.");

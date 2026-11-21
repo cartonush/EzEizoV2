@@ -9,11 +9,12 @@ internal static class Program
         if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
             throw new InvalidOperationException("EzEizo requires an STA application thread.");
         ApplicationConfiguration.Initialize();
-        if (args.Contains("--create-database") || args.Contains("--self-test") || args.Contains("--seed-template") || args.Contains("--verify-template") || args.Contains("--verify-provision"))
+        if (args.Contains("--create-database") || args.Contains("--self-test") || args.Contains("--seed-template") || args.Contains("--verify-template") || args.Contains("--verify-provision") || args.Contains("--probe-startup"))
         {
             try
             {
                 if (args.Contains("--self-test")) SmokeTest.Run();
+                else if (args.Contains("--probe-startup")) SharedDatabaseStartup.Initialize();
                 else
                 {
                     var db = new Database();
