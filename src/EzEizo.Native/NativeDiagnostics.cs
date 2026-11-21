@@ -14,6 +14,9 @@ public static class NativeDiagnostics
     }
     public static void VerifyUi()
     {
+        // The packaged template has only a manager. Add a throwaway technician to
+        // exercise the user list and history page without changing the ZIP template.
+        new Database().CreateAccount("טכנאי תצוגה", "7412589", "mechanic", "123456");
         using var window = new NativeWindow(AppRole.Manager);
         var stage = 0;
         var started = DateTime.UtcNow;
