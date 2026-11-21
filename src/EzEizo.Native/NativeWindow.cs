@@ -17,9 +17,6 @@ public sealed partial class NativeWindow : Form
     private readonly BlockingCollection<(Func<object?> work, TaskCompletionSource<object?> done)> jobs = new();
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
-    private readonly Label heading = new() { ForeColor = Color.White, Font = new Font("Segoe UI", 19, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label subtitle = new() { ForeColor = Color.FromArgb(195, 216, 229), Font = new Font("Segoe UI", 10), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label eyebrow = new() { Text = "כנף 1 - טייסת תחזוקה", ForeColor = Color.FromArgb(176, 203, 221), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
     private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
     private readonly Panel bottomNav = new() { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
@@ -44,20 +41,17 @@ public sealed partial class NativeWindow : Form
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
         Font = new Font("Segoe UI", 11);
-        heading.Text = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
-        subtitle.Text = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
+        header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
+        header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
         Text += " · 2.5.3";
         header.Manager = role == AppRole.Manager;
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
             Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
         var version = new NativeBadge { Text = "v2.5.3", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-        header.Controls.AddRange([brand, eyebrow, heading, subtitle, version, backButton, logoutButton]);
+        header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
             brand.Location = new Point(header.Width - 72, 17);
-            eyebrow.SetBounds(header.Width - 595, 5, 500, 17);
-            heading.SetBounds(header.Width - 595, 23, 500, 27);
-            subtitle.SetBounds(header.Width - 595, 52, 500, 18);
             version.Location = new Point(24, 21);
             logoutButton.Location = new Point(112, 20);
             backButton.Location = new Point(225, 20);
