@@ -84,7 +84,8 @@ public sealed partial class NativeWindow
     }
     private static void Section(FlowLayoutPanel stack, string title)
     {
-        var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White, Margin = new Padding(0, 12, 0, 8) };
+        var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White,
+            Tag = "section-heading", Margin = new Padding(0, 0, 0, 8) };
         heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
         heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
@@ -447,20 +448,55 @@ public sealed partial class NativeWindow
         var completed = work["aircraft"] as JsonArray ?? new JsonArray();
         while (completed.Count < rows.Count) completed.Add(new JsonObject());
         if (work["aircraft"] is null) work["aircraft"] = completed;
-        Section(stack, "רשימת מטוסים להטענה");
+        Section(stack, "ביצוע הטענת מפתחות");
         var keyBar = EditorBar(stack);
+        stack.Controls.Add(Label($"{V(doc, "date")} · {V(doc, "time")} · טייסת {V(doc, "squadron")} · דת״ק {V(doc, "shelter")}", 40));
+        var loadingGrid = new DataGridView { Width = 745, Height = Math.Min(440, 50 + rows.Count * 54),
+            RowHeadersVisible = false, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+        loadingGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "aircraft", HeaderText = "מס׳ מטוס", ReadOnly = true, FillWeight = 25 });
+        loadingGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 13 });
+        loadingGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 13 });
+        loadingGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "notes", HeaderText = "הערות", FillWeight = 49 });
+        loadingGrid.RowTemplate.Height = 49; loadingGrid.ColumnHeadersHeight = 44;
         for (var i = 0; i < rows.Count; i++)
         {
-            var index = i; var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
-            stack.Controls.Add(Label($"מטוס {row?["aircraft"]} · הערת מנהל: {row?["notes"]}", 45, true));
-            if (B(row, "blue")) Check(stack, "ארז כחול בוצע", state, "blueDone");
-            if (B(row, "shach")) Check(stack, "שחק בוצע", state, "shachDone");
-            Field(stack, "הערת טכנאי (לא חובה)", state, "technicianNote", true);
+            var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
+            var managerNote = V(row, "notes"); var technicianNote = V(state, "technicianNote");
+            loadingGrid.Rows.Add(V(row, "aircraft"), B(state, "blueDone"), B(state, "shachDone"),
+                managerNote + (managerNote.Length > 0 && technicianNote.Length > 0 ? Environment.NewLine : "") + technicianNote);
+            loadingGrid.Rows[i].Cells["blue"].ReadOnly = !B(row, "blue");
+            loadingGrid.Rows[i].Cells["shach"].ReadOnly = !B(row, "shach");
+            loadingGrid.Rows[i].Cells["blue"].Style.BackColor = B(row, "blue") ? Color.White : Pale;
+            loadingGrid.Rows[i].Cells["shach"].Style.BackColor = B(row, "shach") ? Color.White : Pale;
         }
+        loadingGrid.CurrentCellDirtyStateChanged += (_, _) =>
+        { if (loadingGrid.IsCurrentCellDirty) loadingGrid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+        loadingGrid.CellBeginEdit += (_, e) =>
+        { if (e.ColumnIndex == loadingGrid.Columns["notes"].Index) loadingGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = V(completed[e.RowIndex], "technicianNote"); };
+        loadingGrid.CellEndEdit += (_, e) =>
+        {
+            if (e.ColumnIndex != loadingGrid.Columns["notes"].Index) return;
+            var added = loadingGrid.Rows[e.RowIndex].Cells["notes"].Value?.ToString() ?? "";
+            Object(completed[e.RowIndex])["technicianNote"] = added;
+            var prefix = V(rows[e.RowIndex], "notes");
+            loadingGrid.Rows[e.RowIndex].Cells["notes"].Value = prefix + (prefix.Length > 0 && added.Length > 0 ? Environment.NewLine : "") + added;
+        };
+        loadingGrid.CellValueChanged += (_, e) =>
+        {
+            if (e.RowIndex < 0) return;
+            var name = loadingGrid.Columns[e.ColumnIndex].Name;
+            if (name == "blue" || name == "shach")
+                Object(completed[e.RowIndex])[name == "blue" ? "blueDone" : "shachDone"] = loadingGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value is true;
+        };
+        stack.Controls.Add(loadingGrid);
         stack.Controls.Add(Label($"אחזקה נדרשת: הטענת מטוסים במסגרת שינוי מפתחות לחודשים {V(doc, "period")}", 55));
         stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות EREZ 78 לאחר טעינה ושידור PTT בארז, SAK 7 / 34 בשחק.", 55));
         stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים: מ.כ 2020 + חרב אש", 48));
         Section(stack, "פעולות לביצוע");
+        var taskToggle = Button("הצג משימות לביצוע", (sender, _) => { });
+        stack.Controls.Add(taskToggle);
+        var taskGroup = new FlowLayoutPanel { Width = 745, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false };
         var actions = work["actions"] as JsonArray ?? new JsonArray();
         while (actions.Count < 12) actions.Add(false);
         actions[0] = true; if (work["actions"] is null) work["actions"] = actions;
@@ -470,8 +506,11 @@ public sealed partial class NativeWindow
             var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", Width = 745, Height = 48,
                 Checked = i == 0 || bool.TryParse(actions[i]?.ToString(), out var b) && b, Enabled = i != 0 };
             box.CheckedChanged += (_, _) => actions[index] = box.Checked;
-            stack.Controls.Add(box);
+            taskGroup.Controls.Add(box);
         }
+        taskToggle.Click += (_, _) => { taskGroup.Visible = !taskGroup.Visible;
+            taskToggle.Text = taskGroup.Visible ? "הסתר משימות" : "הצג משימות לביצוע"; };
+        stack.Controls.Add(taskGroup);
         stack.Controls.Add(Label("חתימת משלח המשימה"));
         stack.Controls.Add(new NativeSignature(V(doc, "dispatcherSignature")) { Enabled = false });
         var infoButton = Button("מידע לעזר הטכנאי · הצג / הסתר", (_, _) => { });
