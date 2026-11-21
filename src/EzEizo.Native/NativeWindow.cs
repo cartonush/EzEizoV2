@@ -3,8 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace EzEizo.Core;
 
-// Native Windows UI prototype. This project deliberately does not reference WebView2.
-// It is built alongside the existing release until every workflow has been ported and tested.
+// Native Windows UI backed by the local Access store; no embedded browser.
 public sealed partial class NativeWindow : Form
 {
     internal string DiagnosticPage => currentPage;
