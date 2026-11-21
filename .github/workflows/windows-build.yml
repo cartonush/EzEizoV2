@@ -1,4 +1,4 @@
-name: Build EzEizo Windows 2.5.3
+name: Build EzEizo Windows 2.5.4
 
 on:
   workflow_dispatch:
@@ -169,7 +169,7 @@ jobs:
           Write-Host ("Package size: {0:N1} MiB" -f ($bytes / 1MB))
       - uses: actions/upload-artifact@v4
         with:
-          name: EzEizo-Windows-2.5.3-files
+          name: EzEizo-Windows-2.5.4-files
           path: dist/EzEizo
           retention-days: 30
       - name: Publish versioned Windows ZIP
@@ -177,7 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.3.zip -Force
-          $tag = 'v2.5.3'
+          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.4.zip -Force
+          $tag = 'v2.5.4'
           $notes = 'Native Windows manager and technician applications using local Access without WebView2 or Internet. Extract EzEizo to Desktop. Preserve the existing data folder when updating. See README.txt.'
-          gh release create $tag dist/EzEizo-Windows-2.5.3.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.3' --notes $notes
+          gh release create $tag dist/EzEizo-Windows-2.5.4.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.4' --notes $notes
