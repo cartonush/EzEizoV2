@@ -190,12 +190,15 @@ public sealed partial class NativeWindow
         }
         foreach (var kind in NativeCatalog.Tables.Keys)
         {
-            var toggle = Check(stack, NativeCatalog.Tables[kind].title, state, kind == "removed" || kind == "installed" ? "unitsEnabled" : kind + "Enabled");
+            if (kind == "installed") Section(stack, "יחידות שהורכבו");
+            var toggle = kind == "installed" ? stack.Controls.OfType<CheckBox>().Last(x => x.Text == "יחידות שפורקו") :
+                Check(stack, NativeCatalog.Tables[kind].title, state, kind == "removed" ? "unitsEnabled" : kind + "Enabled");
             var table = Table(stack, state, kind);
             table.Visible = toggle.Checked;
             toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
         }
         ToolReviews(stack, state, controls);
+        TakenDeclaration(stack, state, controls);
         controls["technicianDeclarationSignature"] = Signature(stack,
             "אני מאשר שכל הפרטים שלמים ומדויקים, שעודכנו מערכות האחזקה ושמכשירים תקולים הועברו עם תגי בר תיקון. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
@@ -248,9 +251,13 @@ public sealed partial class NativeWindow
             if (!B(state, "entryEnabled") || !B(state, "finalEnabled")) return "כאשר יש כלים, ביקורת כניסה וסיום הן חובה.";
             foreach (var key in new[] { "entryTechnicianSignature", "entryInspectorSignature", "entryInspectorNumber", "finalTechnicianSignature", "finalInspectorSignature", "finalInspectorNumber", "finalLeadName", "finalLeadSignature", "departureTime" })
                 if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי ביקורת כלים.";
+            if (B(state, "interimEnabled")) foreach (var key in new[] { "interimTechnicianSignature", "interimInspectorSignature", "interimInspectorNumber", "interimToolsName", "interimToolsSignature" })
+                if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי ביקורת במהלך העבודה.";
         }
         if (B(state, "takenEnabled")) foreach (var key in new[] { "takenFullName", "takenPersonalNumber", "takenRank", "takenSignature" })
             if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי חתימה על קשיחים שנלקחו.";
+        foreach (var key in new[] { "entryInspectorNumber", "interimInspectorNumber", "finalInspectorNumber", "takenPersonalNumber" })
+            if (V(state, key).Length > 0 && (V(state, key).Length > 7 || !V(state, key).All(char.IsAsciiDigit))) return "מספר אישי חייב להכיל ספרות בלבד, עד 7 ספרות.";
         if (string.IsNullOrWhiteSpace(V(state, "technicianDeclarationSignature"))) return "חסרה חתימת הצהרת הטכנאי.";
         return null;
     }
@@ -262,7 +269,12 @@ public sealed partial class NativeWindow
         if (state[kind] is null) state[kind] = data;
         var grid = new DataGridView { Width = 740, Height = 185, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White };
-        foreach (var field in spec.fields) grid.Columns.Add(field.key, field.label);
+        foreach (var field in spec.fields)
+        {
+            if (field.key == "name" && kind is "removed" or "installed")
+                grid.Columns.Add(new DataGridViewComboBoxColumn { Name = field.key, HeaderText = field.label, DataSource = new[] { "MLPRF", "PSP", "DMT" }, FlatStyle = FlatStyle.Flat });
+            else grid.Columns.Add(field.key, field.label);
+        }
         foreach (var row in data) grid.Rows.Add(spec.fields.Select(f => V(row, f.key)).ToArray());
         grid.CellEndEdit += (_, _) => Sync();
         grid.RowsRemoved += (_, _) => Sync();
@@ -295,10 +307,38 @@ public sealed partial class NativeWindow
             var group = new FlowLayoutPanel { Width = 750, Height = fields.Sum(f => f.Item3 ? 220 : 90), AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             foreach (var (key, label, sign) in fields)
                 if (sign) pads[key] = Signature(group, label, state, key, true);
-                else Field(group, label, state, key);
+                else if (key == "departureTime") TimeField(group, label, state, key);
+                else
+                {
+                    var input = Field(group, label, state, key);
+                    if (key.EndsWith("InspectorNumber")) Numeric(input);
+                }
             group.Visible = box.Checked; box.CheckedChanged += (_, _) => group.Visible = box.Checked;
             stack.Controls.Add(group);
         }
+    }
+
+    private static void Numeric(TextBox input)
+    {
+        input.MaxLength = 7;
+        input.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsAsciiDigit(e.KeyChar)) e.Handled = true; };
+    }
+    private static void TimeField(FlowLayoutPanel stack, string label, JsonObject state, string key)
+    {
+        stack.Controls.Add(Label(label));
+        var time = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true };
+        if (TimeSpan.TryParse(V(state, key), out var value)) time.Value = DateTime.Today.Add(value);
+        time.ValueChanged += (_, _) => state[key] = time.Value.ToString("HH:mm");
+        stack.Controls.Add(time);
+        stack.Controls.Add(Button("השעה עכשיו", (_, _) => { time.Value = DateTime.Now; state[key] = time.Value.ToString("HH:mm"); }));
+    }
+    private static void TakenDeclaration(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
+    {
+        Section(stack, "חתימה על קשיחים שנלקחו");
+        Field(stack, "שם מלא", state, "takenFullName");
+        var number = Field(stack, "מספר אישי", state, "takenPersonalNumber"); Numeric(number);
+        Field(stack, "דרגה", state, "takenRank");
+        pads["takenSignature"] = Signature(stack, "חתימה", state, "takenSignature", true);
     }
 
     private async Task KeyEditor(FlowLayoutPanel stack, JsonNode doc, Account user)
@@ -338,6 +378,7 @@ public sealed partial class NativeWindow
             var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
         }
         ToolReviews(stack, work, pads);
+        TakenDeclaration(stack, work, pads);
         void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
         stack.Controls.Add(Button("שמירה", async (_, _) =>
         {
@@ -353,10 +394,42 @@ public sealed partial class NativeWindow
         stack.Controls.Add(Button("סיים הטענה", async (_, _) =>
         {
             Capture();
-            if (actions.Any(x => x?.ToString() != "true") || rows.Where((row, i) => B(row, "blue") && !B(completed[i], "blueDone") || B(row, "shach") && !B(completed[i], "shachDone")).Any())
-            { status.Text = "יש להשלים את המשימות ואת כל המפתחות שנבחרו."; return; }
+            var validation = ValidateKey(doc, work);
+            if (validation is not null) { status.Text = validation; MessageBox.Show(this, validation, "חסר מידע"); return; }
             try { await Work(() => store.Update("keyLoads", id, "complete", Json(new JsonObject { ["session"] = activeSession, ["work"] = work.DeepClone() }), user)); await ReleaseForm(); await OpenList("keys"); }
             catch (Exception ex) { Error(ex); }
         }));
+    }
+    private static string? ValidateKey(JsonNode doc, JsonObject state)
+    {
+        var actions = state["actions"] as JsonArray;
+        if (actions?.Count != 12 || actions.Any(x => x?.ToString() != "true")) return "יש לסמן את כל 12 המשימות.";
+        var rows = doc["rows"] as JsonArray ?? new();
+        var completed = state["aircraft"] as JsonArray ?? new();
+        foreach (var (row, index) in rows.Select((row, index) => (row, index)))
+            if (index >= completed.Count || B(row, "blue") && !B(completed[index], "blueDone") || B(row, "shach") && !B(completed[index], "shachDone"))
+                return $"לא הושלמה הטענה במטוס {V(row, "aircraft")}.";
+        foreach (var kind in new[] { "tools", "taken", "rejected" })
+        {
+            if (!B(state, kind + "Enabled")) continue;
+            var spec = NativeCatalog.Tables[kind];
+            var filled = (state[kind] as JsonArray ?? new()).Where(x => spec.fields.Any(f => !string.IsNullOrWhiteSpace(V(x, f.key)))).ToArray();
+            if (filled.Length == 0) return $"יש למלא שורה בטבלת {spec.title}.";
+            foreach (var row in filled) foreach (var field in spec.fields)
+                if (!field.optional && string.IsNullOrWhiteSpace(V(row, field.key))) return $"חסר {field.label} בטבלת {spec.title}.";
+        }
+        if (B(state, "toolsEnabled"))
+        {
+            if (!B(state, "entryEnabled") || !B(state, "finalEnabled")) return "כאשר יש כלים חובה לסמן ביקורת כניסה וסיום.";
+            foreach (var key in new[] { "entryTechnicianSignature", "entryInspectorSignature", "entryInspectorNumber", "finalTechnicianSignature", "finalInspectorSignature", "finalInspectorNumber", "finalLeadName", "finalLeadSignature", "departureTime" })
+                if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי ביקורת כלים.";
+            if (B(state, "interimEnabled")) foreach (var key in new[] { "interimTechnicianSignature", "interimInspectorSignature", "interimInspectorNumber", "interimToolsName", "interimToolsSignature" })
+                if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי ביקורת במהלך העבודה.";
+        }
+        if (B(state, "takenEnabled")) foreach (var key in new[] { "takenFullName", "takenPersonalNumber", "takenRank", "takenSignature" })
+            if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי חתימה על קשיחים.";
+        foreach (var key in new[] { "entryInspectorNumber", "interimInspectorNumber", "finalInspectorNumber", "takenPersonalNumber" })
+            if (V(state, key).Length > 0 && (V(state, key).Length > 7 || !V(state, key).All(char.IsAsciiDigit))) return "מספר אישי חייב להכיל ספרות בלבד, עד 7 ספרות.";
+        return null;
     }
 }
