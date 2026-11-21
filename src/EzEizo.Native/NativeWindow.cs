@@ -16,10 +16,10 @@ public sealed partial class NativeWindow : Form
     private readonly OfflineStore store = new();
     private readonly BlockingCollection<(Func<object?> work, TaskCompletionSource<object?> done)> jobs = new();
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
-    private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleRight, BackColor = Color.White };
-    private readonly Label heading = new() { ForeColor = Color.White, Font = new Font("Segoe UI", 19, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight };
-    private readonly Label subtitle = new() { ForeColor = Color.FromArgb(195, 216, 229), Font = new Font("Segoe UI", 10), TextAlign = ContentAlignment.MiddleRight };
-    private readonly Label eyebrow = new() { Text = "כנף 1 - טייסת תחזוקה", ForeColor = Color.FromArgb(176, 203, 221), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight };
+    private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
+    private readonly Label heading = new() { ForeColor = Color.White, Font = new Font("Segoe UI", 19, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label subtitle = new() { ForeColor = Color.FromArgb(195, 216, 229), Font = new Font("Segoe UI", 10), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label eyebrow = new() { Text = "כנף 1 - טייסת תחזוקה", ForeColor = Color.FromArgb(176, 203, 221), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
     private readonly Panel header = new() { Dock = DockStyle.Top, Height = 89, BackColor = Navy };
     private readonly Panel bottomNav = new() { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, Width = 110, Height = 37 };
@@ -149,7 +149,7 @@ public sealed partial class NativeWindow : Form
     };
     private static Label Label(string text, int height = 34, bool bold = false) => new()
     {
-        Text = text, Width = 750, Height = height, TextAlign = ContentAlignment.MiddleRight,
+        Text = text, Width = 750, Height = height, TextAlign = ContentAlignment.MiddleLeft,
         ForeColor = Navy, Font = new Font("Segoe UI", bold ? 17 : 11, bold ? FontStyle.Bold : FontStyle.Regular)
     };
     private static Button Button(string label, EventHandler click)
@@ -171,16 +171,17 @@ public sealed partial class NativeWindow : Form
         var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
             Margin = new Padding(0, 0, 10, 10), Padding = new Padding(10) };
         tile.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 25,
-            ForeColor = Muted, Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.MiddleRight });
+            ForeColor = Muted, Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.MiddleLeft });
         tile.Controls.Add(new Label { Text = value, Dock = DockStyle.Bottom, Height = 31,
             ForeColor = Navy, Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleRight, AutoEllipsis = true });
+            TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true });
         return tile;
     }
     private void CenterCard()
     {
         if (activeCard is null || activeCard.IsDisposed) return;
-        activeCard.Width = Math.Min(850, Math.Max(760, content.ClientSize.Width - 32));
+        var desired = currentPage == "login" ? 600 : 850;
+        activeCard.Width = Math.Min(desired, Math.Max(520, content.ClientSize.Width - 32));
         activeCard.Height = Math.Max(200, content.ClientSize.Height - 20);
         activeCard.Location = new Point((content.ClientSize.Width - activeCard.Width) / 2, 10);
     }
@@ -320,6 +321,8 @@ public sealed partial class NativeWindow : Form
             finally { submit!.Enabled = true; }
         });
         stack.Controls.Add(submit);
+        foreach (Control field in stack.Controls)
+            field.Width = Math.Min(field.Width, 530);
         Present(stack);
         AcceptButton = submit;
         status.Text = "המערכת פועלת מקומית גם ללא חיבור לאינטרנט";
@@ -392,7 +395,7 @@ public sealed partial class NativeWindow : Form
                     card.Secondary = true;
                     card.Width = 735;
                     card.Height = 77;
-                    card.TextAlign = ContentAlignment.MiddleRight;
+                    card.TextAlign = ContentAlignment.MiddleLeft;
                     cards.Controls.Add(card);
                 }
             }
@@ -478,7 +481,7 @@ public sealed partial class NativeWindow : Form
                 foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
                 {
                     var row = new FlowLayoutPanel { Width = 745, Height = 54, WrapContents = false };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 310, Height = 45, TextAlign = ContentAlignment.MiddleRight });
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 310, Height = 45, TextAlign = ContentAlignment.MiddleLeft });
                     row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
