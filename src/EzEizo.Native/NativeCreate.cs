@@ -200,7 +200,7 @@ public sealed partial class NativeWindow
             var stack = Stack();
             Section(stack, "הטענת מפתחות");
             var fields = FieldGrid(); fields.Height = 285; stack.Controls.Add(fields);
-            var date = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+            var date = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Value = DateTime.Today };
             var dateCell = FieldCell(); fields.Controls.Add(dateCell); AddField(dateCell, "תאריך", date);
             var time = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
             var timeCell = FieldCell(); fields.Controls.Add(timeCell); AddField(timeCell, "שעה", time);
@@ -344,7 +344,7 @@ public sealed partial class NativeWindow
             }
             else
             {
-                date = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Short, Value = DateTime.TryParse(V(sheet, "date"), out var d) ? d : DateTime.Today };
+                date = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Value = DateTime.TryParse(V(sheet, "date"), out var d) ? d : DateTime.Today };
                 stack.Controls.Add(Label("תאריך")); stack.Controls.Add(date);
                 time = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = TimeSpan.TryParse(V(sheet, "time"), out var t) ? DateTime.Today.Add(t) : DateTime.Now };
                 stack.Controls.Add(Label("שעה")); stack.Controls.Add(time);
