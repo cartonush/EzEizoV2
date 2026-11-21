@@ -529,14 +529,14 @@ public sealed partial class NativeWindow
         }
         loadingGrid.CurrentCellDirtyStateChanged += (_, _) =>
         { if (loadingGrid.IsCurrentCellDirty) loadingGrid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        loadingGrid.CellBeginEdit += (_, e) =>
-        { if (e.ColumnIndex == loadingGrid.Columns["notes"].Index) loadingGrid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = V(completed[e.RowIndex], "technicianNote"); };
         loadingGrid.CellEndEdit += (_, e) =>
         {
             if (e.ColumnIndex != loadingGrid.Columns["notes"].Index) return;
-            var added = loadingGrid.Rows[e.RowIndex].Cells["notes"].Value?.ToString() ?? "";
-            Object(completed[e.RowIndex])["technicianNote"] = added;
             var prefix = V(rows[e.RowIndex], "notes");
+            var entered = loadingGrid.Rows[e.RowIndex].Cells["notes"].Value?.ToString() ?? "";
+            var added = prefix.Length > 0 && entered.StartsWith(prefix, StringComparison.Ordinal)
+                ? entered[prefix.Length..].TrimStart('\r', '\n', ' ') : entered;
+            Object(completed[e.RowIndex])["technicianNote"] = added;
             loadingGrid.Rows[e.RowIndex].Cells["notes"].Value = prefix + (prefix.Length > 0 && added.Length > 0 ? Environment.NewLine : "") + added;
         };
         loadingGrid.CellValueChanged += (_, e) =>
