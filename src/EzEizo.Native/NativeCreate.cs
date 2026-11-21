@@ -29,7 +29,9 @@ public sealed partial class NativeWindow
         var caption = Label(title);
         if (stack.Width <= 500) caption.Width = 380;
         stack.Controls.Add(caption);
-        var box = new ComboBox { Width = stack.Width <= 500 ? 380 : 440, Height = 40, DropDownStyle = ComboBoxStyle.DropDownList,
+        var box = new ComboBox { Width = stack.Width <= 500 ? 380 : 440, Height = 40,
+            DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.ListItems,
             Margin = new Padding(0, 0, 0, 14), Tag = caption };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
