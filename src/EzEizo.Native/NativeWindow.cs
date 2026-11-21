@@ -180,14 +180,14 @@ public sealed partial class NativeWindow : Form
             nav.Controls.Add(Button("התנתק", async (_, _) => { await ReleaseForm(); account = null; Login(); }));
             stack.Controls.Add(nav);
             stack.Controls.Add(Label(page == "issues" ? "תקלות" : "הטענות מפתחות", 55, true));
+            ComboBox? statuses = null;
             if (role == AppRole.Manager)
             {
-                var statuses = new ComboBox { Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
+                statuses = new ComboBox { Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
                 statuses.Items.AddRange(page == "issues" ? new object[] { "הכל", "פתוח", "ממתין לסגירה", "סגור" } : new object[] { "הכל", "פתוח", "סגור" });
                 statuses.SelectedItem = statusFilter;
                 if (statuses.SelectedIndex < 0) { statuses.SelectedIndex = 0; statusFilter = "הכל"; }
                 stack.Controls.Add(Label("סטטוס")); stack.Controls.Add(statuses);
-                statuses.SelectedIndexChanged += (_, _) => { statusFilter = statuses.SelectedItem?.ToString() ?? "הכל"; Render(); };
             }
             var search = Input("חפש מספר סידורי", 20);
             search.Text = searchTerm;
@@ -217,6 +217,7 @@ public sealed partial class NativeWindow : Form
                     cards.Controls.Add(card);
                 }
             }
+            if (statuses is not null) statuses.SelectedIndexChanged += (_, _) => { statusFilter = statuses.SelectedItem?.ToString() ?? "הכל"; Render(); };
             search.TextChanged += (_, _) => { searchTerm = search.Text; Render(); };
             Render();
             content.Controls.Clear(); content.Controls.Add(stack);
