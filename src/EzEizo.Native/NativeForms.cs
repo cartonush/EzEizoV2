@@ -174,25 +174,59 @@ public sealed partial class NativeWindow
     {
         var state = page == "issues" ? doc["closed"]?["state"] : doc["work"] ?? doc["workDraft"];
         if (state is null) { stack.Controls.Add(Label("טרם נשמר מילוי של טכנאי בטופס זה.")); return; }
-        Section(stack, "מילוי הטכנאי");
+        Section(stack, page == "issues" ? "טופס טיפול בתקלה" : "ביצוע הטענת מפתחות");
         if (page == "issues")
         {
+            var sheet = doc["sheet"] ?? doc;
+            stack.Controls.Add(Label("תיאור התקלה: " + V(sheet, "fault"), 75));
             stack.Controls.Add(Label("תיאור תיקון: " + V(state, "repair"), 85));
-            stack.Controls.Add(Label("הערת טכנאי: " + V(state, "technicianNote"), 60));
+            stack.Controls.Add(Label("הערות: " + V(sheet, "managerNotes") + " " + V(state, "technicianNote"), 75));
             stack.Controls.Add(Label("שעת הגעה: " + V(state, "arrivalTime") + "     שעת סיום: " + V(state, "completionTime")));
+            var constants = Object(sheet["constants"]);
+            if (constants.Count > 0)
+            {
+                Section(stack, "קבועים לפי מטוס");
+                foreach (var (group, entries) in constants)
+                {
+                    stack.Controls.Add(Label(group, 38, true));
+                    var row = string.Join("     ", (entries as JsonArray ?? new()).Select(x => $"{x?[0]}: {x?[1]}"));
+                    stack.Controls.Add(Label(row, Math.Max(45, 32 * (row.Length / 85 + 1))));
+                }
+            }
         }
         else
         {
             var aircraft = state["aircraft"] as JsonArray ?? new();
             var rows = doc["rows"] as JsonArray ?? new();
+            var grid = new DataGridView { Width = 745, Height = Math.Min(400, 52 + rows.Count * 47),
+                ReadOnly = true, RowHeadersVisible = false, AllowUserToAddRows = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "aircraft", HeaderText = "מס׳ מטוס", FillWeight = 25 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "blue", HeaderText = "ארז כחול", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "shach", HeaderText = "שחק", FillWeight = 13 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "notes", HeaderText = "הערות", FillWeight = 49 });
             for (var i = 0; i < rows.Count; i++)
-                stack.Controls.Add(Label($"מטוס {V(rows[i], "aircraft")} · ארז כחול: {(i < aircraft.Count && B(aircraft[i], "blueDone") ? "בוצע" : "—")} · שחק: {(i < aircraft.Count && B(aircraft[i], "shachDone") ? "בוצע" : "—")} · הערה: {V(i < aircraft.Count ? aircraft[i] : null, "technicianNote")}", 50));
+            {
+                var work = i < aircraft.Count ? aircraft[i] : null;
+                grid.Rows.Add(V(rows[i], "aircraft"), B(rows[i], "blue") ? B(work, "blueDone") ? "✓" : "□" : "—",
+                    B(rows[i], "shach") ? B(work, "shachDone") ? "✓" : "□" : "—",
+                    V(rows[i], "notes") + " " + V(work, "technicianNote"));
+            }
+            stack.Controls.Add(grid);
+            stack.Controls.Add(Label($"אחזקה נדרשת: הטענת מטוסים במסגרת שינוי מפתחות לחודשים {V(doc, "period")}", 55));
+            stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות EREZ 78 לאחר טעינה ושידור PTT בארז, SAK 7 / 34 בשחק.", 55));
+            stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים: מ.כ 2020 + חרב אש", 48));
         }
         var actions = state["actions"] as JsonArray ?? new();
         var titles = page == "issues" ? NativeCatalog.Actions : NativeCatalog.KeyActions;
         Section(stack, "פעולות אחזקה");
         for (var i = 0; i < titles.Length; i++)
-            stack.Controls.Add(Label($"{i + 1:D2}. {(i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□")} {titles[i]}", 48));
+        {
+            var mark = i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□";
+            if (page == "issues" && i == 10 && V(state, "action11Result") == "notRequired") mark = "X";
+            var time = page == "issues" && i is 1 or 11 ? " · " + V(state, i == 1 ? "arrivalTime" : "completionTime") : "";
+            stack.Controls.Add(Label($"{i + 1:D2}. {mark} {titles[i]}{time}", 48));
+        }
         foreach (var (kind, spec) in NativeCatalog.Tables)
         {
             var rows = state[kind] as JsonArray;
@@ -204,6 +238,23 @@ public sealed partial class NativeWindow
             foreach (var row in rows) grid.Rows.Add(spec.fields.Select(field => V(row, field.key)).ToArray());
             stack.Controls.Add(grid);
         }
+        if (B(state, "toolsEnabled"))
+        {
+            Section(stack, "ביקורות כלים");
+            foreach (var (name, prefix) in new[] { ("entry", "ביקורת כניסה"), ("interim", "ביקורת במהלך העבודה"), ("final", "ביקורת בסיום העבודה") })
+            {
+                if (!B(state, name + "Enabled")) continue;
+                stack.Controls.Add(Label(prefix, 42, true));
+                stack.Controls.Add(Label("מספר אישי של הבודק: " + V(state, name + "InspectorNumber") +
+                    (name == "final" ? "  ·  שעת עזיבה: " + V(state, "departureTime") : ""), 38));
+            }
+        }
+        if (B(state, "takenEnabled"))
+        {
+            Section(stack, "חתימה על קשיחים שנלקחו");
+            stack.Controls.Add(Label($"שם מלא: {V(state, "takenFullName")}   ·   מספר אישי: {V(state, "takenPersonalNumber")}   ·   דרגה: {V(state, "takenRank")}", 44));
+        }
+        Section(stack, "חתימות");
         foreach (var (name, label) in new[]
         {
             ("safetyTechnicianSignature", "בדיקת מטוס בטוח לאחזקה"),
@@ -211,8 +262,10 @@ public sealed partial class NativeWindow
             ("entryInspectorSignature", "ביקורת כניסה · חתימת בודק"),
             ("interimTechnicianSignature", "ביקורת במהלך העבודה · טכנאי"),
             ("interimInspectorSignature", "ביקורת במהלך העבודה · בודק"),
+            ("interimToolsSignature", "ביקורת במהלך העבודה · פ. כלים / מ״ע"),
             ("finalTechnicianSignature", "ביקורת בסיום · טכנאי"),
             ("finalInspectorSignature", "ביקורת בסיום · בודק"),
+            ("finalLeadSignature", "ביקורת בסיום · ר״צ / מ״ע"),
             ("takenSignature", "קשיחים שנלקחו"),
             ("technicianDeclarationSignature", "הצהרת הטכנאי")
         })
