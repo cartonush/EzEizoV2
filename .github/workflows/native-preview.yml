@@ -3,9 +3,10 @@ name: Build native UI preview
 on:
   workflow_dispatch:
   push:
-    branches: [native-ui]
+    branches: [ui-2-5-1]
     paths:
       - 'src/EzEizo.Native/**'
+      - 'launch/NativeLauncher.cpp'
       - 'src/EzEizo.Native.Metis/**'
       - 'src/EzEizo.Native.Mechanic/**'
       - '.github/workflows/native-preview.yml'
@@ -44,6 +45,18 @@ jobs:
             }
           }
           if (Test-Path dist/native-preview/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - name: Build two direct EXE launchers
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'Visual C++ build tools not found' }
+          $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+          $output = (Resolve-Path dist/native-preview).Path + '\Metis.exe'
+          $line = 'call "' + $devcmd + '" -arch=x64 >nul && cl.exe /nologo /O2 /MT /EHsc /DUNICODE /D_UNICODE /Fe:"' + $output + '" launch\NativeLauncher.cpp /link /SUBSYSTEM:WINDOWS /OUT:"' + $output + '"'
+          cmd /c $line
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $output)) { throw 'Native launcher compilation failed' }
+          Copy-Item $output dist/native-preview/Mechanic.exe
       - name: Install Access engine for offline tests
         shell: pwsh
         run: |
@@ -94,8 +107,6 @@ jobs:
           if ($result.ExitCode -ne 0 -or !(Test-Path $db)) { throw 'Clean ACCDB template creation failed' }
           New-Item -ItemType Directory -Force dist/native-preview/data | Out-Null
           Copy-Item $db dist/native-preview/data/EzEizo.accdb
-          Set-Content -Path dist/native-preview/Metis.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Metis.exe"') -Encoding ASCII
-          Set-Content -Path dist/native-preview/Mechanic.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Mechanic.exe"') -Encoding ASCII
           if (Test-Path dist/native-preview/program/wwwroot) { throw 'Native package contains the old website' }
       - name: Launch both native windows
         shell: pwsh
@@ -108,6 +119,17 @@ jobs:
             if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
             $process.Kill()
           }
+      - name: Verify direct launchers open both applications
+        shell: pwsh
+        run: |
+          Start-Process (Resolve-Path dist/native-preview/Metis.exe).Path
+          Start-Process (Resolve-Path dist/native-preview/Mechanic.exe).Path
+          Start-Sleep -Seconds 4
+          $manager = Get-Process 'EzEizo-Native-Metis' -ErrorAction SilentlyContinue
+          $mechanic = Get-Process 'EzEizo-Native-Mechanic' -ErrorAction SilentlyContinue
+          if (!$manager -or !$mechanic) { throw 'Direct EXE launch failed' }
+          $manager | Stop-Process -Force
+          $mechanic | Stop-Process -Force
       - name: Smoke test native manager login and navigation
         shell: pwsh
         run: |
@@ -120,13 +142,15 @@ jobs:
       - name: Save UI screenshot outside the distributable package
         shell: pwsh
         run: |
-          if (!(Test-Path dist/native-preview/program/native-ui-screenshot.png)) { throw 'No native UI screenshot captured' }
-          Copy-Item dist/native-preview/program/native-ui-screenshot.png dist/native-ui-screenshot.png
-          Remove-Item dist/native-preview/program/native-ui-screenshot.png
+          New-Item -ItemType Directory -Force dist/screenshots | Out-Null
+          $screens = Get-ChildItem dist/native-preview/program/native-*.png
+          if ($screens.Count -lt 5) { throw 'Missing native UI screenshots' }
+          Copy-Item $screens.FullName dist/screenshots/
+          Remove-Item $screens.FullName
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-screenshot
-          path: dist/native-ui-screenshot.png
+          path: dist/screenshots
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
