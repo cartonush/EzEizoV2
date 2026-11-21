@@ -2,6 +2,50 @@ namespace EzEizo.Core;
 
 public static class NativeDiagnostics
 {
+    private static IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
+    }
+    public static void VerifyUi()
+    {
+        using var window = new NativeWindow(AppRole.Manager);
+        var stage = 0;
+        var started = DateTime.UtcNow;
+        string? failure = null;
+        using var timer = new System.Windows.Forms.Timer { Interval = 150 };
+        timer.Tick += (_, _) =>
+        {
+            try
+            {
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(45))
+                { failure = "Native UI navigation timed out on " + window.DiagnosticPage; window.Close(); return; }
+                var controls = Descendants(window).ToArray();
+                if (stage == 0 && window.DiagnosticPage == "login")
+                {
+                    var file = Path.Combine(Database.DataDirectory, "initial-manager.txt");
+                    if (!File.Exists(file)) return;
+                    var password = File.ReadAllLines(file).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = "9862436";
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = password;
+                    controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
+                    stage = 1;
+                }
+                if (stage == 1 && window.DiagnosticPage == "issues")
+                { controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 2; }
+                if (stage == 2 && window.DiagnosticPage == "keys")
+                { controls.OfType<Button>().First(x => x.Text == "משתמשים").PerformClick(); stage = 3; }
+                if (stage == 3 && window.DiagnosticPage == "users") { stage = 4; window.Close(); }
+            }
+            catch (Exception ex) { failure = ex.ToString(); window.Close(); }
+        };
+        timer.Start();
+        Application.Run(window);
+        if (stage != 4) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+    }
     public static void VerifyPdf()
     {
         var db = new Database();
