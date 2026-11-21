@@ -139,17 +139,21 @@ public sealed partial class NativeWindow
             foreach (var tech in technicians) people.Items.Add(new PersonChoice(new Account(tech.Id, tech.Name, tech.PersonalNumber, "mechanic")));
             var peopleCaption = Label("טכנאים"); stack.Controls.Add(peopleCaption); stack.Controls.Add(people);
             var allDates = new CheckBox { Width = 440, Height = 40, Text = "כל התקופות" }; stack.Controls.Add(allDates);
-            stack.Controls.Add(Label("מתאריך ושעה"));
-            var from = new DateTimePicker { Width = 220, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now.AddDays(-1) };
-            stack.Controls.Add(from);
-            stack.Controls.Add(Label("עד תאריך ושעה"));
-            var until = new DateTimePicker { Width = 220, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now };
-            stack.Controls.Add(until);
+            var dates = FieldGrid(); dates.Height = 112;
+            var from = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now.AddDays(-1) };
+            var fromCell = FieldCell(); AddField(fromCell, "מתאריך ושעה", from); dates.Controls.Add(fromCell);
+            var until = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now };
+            var untilCell = FieldCell(); AddField(untilCell, "עד תאריך ושעה", until); dates.Controls.Add(untilCell);
+            stack.Controls.Add(dates);
             allDates.CheckedChanged += (_, _) => { from.Enabled = !allDates.Checked; until.Enabled = !allDates.Checked; };
-            var formType = Choice(stack, "סוג טופס", ["תקלות והטענות מפתחות", "תקלות", "הטענות מפתחות"]);
+            var typeAndStatus = FieldGrid(); typeAndStatus.Height = 112;
+            var typeCell = FieldCell(); typeAndStatus.Controls.Add(typeCell);
+            var formType = Choice(typeCell, "סוג טופס", ["תקלות והטענות מפתחות", "תקלות", "הטענות מפתחות"]);
             formType.SelectedIndex = 1;
-            var stateFilter = Choice(stack, "סטטוס", ["כל המצבים", "פתוח", "ממתין לסגירה", "סגור"]);
+            var statusCell = FieldCell(); typeAndStatus.Controls.Add(statusCell);
+            var stateFilter = Choice(statusCell, "סטטוס", ["כל המצבים", "פתוח", "ממתין לסגירה", "סגור"]);
             stateFilter.SelectedIndex = 1;
+            stack.Controls.Add(typeAndStatus);
             void LayoutFilters()
             {
                 var kind = report.SelectedIndex;
