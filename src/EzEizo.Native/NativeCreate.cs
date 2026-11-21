@@ -196,4 +196,106 @@ public sealed partial class NativeWindow
         }
         catch (Exception ex) { Error(ex); }
     }
+
+    private async Task EditDefinition(string page, JsonNode doc)
+    {
+        if (account is null || role != AppRole.Manager || V(doc, "status") != "open") return;
+        var user = account; var id = V(doc, "id");
+        Loading("טוען טופס לעריכת מנהל…");
+        try
+        {
+            var technicians = await Work(() => database.Technicians());
+            currentPage = "edit-definition"; refreshTimer.Stop();
+            var stack = Stack();
+            stack.Controls.Add(Button("חזרה לטופס", async (_, _) => await OpenDocument(page, id)));
+            Section(stack, "עריכת פרטי טופס פתוח");
+            var sheet = page == "issues" ? doc["sheet"] ?? doc : doc;
+            var squad = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
+            squad.SelectedItem = V(sheet, "squadron");
+            var shelter = Choice(stack, "דת״ק", NativeCatalog.Squadrons.TryGetValue(Selected(squad), out var current) ? current.shelters : []);
+            shelter.SelectedItem = V(sheet, "shelter");
+            squad.SelectedIndexChanged += (_, _) => Options(shelter, NativeCatalog.Squadrons.TryGetValue(Selected(squad), out var entry) ? entry.shelters : []);
+            var aircraft = Choice(stack, "מספר מטוס", NativeCatalog.Squadrons.TryGetValue(Selected(squad), out current) ? current.aircraft : []);
+            aircraft.SelectedItem = V(sheet, "aircraft");
+            squad.SelectedIndexChanged += (_, _) => Options(aircraft, NativeCatalog.Squadrons.TryGetValue(Selected(squad), out var entry) ? entry.aircraft : []);
+            var team = Team(stack, technicians);
+            var uids = (doc[page == "issues" ? "assigneeUids" : "teamUids"] as JsonArray ?? new()).Select(x => x?.ToString()).ToHashSet();
+            for (var i = 0; i < team.Items.Count; i++)
+                team.SetItemChecked(i, uids.Contains(((PersonChoice)team.Items[i]!).User.Id));
+            TextBox? fault = null, notes = null;
+            ComboBox? system = null, ew = null, workshop = null;
+            DateTimePicker? date = null, time = null;
+            DataGridView? rows = null;
+            if (page == "issues")
+            {
+                workshop = Choice(stack, "מוסך", ["מוסך א", "מוסך ב", "כנפ״ת"]);
+                workshop.SelectedItem = V(sheet, "workshop");
+                system = Choice(stack, "שם מערכת", NativeCatalog.Systems); system.SelectedItem = V(sheet, "systemName");
+                ew = Choice(stack, "חליפת ל״א", NativeCatalog.Ew); ew.SelectedItem = V(sheet, "ewSystem");
+                stack.Controls.Add(Label("תיאור התקלה")); fault = Input("תיאור התקלה", 2000); fault.Multiline = true; fault.Height = 80; fault.Text = V(sheet, "fault"); stack.Controls.Add(fault);
+                stack.Controls.Add(Label("הערות מנהל")); notes = Input("הערות", 2000); notes.Multiline = true; notes.Height = 70; notes.Text = V(sheet, "managerNotes"); stack.Controls.Add(notes);
+            }
+            else
+            {
+                date = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Short, Value = DateTime.TryParse(V(sheet, "date"), out var d) ? d : DateTime.Today };
+                stack.Controls.Add(Label("תאריך")); stack.Controls.Add(date);
+                time = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = TimeSpan.TryParse(V(sheet, "time"), out var t) ? DateTime.Today.Add(t) : DateTime.Now };
+                stack.Controls.Add(Label("שעה")); stack.Controls.Add(time);
+                rows = new DataGridView { Width = 740, Height = 220, AllowUserToAddRows = true, RowHeadersVisible = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+                rows.Columns.Add("aircraft", "מטוס"); rows.Columns.Add(new DataGridViewCheckBoxColumn { Name = "blue", HeaderText = "ארז כחול" });
+                rows.Columns.Add(new DataGridViewCheckBoxColumn { Name = "shach", HeaderText = "שחק" }); rows.Columns.Add("notes", "הערות");
+                foreach (var row in sheet["rows"] as JsonArray ?? new()) rows.Rows.Add(V(row, "aircraft"), B(row, "blue"), B(row, "shach"), V(row, "notes"));
+                stack.Controls.Add(rows);
+            }
+            stack.Controls.Add(Button("שמור שינויים", async (_, _) =>
+            {
+                try
+                {
+                    var sq = Selected(squad); var sh = Selected(shelter); var plane = Selected(aircraft); var members = Checked(team);
+                    if (!NativeCatalog.Squadrons.TryGetValue(sq, out var catalog) || !catalog.shelters.Contains(sh)) throw new ArgumentException("בחר טייסת ודת״ק מהרשימות.");
+                    if (members.Length < (page == "issues" ? 1 : 2)) throw new ArgumentException("בחר צוות טכנאים תקין.");
+                    JsonObject changes;
+                    if (page == "issues")
+                    {
+                        if (!catalog.aircraft.Contains(plane) || system is null || Selected(system).Length == 0 || ew is null || Selected(ew).Length == 0 || string.IsNullOrWhiteSpace(fault?.Text))
+                            throw new ArgumentException("בחר מטוס ומערכת והזן תיאור תקלה.");
+                        changes = new JsonObject
+                        {
+                            ["squadron"] = sq, ["shelter"] = sh, ["workshop"] = sh == "מוסך" ? Selected(workshop!) : "",
+                            ["aircraft"] = plane, ["systemName"] = Selected(system), ["systemCode"] = NativeCatalog.Codes[Array.IndexOf(NativeCatalog.Systems, Selected(system))],
+                            ["ewSystem"] = Selected(ew), ["fault"] = fault!.Text, ["managerNotes"] = notes?.Text ?? ""
+                        };
+                    }
+                    else
+                    {
+                        rows!.EndEdit();
+                        var entries = new JsonArray(); var planes = new List<string>();
+                        foreach (DataGridViewRow row in rows.Rows)
+                        {
+                            if (row.IsNewRow) continue;
+                            var number = row.Cells["aircraft"].Value?.ToString() ?? "";
+                            var blue = row.Cells["blue"].Value is true; var shach = row.Cells["shach"].Value is true;
+                            if (number.Length == 0 && !blue && !shach) continue;
+                            if (!catalog.aircraft.Contains(number) || planes.Contains(number) || !(blue || shach)) throw new ArgumentException("בחר מטוסים ייחודיים וסוגי מפתחות תקינים.");
+                            planes.Add(number);
+                            entries.Add(new JsonObject { ["aircraft"] = number, ["blue"] = blue, ["shach"] = shach, ["notes"] = row.Cells["notes"].Value?.ToString() ?? "" });
+                        }
+                        if (entries.Count == 0) throw new ArgumentException("יש להזין מטוס אחד לפחות.");
+                        var next = date!.Value.AddMonths(1);
+                        changes = new JsonObject { ["date"] = date.Value.ToString("yyyy-MM-dd"), ["time"] = time!.Value.ToString("HH:mm"),
+                            ["squadron"] = sq, ["shelter"] = sh, ["rows"] = entries, ["aircraftIds"] = Strings(planes),
+                            ["period"] = $"{date.Value:MM}-{next:MM/yy}" };
+                    }
+                    await Work(() => store.Update(page == "issues" ? "issues" : "keyLoads", id, "editDefinition",
+                        Json(new JsonObject { ["changes"] = changes, ["teamUids"] = Strings(members.Select(x => x.Id)) }), user));
+                    await OpenDocument(page, id);
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
+            content.Controls.Clear(); content.Controls.Add(stack);
+            status.Text = "עריכת פרטי הטופס אפשרית כל עוד טכנאי אינו מחזיק בנעילת העריכה.";
+        }
+        catch (Exception ex) { Error(ex); }
+    }
 }
