@@ -6,6 +6,7 @@ on:
     branches: [ui-2-5-1]
     paths:
       - 'src/EzEizo.Native/**'
+      - 'src/EzEizo.Core/**'
       - 'launch/NativeLauncher.cpp'
       - 'src/EzEizo.Native.Metis/**'
       - 'src/EzEizo.Native.Mechanic/**'
