@@ -10,9 +10,10 @@ public sealed partial class NativeWindow
     }
     private static ComboBox Choice(FlowLayoutPanel stack, string title, IEnumerable<string> values)
     {
-        stack.Controls.Add(Label(title));
+        var caption = Label(title);
+        stack.Controls.Add(caption);
         var box = new ComboBox { Width = 440, Height = 40, DropDownStyle = ComboBoxStyle.DropDownList,
-            Margin = new Padding(0, 0, 0, 14) };
+            Margin = new Padding(0, 0, 0, 14), Tag = caption };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
         box.SelectedIndex = 0;
@@ -55,12 +56,12 @@ public sealed partial class NativeWindow
             var constants = await Work(() => store.Constants(user));
             currentPage = "new-fault"; refreshTimer.Stop();
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה", async (_, _) => await OpenList("issues")));
             Section(stack, "פתיחת תקלה חדשה");
             var squadron = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
             var shelter = Choice(stack, "דת״ק", []);
             var workshop = Choice(stack, "מוסך", ["מוסך א", "מוסך ב", "כנפ״ת"]);
             workshop.Visible = false;
+            ((Control)workshop.Tag!).Visible = false;
             var aircraft = Choice(stack, "מספר מטוס", []);
             squadron.SelectedIndexChanged += (_, _) =>
             {
@@ -68,7 +69,7 @@ public sealed partial class NativeWindow
                 Options(shelter, NativeCatalog.Squadrons.TryGetValue(name, out var entry) ? entry.shelters : []);
                 Options(aircraft, NativeCatalog.Squadrons.TryGetValue(name, out entry) ? entry.aircraft : []);
             };
-            shelter.SelectedIndexChanged += (_, _) => workshop.Visible = Selected(shelter) == "מוסך";
+            shelter.SelectedIndexChanged += (_, _) => workshop.Visible = ((Control)workshop.Tag!).Visible = Selected(shelter) == "מוסך";
             var system = Choice(stack, "שם מערכת", NativeCatalog.Systems);
             var ew = Choice(stack, "חליפת ל״א", NativeCatalog.Ew);
             ew.Enabled = false;
@@ -77,12 +78,12 @@ public sealed partial class NativeWindow
             var fault = Input("תיאור התקלה", 2000); fault.Multiline = true; fault.Height = 90; stack.Controls.Add(fault);
             stack.Controls.Add(Label("הערות מנהל (לא חובה)"));
             var notes = Input("הערות", 2000); notes.Multiline = true; notes.Height = 70; stack.Controls.Add(notes);
-            var team = Team(stack, technicians);
             var briefing = new CheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
             stack.Controls.Add(briefing);
             var signature = new NativeSignature();
             stack.Controls.Add(Label("חתימת משלח המשימה")); stack.Controls.Add(signature);
             stack.Controls.Add(Button("נקה חתימה", (_, _) => signature.Clear()));
+            var team = Team(stack, technicians);
             stack.Controls.Add(Button("פתח תקלה", async (_, _) =>
             {
                 try
@@ -126,7 +127,6 @@ public sealed partial class NativeWindow
             var technicians = await Work(() => database.Technicians());
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה", async (_, _) => await OpenList("keys")));
             Section(stack, "הטענת מפתחות חדשה");
             var date = new DateTimePicker { Width = 200, Format = DateTimePickerFormat.Short, Value = DateTime.Today };
             stack.Controls.Add(Label("תאריך")); stack.Controls.Add(date);
