@@ -191,7 +191,20 @@ public sealed partial class NativeWindow : Form
         foreach (var previous in previousControls) previous.Dispose();
         var card = new NativeCard { Padding = new Padding(3) };
         stack.Dock = DockStyle.Fill;
-        card.Controls.Add(stack);
+        var toolbar = stack.Controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.Name == "EditorToolbar");
+        if (toolbar is null) card.Controls.Add(stack);
+        else
+        {
+            stack.Controls.Remove(toolbar);
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            toolbar.Dock = DockStyle.Fill;
+            layout.Controls.Add(toolbar, 0, 0);
+            layout.Controls.Add(stack, 0, 1);
+            card.Controls.Add(layout);
+        }
         activeCard = card;
         content.Controls.Add(card);
         CenterCard();
