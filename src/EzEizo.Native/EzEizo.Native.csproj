@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Data.OleDb" Version="10.0.0" />
+    <Compile Include="../EzEizo.Core/Database.cs" Link="Database.cs" />
+    <Compile Include="../EzEizo.Core/OfflineStore.cs" Link="OfflineStore.cs" />
+    <Compile Include="../EzEizo.Core/Models.cs" Link="Models.cs" />
+    <Compile Include="../EzEizo.Core/SharedDatabaseStartup.cs" Link="SharedDatabaseStartup.cs" />
+    <Compile Include="NativeWindow.cs" />
+  </ItemGroup>
+</Project>
