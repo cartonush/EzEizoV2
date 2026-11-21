@@ -88,6 +88,9 @@ public sealed partial class NativeWindow
         var statusValue = V(doc, "status");
         if (role == AppRole.Manager)
         {
+            ShowReadOnlyForm(stack, page, doc);
+            if (statusValue == "open")
+                stack.Controls.Add(Button("ערוך פרטי טופס וצוות", async (_, _) => await EditDefinition(page, doc)));
             if (page == "issues" && statusValue == "pendingReview")
             {
                 var reviewer = Signature(stack, "חתימת בודק הדף", new JsonObject(), "reviewerSignature", true);
@@ -138,6 +141,59 @@ public sealed partial class NativeWindow
         }
         if (page == "issues") await FaultEditor(stack, doc, user);
         else await KeyEditor(stack, doc, user);
+    }
+
+    private static void ShowReadOnlyForm(FlowLayoutPanel stack, string page, JsonNode doc)
+    {
+        var state = page == "issues" ? doc["closed"]?["state"] : doc["work"] ?? doc["workDraft"];
+        if (state is null) { stack.Controls.Add(Label("טרם נשמר מילוי של טכנאי בטופס זה.")); return; }
+        Section(stack, "מילוי הטכנאי");
+        if (page == "issues")
+        {
+            stack.Controls.Add(Label("תיאור תיקון: " + V(state, "repair"), 85));
+            stack.Controls.Add(Label("הערת טכנאי: " + V(state, "technicianNote"), 60));
+            stack.Controls.Add(Label("שעת הגעה: " + V(state, "arrivalTime") + "     שעת סיום: " + V(state, "completionTime")));
+        }
+        else
+        {
+            var aircraft = state["aircraft"] as JsonArray ?? new();
+            var rows = doc["rows"] as JsonArray ?? new();
+            for (var i = 0; i < rows.Count; i++)
+                stack.Controls.Add(Label($"מטוס {V(rows[i], "aircraft")} · ארז כחול: {(i < aircraft.Count && B(aircraft[i], "blueDone") ? "בוצע" : "—")} · שחק: {(i < aircraft.Count && B(aircraft[i], "shachDone") ? "בוצע" : "—")} · הערה: {V(i < aircraft.Count ? aircraft[i] : null, "technicianNote")}", 50));
+        }
+        var actions = state["actions"] as JsonArray ?? new();
+        var titles = page == "issues" ? NativeCatalog.Actions : NativeCatalog.KeyActions;
+        Section(stack, "פעולות אחזקה");
+        for (var i = 0; i < titles.Length; i++)
+            stack.Controls.Add(Label($"{i + 1:D2}. {(i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□")} {titles[i]}", 48));
+        foreach (var (kind, spec) in NativeCatalog.Tables)
+        {
+            var rows = state[kind] as JsonArray;
+            if (rows is null || rows.Count == 0) continue;
+            Section(stack, spec.title);
+            var grid = new DataGridView { Width = 740, Height = Math.Min(280, rows.Count * 35 + 55), ReadOnly = true,
+                AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            foreach (var field in spec.fields) grid.Columns.Add(field.key, field.label);
+            foreach (var row in rows) grid.Rows.Add(spec.fields.Select(field => V(row, field.key)).ToArray());
+            stack.Controls.Add(grid);
+        }
+        foreach (var (name, label) in new[]
+        {
+            ("safetyTechnicianSignature", "בדיקת מטוס בטוח לאחזקה"),
+            ("entryTechnicianSignature", "ביקורת כניסה · חתימת טכנאי"),
+            ("entryInspectorSignature", "ביקורת כניסה · חתימת בודק"),
+            ("interimTechnicianSignature", "ביקורת במהלך העבודה · טכנאי"),
+            ("interimInspectorSignature", "ביקורת במהלך העבודה · בודק"),
+            ("finalTechnicianSignature", "ביקורת בסיום · טכנאי"),
+            ("finalInspectorSignature", "ביקורת בסיום · בודק"),
+            ("takenSignature", "קשיחים שנלקחו"),
+            ("technicianDeclarationSignature", "הצהרת הטכנאי")
+        })
+        {
+            var value = V(state, name);
+            if (!value.StartsWith("data:image/png;base64,")) continue;
+            stack.Controls.Add(Label(label)); stack.Controls.Add(new NativeSignature(value) { Enabled = false });
+        }
     }
 
     private async Task FaultEditor(FlowLayoutPanel stack, JsonNode doc, Account user)
