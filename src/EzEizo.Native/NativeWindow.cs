@@ -272,7 +272,7 @@ public sealed partial class NativeWindow : Form
                 var inner = width - body.Padding.Horizontal - 12;
                 foreach (Control child in body.Controls)
                 {
-                    if (child is Label or DataGridView || Equals(child.Tag, "section-heading") ||
+                    if (child is System.Windows.Forms.Label or DataGridView || Equals(child.Tag, "section-heading") ||
                         child is FlowLayoutPanel || child is CheckBox || child is NativeSkeletonBlock)
                         child.Width = inner;
                     else if (child is TextBox input && input.Multiline) child.Width = inner;
@@ -430,6 +430,7 @@ public sealed partial class NativeWindow : Form
                 _ => page == "issues" ? "תקלות פתוחות" : "הטענות פתוחות"
             }, 56, true);
             stack.Controls.Add(heading);
+            Action render = () => { };
             if (role == AppRole.Manager)
             {
                 var tabs = new FlowLayoutPanel { Width = 1020, Height = 64, WrapContents = false,
@@ -443,7 +444,7 @@ public sealed partial class NativeWindow : Form
                         statusFilter = filter;
                         heading.Text = caption;
                         foreach (var button in tabButtons) { button.Active = button == tab; button.Invalidate(); }
-                        Render();
+                        render();
                     });
                     tab.Secondary = true; tab.Width = page == "issues" ? 235 : 195;
                     tab.Active = statusFilter == filter;
@@ -496,6 +497,7 @@ public sealed partial class NativeWindow : Form
                     cards.Controls.Add(card);
                 }
             }
+            render = Render;
             search.TextChanged += (_, _) => { searchTerm = search.Text; Render(); };
             Render();
             Present(stack);
