@@ -44,6 +44,43 @@ jobs:
             }
           }
           if (Test-Path dist/native-preview/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - name: Install Access engine for offline tests
+        shell: pwsh
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
+          Invoke-WebRequest 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $download
+          $process = Start-Process -FilePath $download -ArgumentList '/quiet' -Wait -PassThru
+          if ($process.ExitCode -notin @(0,3010)) { throw "Access Engine installation failed: $($process.ExitCode)" }
+      - name: Test native offline database workflow
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--self-test' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'Offline manager and mechanic workflow failed'
+          }
+      - name: Test native PDF and ZIP export
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--verify-pdf' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'PDF or ZIP export failed'
+          }
+      - name: Test simultaneous Access startup
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/native-preview/program/EzEizo-Native-Mechanic.exe).Path
+          $jobs = @((Start-Process $manager -ArgumentList '--probe-startup' -PassThru), (Start-Process $mechanic -ArgumentList '--probe-startup' -PassThru))
+          foreach ($process in $jobs) {
+            if (!$process.WaitForExit(60000) -or $process.ExitCode -ne 0) {
+              if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+              throw 'Simultaneous Access startup failed'
+            }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-experiment
