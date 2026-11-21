@@ -474,7 +474,6 @@ public sealed partial class NativeWindow : Form
             var users = await Work(() => database.AllTechnicians());
             currentPage = "users";
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה לתקלות", async (_, _) => await OpenList("issues")));
             stack.Controls.Add(Label("ניהול משתמשים", 55, true));
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
@@ -536,7 +535,6 @@ public sealed partial class NativeWindow : Form
             documentSection = page;
             currentPage = "document";
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה לרשימה", async (_, _) => await OpenList(page)));
             var sheet = page == "issues" ? doc["sheet"] ?? doc : doc;
             stack.Controls.Add(Label("פרטי אירוע", 29));
             stack.Controls.Add(Label($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}", 60, true));
