@@ -87,19 +87,28 @@ public static class NativeDiagnostics
                 else if (stage == 7 && window.DiagnosticPage == "users")
                 {
                     Capture(window, "native-users.png");
-                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 8;
+                    controls.OfType<Button>().First(x => x.Text == "טפסים סגורים").PerformClick(); stage = 8;
                 }
-                else if (stage == 8 && window.DiagnosticPage == "management")
-                { controls.OfType<Button>().First(x => x.Text.StartsWith("הפקת דוחות")).PerformClick(); stage = 9; }
-                else if (stage == 9 && window.DiagnosticPage == "reports")
+                else if (stage == 8 && window.DiagnosticPage == "user-history")
+                {
+                    if (!controls.OfType<Label>().Any(x => x.Text.Contains("טפסים סגורים")))
+                        throw new InvalidOperationException("Per-technician closed forms are missing.");
+                    Capture(window, "native-user-history.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 9;
+                }
+                else if (stage == 9 && window.DiagnosticPage == "users")
+                { controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 10; }
+                else if (stage == 10 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("הפקת דוחות")).PerformClick(); stage = 11; }
+                else if (stage == 11 && window.DiagnosticPage == "reports")
                 {
                     Capture(window, "native-reports.png");
-                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 10;
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 12;
                 }
-                else if (stage == 10 && window.DiagnosticPage == "management")
-                { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 11; }
-                else if (stage == 11 && window.DiagnosticPage == "constants")
-                { Capture(window, "native-constants.png"); stage = 12; window.Close(); }
+                else if (stage == 12 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 13; }
+                else if (stage == 13 && window.DiagnosticPage == "constants")
+                { Capture(window, "native-constants.png"); stage = 14; window.Close(); }
             }
             catch (Exception ex)
             {
@@ -111,7 +120,7 @@ public static class NativeDiagnostics
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 12) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 14) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
     }
     private static void Capture(Form window, string file)
     {
