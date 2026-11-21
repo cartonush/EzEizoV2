@@ -25,3 +25,27 @@ jobs:
         run: dotnet build src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release
       - name: Compile mechanic native UI
         run: dotnet build src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release
+      - name: Publish native apps
+        shell: pwsh
+        run: |
+          dotnet publish src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/manager
+          dotnet publish src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/mechanic
+          New-Item -ItemType Directory -Force dist/native-preview/program | Out-Null
+          Copy-Item dist/manager/* dist/native-preview/program/ -Recurse -Force
+          $mechanicRoot = (Resolve-Path dist/mechanic).Path
+          Get-ChildItem $mechanicRoot -File -Recurse | ForEach-Object {
+            $relative = $_.FullName.Substring($mechanicRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
+            $destination = Join-Path (Resolve-Path dist/native-preview/program).Path $relative
+            if (Test-Path $destination) {
+              if ((Get-FileHash $_.FullName).Hash -ne (Get-FileHash $destination).Hash) { throw "Shared runtime differs: $relative" }
+            } else {
+              New-Item -ItemType Directory -Force (Split-Path $destination) | Out-Null
+              Copy-Item $_.FullName $destination
+            }
+          }
+          if (Test-Path dist/native-preview/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-native-ui-experiment
+          path: dist/native-preview
+          retention-days: 14
