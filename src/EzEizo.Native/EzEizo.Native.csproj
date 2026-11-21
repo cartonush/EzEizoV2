@@ -13,5 +13,8 @@
     <Compile Include="../EzEizo.Core/Models.cs" Link="Models.cs" />
     <Compile Include="../EzEizo.Core/SharedDatabaseStartup.cs" Link="SharedDatabaseStartup.cs" />
     <Compile Include="NativeWindow.cs" />
+    <Compile Include="NativeForms.cs" />
+    <Compile Include="NativeCatalog.cs" />
+    <Compile Include="NativeSignature.cs" />
   </ItemGroup>
 </Project>
