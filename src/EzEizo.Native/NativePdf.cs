@@ -165,19 +165,19 @@ internal static class NativePdf
                 var part = parts[index];
                 if (part.Cells is { Length: > 0 } cells)
                 {
-                    var height = Math.Max(34, cells.Max(cell => (int)Math.Ceiling(
+                    var tableHeight = Math.Max(34, cells.Max(cell => (int)Math.Ceiling(
                         e.Graphics.MeasureString(cell ?? "", tableFont, e.MarginBounds.Width / cells.Length - 12, format).Height) + 12));
-                    if (y + height > e.MarginBounds.Bottom && y > e.MarginBounds.Top) break;
+                    if (y + tableHeight > e.MarginBounds.Bottom && y > e.MarginBounds.Top) break;
                     var cellWidth = e.MarginBounds.Width / (float)cells.Length;
                     for (var cellIndex = 0; cellIndex < cells.Length; cellIndex++)
                     {
-                        var rect = new RectangleF(e.MarginBounds.Right - (cellIndex + 1) * cellWidth, y, cellWidth, height);
+                        var rect = new RectangleF(e.MarginBounds.Right - (cellIndex + 1) * cellWidth, y, cellWidth, tableHeight);
                         e.Graphics.FillRectangle(part.TableHeader ? Brushes.LightBlue : Brushes.White, rect);
                         e.Graphics.DrawRectangle(Pens.LightGray, rect.X, rect.Y, rect.Width, rect.Height);
                         e.Graphics.DrawString(cells[cellIndex] ?? "", part.TableHeader ? tableHeaderFont : tableFont,
                             Brushes.Black, new RectangleF(rect.X + 5, rect.Y + 5, rect.Width - 10, rect.Height - 10), format);
                     }
-                    y += height; index++; continue;
+                    y += tableHeight; index++; continue;
                 }
                 var font = part.Heading ? titleFont : textFont;
                 var width = e.MarginBounds.Width;
