@@ -6,12 +6,13 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        if (args.Contains("--self-test") || args.Contains("--verify-pdf") || args.Contains("--probe-startup"))
+        if (args.Contains("--self-test") || args.Contains("--verify-pdf") || args.Contains("--probe-startup") || args.Contains("--seed-template"))
         {
             try
             {
                 if (args.Contains("--self-test")) SmokeTest.Run();
                 else if (args.Contains("--verify-pdf")) NativeDiagnostics.VerifyPdf();
+                else if (args.Contains("--seed-template")) { new Database().Initialize(); new OfflineStore().Initialize(); }
                 else SharedDatabaseStartup.Initialize();
                 return;
             }
