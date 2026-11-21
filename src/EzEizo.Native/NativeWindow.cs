@@ -20,6 +20,7 @@ public sealed partial class NativeWindow : Form
     private Account? account;
     private string currentPage = "";
     private string searchTerm = "";
+    private string statusFilter = "הכל";
     private int? lastListVersion;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 10000 };
 
@@ -34,6 +35,7 @@ public sealed partial class NativeWindow : Form
         Font = new Font("Segoe UI", 11);
         var header = new Panel { Dock = DockStyle.Top, Height = 90, BackColor = Navy, Padding = new Padding(26, 12, 26, 12) };
         heading.Text = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
+        Text += " · 2.5.0";
         header.Controls.Add(heading);
         Controls.Add(content);
         Controls.Add(status);
@@ -178,6 +180,15 @@ public sealed partial class NativeWindow : Form
             nav.Controls.Add(Button("התנתק", async (_, _) => { await ReleaseForm(); account = null; Login(); }));
             stack.Controls.Add(nav);
             stack.Controls.Add(Label(page == "issues" ? "תקלות" : "הטענות מפתחות", 55, true));
+            if (role == AppRole.Manager)
+            {
+                var statuses = new ComboBox { Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
+                statuses.Items.AddRange(page == "issues" ? new object[] { "הכל", "פתוח", "ממתין לסגירה", "סגור" } : new object[] { "הכל", "פתוח", "סגור" });
+                statuses.SelectedItem = statusFilter;
+                if (statuses.SelectedIndex < 0) { statuses.SelectedIndex = 0; statusFilter = "הכל"; }
+                stack.Controls.Add(Label("סטטוס")); stack.Controls.Add(statuses);
+                statuses.SelectedIndexChanged += (_, _) => { statusFilter = statuses.SelectedItem?.ToString() ?? "הכל"; Render(); };
+            }
             var search = Input("חפש מספר סידורי", 20);
             search.Text = searchTerm;
             stack.Controls.Add(search);
@@ -186,7 +197,11 @@ public sealed partial class NativeWindow : Form
             void Render()
             {
                 cards.Controls.Clear();
-                var matching = data.Where(item => (item["serial"]?.ToString() ?? item["sheet"]?["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+                var matching = data.Where(item =>
+                    (item["serial"]?.ToString() ?? item["sheet"]?["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                    (statusFilter == "הכל" || statusFilter == "פתוח" && item["status"]?.ToString() == "open" ||
+                     statusFilter == "סגור" && item["status"]?.ToString() == "closed" ||
+                     statusFilter == "ממתין לסגירה" && item["status"]?.ToString() == "pendingReview")).ToArray();
                 if (matching.Length == 0) cards.Controls.Add(Label("אין טפסים להצגה."));
                 foreach (var item in matching)
                 {
@@ -232,10 +247,16 @@ public sealed partial class NativeWindow : Form
                 foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
                 {
                     var row = new FlowLayoutPanel { Width = 745, Height = 54, WrapContents = false };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = 450, Height = 45, TextAlign = ContentAlignment.MiddleRight });
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 310, Height = 45, TextAlign = ContentAlignment.MiddleRight });
                     row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
+                        catch (Exception ex) { Error(ex); }
+                    }));
+                    if (!person.Active) row.Controls.Add(Button("מחק לצמיתות", async (_, _) =>
+                    {
+                        if (MessageBox.Show(this, $"למחוק לצמיתות את {person.Name}?", "מחיקה סופית", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                        try { await Work(() => { database.DeleteTechnician(person.Id); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
                     }));
                     list.Controls.Add(row);
