@@ -35,27 +35,27 @@ public static class NativeDiagnostics
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
                 }
-                if (stage == 1 && window.DiagnosticPage == "home")
+                else if (stage == 1 && window.DiagnosticPage == "home")
                 {
                     Capture(window, "native-home.png");
                     controls.OfType<Button>().First(x => x.Text == "תקלות").PerformClick(); stage = 2;
                 }
-                if (stage == 2 && window.DiagnosticPage == "issues")
+                else if (stage == 2 && window.DiagnosticPage == "issues")
                 {
                     Capture(window, "native-issues.png");
                     controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 3;
                 }
-                if (stage == 3 && window.DiagnosticPage == "keys")
+                else if (stage == 3 && window.DiagnosticPage == "keys")
                 {
                     Capture(window, "native-keys.png");
                     controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 4;
                 }
-                if (stage == 4 && window.DiagnosticPage == "management")
+                else if (stage == 4 && window.DiagnosticPage == "management")
                 {
                     Capture(window, "native-management.png");
                     controls.OfType<Button>().First(x => x.Text.StartsWith("ניהול משתמשים")).PerformClick(); stage = 5;
                 }
-                if (stage == 5 && window.DiagnosticPage == "users") { Capture(window, "native-users.png"); stage = 6; window.Close(); }
+                else if (stage == 5 && window.DiagnosticPage == "users") { Capture(window, "native-users.png"); stage = 6; window.Close(); }
             }
             catch (Exception ex)
             {
@@ -98,7 +98,7 @@ public static class NativeDiagnostics
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
                 }
-                if (stage == 1 && window.DiagnosticPage == "queue")
+                else if (stage == 1 && window.DiagnosticPage == "queue")
                 { Capture(window, "native-technician-queue.png"); stage = 2; window.Close(); }
             }
             catch (Exception ex) { failure = ex.ToString(); window.Close(); }
