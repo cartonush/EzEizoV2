@@ -97,7 +97,19 @@ public static class NativeDiagnostics
     private static void Capture(Form window, string file)
     {
         using var screenshot = new Bitmap(window.Width, window.Height);
-        window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
+        try
+        {
+            window.Update();
+            using (var graphics = Graphics.FromImage(screenshot))
+                graphics.CopyFromScreen(window.PointToScreen(Point.Empty), Point.Empty, window.Size);
+            var center = screenshot.GetPixel(window.Width / 2, window.Height / 2);
+            if (center.A == 0 || center.ToArgb() == Color.Black.ToArgb())
+                window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
+        }
+        catch
+        {
+            window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
+        }
         screenshot.Save(Path.Combine(AppContext.BaseDirectory, file));
     }
     public static void VerifyTechnicianUi()

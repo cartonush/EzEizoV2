@@ -7,9 +7,9 @@ namespace EzEizo.Core;
 public sealed partial class NativeWindow : Form
 {
     internal string DiagnosticPage => readyPage;
-    private static readonly Color Navy = Color.FromArgb(13, 48, 75);
-    private static readonly Color Blue = Color.FromArgb(28, 109, 153);
-    private static readonly Color Pale = Color.FromArgb(238, 245, 248);
+    private static readonly Color Navy = Color.FromArgb(11, 39, 67);
+    private static readonly Color Blue = Color.FromArgb(30, 107, 158);
+    private static readonly Color Pale = Color.FromArgb(242, 246, 248);
     private static readonly Color Muted = Color.FromArgb(107, 124, 139);
     private readonly AppRole role;
     private readonly Database database = new();
@@ -17,13 +17,10 @@ public sealed partial class NativeWindow : Form
     private readonly BlockingCollection<(Func<object?> work, TaskCompletionSource<object?> done)> jobs = new();
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
-    private readonly Label heading = new() { ForeColor = Color.White, Font = new Font("Segoe UI", 19, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label subtitle = new() { ForeColor = Color.FromArgb(195, 216, 229), Font = new Font("Segoe UI", 10), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label eyebrow = new() { Text = "כנף 1 - טייסת תחזוקה", ForeColor = Color.FromArgb(176, 203, 221), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Panel header = new() { Dock = DockStyle.Top, Height = 89, BackColor = Navy };
+    private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
     private readonly Panel bottomNav = new() { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
-    private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, Width = 110, Height = 37 };
-    private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, Width = 105, Height = 37 };
+    private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
+    private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, OnDark = true, Width = 105, Height = 37 };
     private string documentSection = "issues";
     private NativeCard? activeCard;
     private readonly List<NativeButton> navButtons = [];
@@ -44,24 +41,20 @@ public sealed partial class NativeWindow : Form
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
         Font = new Font("Segoe UI", 11);
-        heading.Text = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
-        subtitle.Text = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.5.2";
-        var brand = new Label { Text = role == AppRole.Manager ? "מ" : "ט", Size = new Size(48, 48),
-            TextAlign = ContentAlignment.MiddleCenter, ForeColor = Navy, BackColor = role == AppRole.Manager ?
-                Color.FromArgb(110, 204, 184) : Color.FromArgb(88, 195, 210), Font = new Font("Segoe UI", 22, FontStyle.Bold) };
-        var version = new Label { Text = "v2.5.2", Size = new Size(79, 35), ForeColor = Color.FromArgb(221, 238, 246),
-            BackColor = Color.FromArgb(29, 73, 103), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-        header.Controls.AddRange([brand, eyebrow, heading, subtitle, version, backButton, logoutButton]);
+        header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
+        header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
+        Text += " · 2.5.3";
+        header.Manager = role == AppRole.Manager;
+        var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
+            Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.5.3", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+        header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
-            brand.Location = new Point(header.Width - 77, 21);
-            eyebrow.SetBounds(header.Width - 595, 8, 500, 18);
-            heading.SetBounds(header.Width - 595, 28, 500, 29);
-            subtitle.SetBounds(header.Width - 595, 60, 500, 20);
-            version.Location = new Point(24, 27);
-            logoutButton.Location = new Point(112, 26);
-            backButton.Location = new Point(225, 26);
+            brand.Location = new Point(header.Width - 72, 17);
+            version.Location = new Point(24, 21);
+            logoutButton.Location = new Point(112, 20);
+            backButton.Location = new Point(225, 20);
         };
         backButton.Click += async (_, _) =>
         {
@@ -283,7 +276,8 @@ public sealed partial class NativeWindow : Form
         })
         {
             var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 375; tile.Height = 98;
+            tile.Secondary = true; tile.Width = 375; tile.Height = 105;
+            tile.TileTitle = title; tile.TileDescription = detail;
             tiles.Controls.Add(tile);
         }
         stack.Controls.Add(tiles);
@@ -306,6 +300,7 @@ public sealed partial class NativeWindow : Form
         {
             var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
             tile.Secondary = true; tile.Width = 745; tile.Height = 84;
+            tile.TileTitle = title; tile.TileDescription = detail;
             stack.Controls.Add(tile);
         }
         Present(stack); status.Text = "ניהול המערכת";
