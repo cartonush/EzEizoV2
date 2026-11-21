@@ -55,7 +55,7 @@ public sealed partial class NativeWindow
     }
     private static TextBox Field(FlowLayoutPanel stack, string label, JsonObject state, string key, bool multi = false)
     {
-        stack.Controls.Add(Label(label));
+        stack.Controls.Add(Label(label, label.Length > 80 ? 110 : 34));
         var input = Input(label, 2000);
         if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; }
         input.Text = V(state, key);
@@ -73,7 +73,7 @@ public sealed partial class NativeWindow
     }
     private static NativeSignature Signature(FlowLayoutPanel stack, string label, JsonObject state, string key, bool editable)
     {
-        stack.Controls.Add(Label(label));
+        stack.Controls.Add(Label(label, label.Length > 80 ? 120 : 34));
         var pad = new NativeSignature(V(state, key)) { Enabled = editable, Margin = new Padding(0, 0, 0, 12) };
         stack.Controls.Add(pad);
         if (editable) stack.Controls.Add(Button("נקה חתימה", (_, _) => { pad.Clear(); state[key] = ""; }));
@@ -210,6 +210,13 @@ public sealed partial class NativeWindow
         Field(stack, "תיאור תיקון", state, "repair", true);
         stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
         Field(stack, "הערת טכנאי", state, "technicianNote", true);
+        Section(stack, "קבועים לפי מטוס");
+        foreach (var (group, entries) in Object(sheet["constants"]))
+        {
+            stack.Controls.Add(Label(group, 38, true));
+            foreach (var row in entries as JsonArray ?? new())
+                stack.Controls.Add(Label($"{row?[0]}: {row?[1]}", 28));
+        }
         Section(stack, "פעולות אחזקה");
         var actionValues = state["actions"] as JsonArray ?? new JsonArray();
         while (actionValues.Count < 12) actionValues.Add(false);
@@ -256,7 +263,7 @@ public sealed partial class NativeWindow
         ToolReviews(stack, state, controls);
         TakenDeclaration(stack, state, controls);
         controls["technicianDeclarationSignature"] = Signature(stack,
-            "אני מאשר שכל הפרטים שלמים ומדויקים, שעודכנו מערכות האחזקה ושמכשירים תקולים הועברו עם תגי בר תיקון. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
+            "הנני מאשר שכל הפרטים הרשומים שלמים, נכונים ומדויקים. הנני מאשר שעדכנתי במערכות ממוכנות / בספר המטוס את מספרי המכשירים שפורקו והורכבו. הנני מאשר שהעברתי את המכשירים התקולים בצירוף תגי בר תיקון ממולאים בצורה מושלמת. הדף בלשון זכר אך מתייחס לשני המינים. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
         void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
         stack.Controls.Add(Button("שמירה", async (_, _) =>
         {
