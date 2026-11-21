@@ -669,6 +669,18 @@ public sealed partial class NativeWindow : Form
                 stack.Controls.Add(grid);
             }
             await AddDocumentActions(stack, page, doc);
+            if (role == AppRole.Manager)
+            {
+                Section(stack, "היסטוריית הטופס");
+                stack.Controls.Add(Label("נפתח · " + V(doc, "createdAt"), 38));
+                var events = doc["reopenEvents"] as JsonArray ?? new();
+                if (events.Count == 0 && V(doc, "completedAt").Length > 0)
+                    stack.Controls.Add(Label("נסגר · " + V(doc, "reviewedAt") + " " + V(doc, "completedAt"), 38));
+                foreach (var entry in events)
+                    stack.Controls.Add(Label("נפתח לעריכה · " + (V(entry, "at").Length > 0 ? V(entry, "at") : entry?.ToString() ?? ""), 38));
+                if (events.Count > 0 && V(doc, "completedAt").Length > 0)
+                    stack.Controls.Add(Label("נסגר לאחר עריכה · " + V(doc, "completedAt"), 38));
+            }
             Present(stack);
             status.Text = "הטופס נטען מתוך Access";
         }
