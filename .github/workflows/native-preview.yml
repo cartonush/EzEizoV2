@@ -1,0 +1,27 @@
+name: Build native UI preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [native-ui]
+    paths:
+      - 'src/EzEizo.Native/**'
+      - 'src/EzEizo.Native.Metis/**'
+      - 'src/EzEizo.Native.Mechanic/**'
+      - '.github/workflows/native-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile manager native UI
+        run: dotnet build src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release
+      - name: Compile mechanic native UI
+        run: dotnet build src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release
