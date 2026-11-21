@@ -35,7 +35,12 @@ public static class NativeDiagnostics
                     stage = 1;
                 }
                 if (stage == 1 && window.DiagnosticPage == "issues")
-                { controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 2; }
+                {
+                    using var screenshot = new Bitmap(window.Width, window.Height);
+                    window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
+                    screenshot.Save(Path.Combine(AppContext.BaseDirectory, "native-ui-screenshot.png"));
+                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 2;
+                }
                 if (stage == 2 && window.DiagnosticPage == "keys")
                 { controls.OfType<Button>().First(x => x.Text == "משתמשים").PerformClick(); stage = 3; }
                 if (stage == 3 && window.DiagnosticPage == "users") { stage = 4; window.Close(); }
