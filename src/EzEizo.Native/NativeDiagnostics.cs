@@ -135,6 +135,7 @@ public static class NativeDiagnostics
     {
         var db = new Database();
         var technician = db.CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
+        var second = db.CreateAccount("טכנאי בדיקה נוסף", "7654322", "mechanic", "123456");
         var initial = Path.Combine(Database.DataDirectory, "initial-manager.txt");
         var secret = File.ReadAllLines(initial).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
         var manager = db.Authenticate("9862436", secret, AppRole.Manager)
@@ -147,7 +148,7 @@ public static class NativeDiagnostics
         {
             squadron = "105", shelter = "14", date = DateTime.Today.ToString("yyyy-MM-dd"),
             time = DateTime.Now.ToString("HH:mm"), period = "11-12/26",
-            teamUids = new[] { technician.Id }, teamNames = new[] { technician.Name },
+            teamUids = new[] { technician.Id, second.Id }, teamNames = new[] { technician.Name, second.Name },
             rows = new[] { new { aircraft = "603", blue = true, shach = true, notes = "בדיקת ממשק" } }
         }));
         store.CreateKey(key.RootElement, manager);
