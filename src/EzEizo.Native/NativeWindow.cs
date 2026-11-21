@@ -5,7 +5,7 @@ namespace EzEizo.Core;
 
 // Native Windows UI prototype. This project deliberately does not reference WebView2.
 // It is built alongside the existing release until every workflow has been ported and tested.
-public sealed class NativeWindow : Form
+public sealed partial class NativeWindow : Form
 {
     private static readonly Color Navy = Color.FromArgb(13, 48, 75);
     private static readonly Color Blue = Color.FromArgb(28, 109, 153);
@@ -144,6 +144,7 @@ public sealed class NativeWindow : Form
 
     private async Task OpenList(string page, bool silent = false)
     {
+        if (activeFormId is not null) await ReleaseForm();
         var user = account;
         if (user is null) { Login(); return; }
         if (!silent) Loading(page == "issues" ? "טוען תקלות…" : "טוען הטענות מפתחות…");
@@ -159,7 +160,7 @@ public sealed class NativeWindow : Form
             nav.Controls.Add(Button("מפתחות", async (_, _) => await OpenList("keys")));
             if (role == AppRole.Manager) nav.Controls.Add(Button("משתמשים", async (_, _) => await OpenUsers()));
             nav.Controls.Add(Button("רענון", async (_, _) => await OpenList(page)));
-            nav.Controls.Add(Button("התנתק", (_, _) => { account = null; Login(); }));
+            nav.Controls.Add(Button("התנתק", async (_, _) => { await ReleaseForm(); account = null; Login(); }));
             nav.Width = 970;
             stack.Controls.Add(nav);
             stack.Controls.Add(Label(page == "issues" ? "תקלות" : "הטענות מפתחות", 55, true));
@@ -268,7 +269,7 @@ public sealed class NativeWindow : Form
             if (page == "keys")
                 foreach (var row in doc["rows"] as JsonArray ?? new())
                     stack.Controls.Add(Label($"מטוס {row?["aircraft"]} · ארז כחול: {row?["blue"]} · שחק: {row?["shach"]}"));
-            stack.Controls.Add(Label("תצוגה מקומית ראשונית: עריכת טפסים, חתימות ודוחות עדיין בבנייה.", 70));
+            await AddDocumentActions(stack, page, doc);
             content.Controls.Clear(); content.Controls.Add(stack);
             status.Text = "הטופס נטען מתוך Access";
         }
