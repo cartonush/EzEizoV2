@@ -585,7 +585,8 @@ public sealed partial class NativeWindow : Form
             Section(stack, "ניהול משתמשים");
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 950, Height = 320, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var list = new FlowLayoutPanel { Width = 950, Height = Math.Min(350, Math.Max(75, users.Count * 58 + 12)),
+                AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
             {
