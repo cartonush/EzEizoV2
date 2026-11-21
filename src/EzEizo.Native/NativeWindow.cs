@@ -46,6 +46,12 @@ public sealed partial class NativeWindow : Form
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
         Text += " · 2.5.4";
         header.Manager = role == AppRole.Manager;
+        status.TextChanged += (_, _) =>
+        {
+            var warning = new[] { "חסר", "נכשל", "שגוי", "בעיה", "שגיאה", "לא ניתן", "אין טכנאים" }
+                .Any(term => status.Text.Contains(term, StringComparison.OrdinalIgnoreCase));
+            status.ForeColor = warning ? Color.FromArgb(205, 22, 43) : Navy;
+        };
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
             Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
         var version = new NativeBadge { Text = "v2.5.4", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
@@ -164,6 +170,8 @@ public sealed partial class NativeWindow : Form
         BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254),
         ForeColor = Color.FromArgb(21, 43, 64)
     };
+    private static string DisplayDate(string value) => DateTimeOffset.TryParse(value, out var date)
+        ? date.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : value;
     private static Panel DetailTile(string title, string value, int width = 176)
     {
         var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
@@ -636,7 +644,7 @@ public sealed partial class NativeWindow : Form
             stack.Controls.Add(Label("פרטי אירוע", 29));
             stack.Controls.Add(Label($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}", 60, true));
             if (doc["createdAt"] is not null)
-                stack.Controls.Add(Label($"שעת פתיחה: {doc["createdAt"]}     שעת סגירה: {doc["reviewedAt"] ?? doc["completedAt"] ?? "—"}", 46));
+                stack.Controls.Add(Label($"שעת פתיחה: {DisplayDate(V(doc, "createdAt"))}     שעת סגירה: {DisplayDate(V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt"))}", 46));
             var details = new FlowLayoutPanel { Width = 780, Height = page == "issues" ? 165 : 84,
                 WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
             foreach (var (title, key) in new[] { ("טייסת", "squadron"), ("דת״ק", "shelter"), ("מספר מטוס", "aircraft"),
@@ -672,14 +680,14 @@ public sealed partial class NativeWindow : Form
             if (role == AppRole.Manager)
             {
                 Section(stack, "היסטוריית הטופס");
-                stack.Controls.Add(Label("נפתח · " + V(doc, "createdAt"), 38));
+                stack.Controls.Add(Label("נפתח · " + DisplayDate(V(doc, "createdAt")), 38));
                 var events = doc["reopenEvents"] as JsonArray ?? new();
                 if (events.Count == 0 && V(doc, "completedAt").Length > 0)
-                    stack.Controls.Add(Label("נסגר · " + V(doc, "reviewedAt") + " " + V(doc, "completedAt"), 38));
+                    stack.Controls.Add(Label("נסגר · " + DisplayDate(V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt")), 38));
                 foreach (var entry in events)
-                    stack.Controls.Add(Label("נפתח לעריכה · " + (V(entry, "at").Length > 0 ? V(entry, "at") : entry?.ToString() ?? ""), 38));
+                    stack.Controls.Add(Label("נפתח לעריכה · " + DisplayDate(V(entry, "at")), 38));
                 if (events.Count > 0 && V(doc, "completedAt").Length > 0)
-                    stack.Controls.Add(Label("נסגר לאחר עריכה · " + V(doc, "completedAt"), 38));
+                    stack.Controls.Add(Label("נסגר לאחר עריכה · " + DisplayDate(V(doc, "completedAt")), 38));
             }
             Present(stack);
             status.Text = "הטופס נטען מתוך Access";
