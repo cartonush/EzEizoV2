@@ -110,7 +110,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "מלא פרטים וחתימת משלח המשימה.";
         }
         catch (Exception ex) { Error(ex); }
@@ -191,7 +191,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "בחר טייסת לפני בחירת מטוסים ברשימה.";
         }
         catch (Exception ex) { Error(ex); }
@@ -293,7 +293,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "עריכת פרטי הטופס אפשרית כל עוד טכנאי אינו מחזיק בנעילת העריכה.";
         }
         catch (Exception ex) { Error(ex); }
