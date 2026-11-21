@@ -6,6 +6,6 @@ internal static class Program
     private static void Main()
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new NativeWindow(AppRole.Manager));
+        Application.Run(new EzEizo.Core.NativeWindow(AppRole.Manager));
     }
 }
