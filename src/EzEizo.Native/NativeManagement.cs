@@ -51,7 +51,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "בחר מטוס כדי לראות ולערוך את הקבועים שלו.";
         }
         catch (Exception ex) { Error(ex); }
@@ -97,7 +97,7 @@ public sealed partial class NativeWindow
                     grid.Rows.Add(plane, Date(blue), V(blue, "period"), Date(shach), V(shach, "period"));
                 }
             };
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "כל סוג מפתח מחושב לפי ההטענה האחרונה שהושלמה עבורו.";
         }
         catch (Exception ex) { Error(ex); }
@@ -214,7 +214,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "בחר דוח, סננים ותאריכים.";
         }
         catch (Exception ex) { Error(ex); }
