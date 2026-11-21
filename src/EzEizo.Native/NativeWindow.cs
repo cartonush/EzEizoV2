@@ -161,7 +161,7 @@ public sealed partial class NativeWindow : Form
     }
     private static TextBox Input(string placeholder, int max = 200, bool password = false) => new()
     {
-        PlaceholderText = placeholder, Width = 440, Height = 42, MaxLength = max,
+        PlaceholderText = placeholder, Width = 440, Height = 42, AutoSize = false, MaxLength = max,
         UseSystemPasswordChar = password, Margin = new Padding(0, 0, 0, 15),
         BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254),
         ForeColor = Color.FromArgb(21, 43, 64)
@@ -213,6 +213,7 @@ public sealed partial class NativeWindow : Form
         }
         activeCard = card;
         content.Controls.Add(card);
+        StyleGrids(card);
         CenterCard();
         bottomNav.Visible = !loading && account is not null && role == AppRole.Manager;
         logoutButton.Visible = !loading && account is not null;
@@ -232,6 +233,26 @@ public sealed partial class NativeWindow : Form
         }
         LayoutBottomNav();
         if (!loading) readyPage = currentPage;
+    }
+    private static void StyleGrids(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            if (child is DataGridView grid)
+            {
+                grid.BackgroundColor = Color.White;
+                grid.GridColor = Color.FromArgb(213, 226, 233);
+                grid.BorderStyle = BorderStyle.None;
+                grid.EnableHeadersVisualStyles = false;
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Pale;
+                grid.ColumnHeadersDefaultCellStyle.ForeColor = Navy;
+                grid.DefaultCellStyle.BackColor = Color.White;
+                grid.DefaultCellStyle.ForeColor = Navy;
+                grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(222, 239, 247);
+                grid.DefaultCellStyle.SelectionForeColor = Navy;
+            }
+            StyleGrids(child);
+        }
     }
     private void LayoutBottomNav()
     {
