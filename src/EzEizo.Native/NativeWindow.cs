@@ -150,7 +150,9 @@ public sealed partial class NativeWindow : Form
     };
     private static Button Button(string label, EventHandler click)
     {
-        var button = new NativeButton { Text = label, Width = 175, Height = 44,
+        using var measuredFont = new Font("Segoe UI", 10, FontStyle.Bold);
+        var measuredWidth = TextRenderer.MeasureText(label.Replace(Environment.NewLine, " "), measuredFont).Width;
+        var button = new NativeButton { Text = label, Width = Math.Clamp(measuredWidth + 42, 175, 350), Height = 44,
             Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 7, 12) };
         button.Click += click;
         return button;
