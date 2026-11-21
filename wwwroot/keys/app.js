@@ -301,8 +301,8 @@ function renderWork() {
   const load = activeLoad, closed = load.status === "closed" || manager || !editLock?.held;
   const loading = $("#key-work-loading");
   if (loading) loading.hidden = manager || load.status !== "open" || Boolean(editLock?.held) || Boolean($("#key-edit-lock-notice strong")?.textContent && !$("#key-edit-lock-notice strong").textContent.includes("בודק"));
-  $("#save-key-draft").hidden = closed;
-  $("#reset-key-work").hidden = closed;
+  $("#work-view").classList.toggle("is-loading", Boolean(loading && !loading.hidden));
+  $(".key-save-toolbar").hidden = closed;
   const lockNotice = $("#key-edit-lock-notice");
   if (lockNotice) lockNotice.hidden = manager || load.status !== "open" || Boolean(editLock?.held);
   $("#work-summary").textContent = `${load.serial ? `${load.serial} · ` : ""}${load.date.split("-").reverse().join("/")} · ${load.time} · טייסת ${load.squadron} · דת״ק ${load.shelter} · צוות: ${load.teamNames.join(" · ")}${load.status === "closed" ? " · נסגר" : ""}`;

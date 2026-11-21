@@ -13,6 +13,9 @@ const currentUser = await gate(managerClosedView ? "manager" : "technician");
 let cloudIssues = [];
 let keyLoads = [];
 let keyLoadError = "";
+let issueLoadError = "";
+let issuesReady = false;
+let keyLoadsReady = false;
 const selectedId = new URLSearchParams(window.location.search).get("id");
 let remoteIssue = null;
 if (selectedId) {
@@ -298,6 +301,10 @@ function renderIssueList() {
     if (!selectedSheet) list.textContent = "התקלה הסגורה לא נמצאה. חזור לרשימת התקלות הסגורות.";
     return;
   }
+  if (!issuesReady || !keyLoadsReady) {
+    list.innerHTML = '<div class="app-skeleton" role="status"><p>טוען את משימות הצוות…</p><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span></div><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span></div></div>';
+    return;
+  }
   const issues = cloudIssues.filter((item) => item.status === "open").map((item) => ({ type: "issue", createdAt: item.createdAt, data: item.sheet }));
   const loads = keyLoads.filter((item) => item.status === "open").map((item) => ({ type: "keys", createdAt: item.createdAt, data: item }));
   const tasks = [...issues, ...loads].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
@@ -318,6 +325,11 @@ function renderIssueList() {
     warning.className = "copy-status";
     warning.dataset.state = "error";
     warning.textContent = `לא ניתן לטעון הטענות מפתחות: ${keyLoadError}`;
+    list.append(warning);
+  }
+  if (issueLoadError) {
+    const warning = document.createElement("p"); warning.className = "copy-status";
+    warning.dataset.state = "error"; warning.textContent = `לא ניתן לטעון תקלות: ${issueLoadError}`;
     list.append(warning);
   }
 }
@@ -451,6 +463,8 @@ document.querySelector("#reset-sheet")?.addEventListener("click", async (event) 
 
 watchIssues((issues) => {
   cloudIssues = issues;
+  issuesReady = true;
+  issueLoadError = "";
   renderIssueList();
   const current = issues.find((item) => item.id === selectedId);
   if (current?.status === "open" && current.sheet.managerNotes !== sheet.managerNotes) {
@@ -465,9 +479,9 @@ watchIssues((issues) => {
     draftState.setItem(STORAGE_KEY, JSON.stringify(state));
     location.reload();
   }
-}, (error) => { const list = document.querySelector("#mechanic-issues"); list.textContent = `לא ניתן לטעון תקלות: ${error.message}`; list.dataset.state = "error"; if (error.code === "unavailable") document.dispatchEvent(new Event("ezeizo:connection-lost")); }, managerClosedView ? null : currentUser.uid);
+}, (error) => { issuesReady = true; issueLoadError = error.message; renderIssueList(); if (error.code === "unavailable") document.dispatchEvent(new Event("ezeizo:connection-lost")); }, managerClosedView ? null : currentUser.uid);
 
-if (!managerClosedView) watchKeyLoads((loads) => { keyLoads = loads; keyLoadError = ""; renderIssueList(); }, (error) => { keyLoadError = error.message; renderIssueList(); }, currentUser.uid);
+if (!managerClosedView) watchKeyLoads((loads) => { keyLoads = loads; keyLoadsReady = true; keyLoadError = ""; renderIssueList(); }, (error) => { keyLoadsReady = true; keyLoadError = error.message; renderIssueList(); }, currentUser.uid);
 
 function rowHasValue(item, fields) {
   return fields.some(({ key }) => String(item?.[key] ?? "").trim() !== "");

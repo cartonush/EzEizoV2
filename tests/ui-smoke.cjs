@@ -27,10 +27,12 @@ const mock = () => {
         case 'login': data={name:'רועי סויסה',role:new URLSearchParams(location.search).get('role')==='mechanic'?'mechanic':'manager'};break;
         case 'home': data={name:'רועי סויסה',uid:location.pathname.includes('/mechanic/')?'mechanic-1':'manager-1',email:'9862436',role:location.pathname.includes('/mechanic/')?'mechanic':'manager'};break;
         case 'offline.list': data=request.payload.collection==='issues'?[issue]:request.payload.collection==='keyLoads'?[keyLoad]:[];break;
+        case 'offline.version': data=1;break;
         case 'offline.get': data=issue;break;
         case 'offline.drafts': data={};break;
         case 'offline.lock': data={held:true};break;
-        case 'offline.technicians': case 'offline.constants': data=[];break;
+        case 'offline.technicians': data=[{uid:'mechanic-1',name:'צוק עינב',personalNumber:'1234567',email:'1234567',active:true},{uid:'second',name:'רועי סויסה',personalNumber:'7654321',email:'7654321',active:true}];break;
+        case 'offline.constants': data=[];break;
         case 'offline.readLock': data=null;break;
         default: data={};
       }
@@ -62,6 +64,14 @@ const mock = () => {
     assert.doesNotMatch(await page.locator('body').innerText(),/Firestore|Firebase/);
     await page.goto(`${origin}/Metis/index.html#reports`);
     await page.locator('main:not([hidden])').waitFor();
+    await page.goto(`${origin}/Metis/index.html#users`);
+    await page.locator('#users-list .issue-item').first().waitFor();
+    await page.locator('#users-search').fill('1234567');
+    assert.equal(await page.locator('#users-list .issue-item').count(),1);
+    assert.match(await page.locator('#users-list').innerText(),/צוק עינב/);
+    await page.locator('#users-search').fill('רועי');
+    assert.equal(await page.locator('#users-list .issue-item').count(),1);
+    assert.match(await page.locator('#users-list').innerText(),/רועי סויסה/);
     await page.goto(`${origin}/Metis/index.html#keys`);
     await page.locator('main:not([hidden])').waitFor();
     await page.goto(`${origin}/index.html?role=mechanic`);
@@ -75,11 +85,20 @@ const mock = () => {
     await page.locator('#mechanic-back:not([hidden])').waitFor();
     await page.locator('#sheet-form:visible').waitFor();
     await page.locator('#save-sheet:visible').waitFor();
+    const toolbar=await page.locator('#sheet-form .sheet-save-toolbar').evaluate(el=>{
+      const a=el.querySelector('button:first-child').getBoundingClientRect(), b=el.querySelector('button:last-child').getBoundingClientRect(), label=el.querySelector('span').getBoundingClientRect();
+      return {saveX:a.x,resetX:b.x,saveWidth:a.width,resetWidth:b.width,labelX:label.x,labelRight:label.right,position:getComputedStyle(el).position};
+    });
+    assert.equal(toolbar.position,'sticky');
+    assert.ok(toolbar.saveX>toolbar.resetX && toolbar.labelX>toolbar.resetX && toolbar.labelRight<toolbar.saveX);
+    assert.ok(Math.abs(toolbar.saveWidth-toolbar.resetWidth)<2);
     await page.locator('#mechanic-back').click();
     await page.waitForURL('**/mechanic/index.html');
     await page.locator('a[href*="test-issue"]').waitFor();
     await page.locator('a[href*="test-key"]').click();
     await page.locator('#save-key-draft:visible').waitFor();
+    assert.equal(await page.locator('#work-view .key-save-toolbar').evaluate(el=>getComputedStyle(el).position),'sticky');
+    assert.ok(await page.locator('#reset-key-work:visible').count());
     await page.locator('#save-key-draft').click();
     await page.waitForURL('**/mechanic/index.html');
     assert.deepEqual(errors,[],`Browser errors: ${errors.join('\n')}`);

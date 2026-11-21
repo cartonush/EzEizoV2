@@ -30,9 +30,15 @@ export function call(action,payload={}){
   });
 }
 export function observe(action,payload,change,error){
-  let last=null,disposed=false,busy=false;
+  let last=null,revision=null,disposed=false,busy=false;
   const refresh=async()=>{if(disposed||busy)return;busy=true;try{
+    let currentRevision=null;
+    if(action==='offline.list'){
+      currentRevision=await call('offline.version',{collection:payload.collection});
+      if(revision!==null && currentRevision===revision)return;
+    }
     const value=await call(action,payload), serialized=JSON.stringify(value);
+    if(action==='offline.list')revision=currentRevision;
     if(serialized!==last){last=serialized;change(value);}
   }catch(e){error?.(e);}finally{busy=false;}};
   void refresh();const timer=setInterval(()=>{if(!document.hidden)void refresh();},3500);

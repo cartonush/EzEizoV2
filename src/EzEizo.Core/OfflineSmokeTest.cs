@@ -20,14 +20,18 @@ public static class OfflineSmokeTest
         using var sheet = Document(new { fault = "פירוק והרכבה אנטנת מכם", squadron = "105", aircraft = "603", actions = Array.Empty<string>(), constants = new { } });
         var second = db.CreateAccount("בדיקת טכנאי נוסף", "9876543", "mechanic", "246810");
         using var assigned = Document(new[] { new { uid = technician.Id, name = technician.Name }, new { uid = second.Id, name = second.Name } });
+        var revisionBefore = store.Version("issues");
         var serial = store.CreateIssues(sheet.RootElement, assigned.RootElement, manager);
+        if (store.Version("issues") <= revisionBefore) throw new InvalidOperationException("יצירת תקלה לא עדכנה את גרסת הרשימה.");
         var issue = store.List("issues", technician).Single(x => x["sheet"]?["serial"]?.ToString() == serial);
         var id = issue["id"]!.ToString();
         if (store.List("issues", second).Single(x => x["sheet"]?["serial"]?.ToString() == serial)["id"]!.ToString() != id ||
             store.List("issues", manager).Count(x => x["sheet"]?["serial"]?.ToString() == serial) != 1)
             throw new InvalidOperationException("תקלה לצוות חייבת להיות טופס משותף אחד.");
         using var edit = Document(new { changes = new { fault = "תקלה מעודכנת" }, teamUids = new[] { technician.Id, second.Id } });
+        revisionBefore = store.Version("issues");
         store.Update("issues", id, "editDefinition", edit.RootElement, manager);
+        if (store.Version("issues") <= revisionBefore) throw new InvalidOperationException("עריכת תקלה לא עדכנה את גרסת הרשימה.");
         var session = Guid.NewGuid().ToString();
         if (store.Lock("issues", id, session, technician)["held"]?.GetValue<bool>() != true)
             throw new InvalidOperationException("נעילת הטופס נכשלה.");

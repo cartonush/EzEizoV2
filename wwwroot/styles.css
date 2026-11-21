@@ -211,6 +211,12 @@ td input:focus { border-color: #5da8c5; }
 .lifecycle-list strong { color: #173b5d; margin-inline-end: 9px; }
 .lifecycle-list time { color: #587080; font-size: 13px; }
 .app-skeleton { padding: 18px; max-width: 900px; margin: auto; }
+.sheet-save-toolbar { position: sticky; top: 78px; z-index: 90; display: grid; grid-template-columns: minmax(155px,1fr) minmax(180px,1.35fr) minmax(155px,1fr); align-items: center; gap: 16px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 8px 24px #09233920; }
+.sheet-save-toolbar button { width: 100%; min-height: 44px; margin: 0; text-align: center; white-space: normal; }
+.sheet-save-toolbar span { display: block; text-align: center; color: #42637c; font-size: 12px; font-weight: 700; line-height: 1.35; }
+.is-loading > :not(.app-skeleton):not(.edit-lock-notice) { display: none !important; }
+.user-search-field { display: grid; gap: 7px; max-width: 430px; margin: 18px 0 12px; font-weight: 700; }
+@media (max-width: 620px) { .sheet-save-toolbar { top: 65px; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr); gap: 7px; padding: 8px; } .sheet-save-toolbar button { font-size: 11px; padding: 8px 5px; min-height: 46px; } .sheet-save-toolbar span { font-size: 10px; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skeleton-nav { display: flex; gap: 9px; margin-bottom: 18px; }
 .skeleton-nav span { flex: 1; height: 48px; border-radius: 12px; }

@@ -54,7 +54,6 @@ public sealed class MainWindow : Form
             if (!File.Exists(Path.Combine(assets, "index.html")))
                 throw new FileNotFoundException("קובצי הממשק חסרים. יש להעתיק גם את תיקיית wwwroot.");
             await web.EnsureCoreWebView2Async();
-            await databaseReady;
             web.CoreWebView2.SetVirtualHostNameToFolderMapping("ezeizo.local", assets,
                 CoreWebView2HostResourceAccessKind.DenyCors);
             web.CoreWebView2.WebMessageReceived += MessageReceived;
@@ -85,6 +84,7 @@ public sealed class MainWindow : Form
             web.Source = new Uri($"https://ezeizo.local/index.html?role={(role == AppRole.Manager ? "manager" : "mechanic")}");
             Controls.Remove(startup);
             startup.Dispose();
+            await databaseReady;
         }
         catch (Exception ex)
         {
@@ -129,6 +129,7 @@ public sealed class MainWindow : Form
                 "saveFault" => SaveFault(p),
                 "reviewFault" => ReviewFault(p),
                 "offline.list" => store.List(Get(p,"collection"), RequireLogin()),
+                "offline.version" => Version(p),
                 "offline.get" => store.Get(Get(p,"collection"),Get(p,"id"),RequireLogin()),
                 "offline.createIssues" => store.CreateIssues(p.GetProperty("sheet"),p.GetProperty("assignees"),RequireManager()),
                 "offline.createKey" => store.CreateKey(p.GetProperty("load"),RequireManager()),
@@ -225,6 +226,11 @@ public sealed class MainWindow : Form
     private object OfflineTechnicians()
     {
         RequireManager(); return db.AllTechnicians().Select(x => new { uid=x.Id, name=x.Name, personalNumber=x.PersonalNumber, email=x.PersonalNumber, role="technician", active=x.Active, deleted=x.Deleted });
+    }
+    private object Version(JsonElement p)
+    {
+        RequireLogin();
+        return store.Version(Get(p,"collection"));
     }
     private object CreateTechnician(JsonElement p)
     {

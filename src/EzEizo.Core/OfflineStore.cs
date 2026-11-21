@@ -46,7 +46,26 @@ public sealed class OfflineStore
             using var index = Cmd(c, null, "CREATE UNIQUE INDEX [UX_OfflineDraft] ON [OfflineDrafts] ([UserID],[DraftKey])");
             index.ExecuteNonQuery();
         }
+        if (!names.Contains("OfflineRevisions"))
+        {
+            using var revision = Cmd(c, null, "CREATE TABLE [OfflineRevisions] ([CollectionName] TEXT(30) PRIMARY KEY, [RevisionValue] LONG)");
+            revision.ExecuteNonQuery();
+        }
         ConsolidateLegacyIssues(c);
+    }
+    public int Version(string collection)
+    {
+        if (collection is not ("issues" or "keyLoads" or "aircraftConstants")) throw new ArgumentException("אוסף לא תקין.");
+        using var c = Open();
+        using var cmd = Cmd(c, null, "SELECT [RevisionValue] FROM [OfflineRevisions] WHERE [CollectionName]=?", collection);
+        return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+    }
+    private static void Touch(OleDbConnection c, OleDbTransaction tx, string collection)
+    {
+        using var update = Cmd(c, tx, "UPDATE [OfflineRevisions] SET [RevisionValue]=[RevisionValue]+1 WHERE [CollectionName]=?", collection);
+        if (update.ExecuteNonQuery() != 0) return;
+        using var insert = Cmd(c, tx, "INSERT INTO [OfflineRevisions] ([CollectionName],[RevisionValue]) VALUES (?,?)", collection, 1);
+        insert.ExecuteNonQuery();
     }
     private static void ConsolidateLegacyIssues(OleDbConnection c)
     {
@@ -173,6 +192,7 @@ public sealed class OfflineStore
     {
         using var cmd = Cmd(c, tx, "INSERT INTO [OfflineDocuments] ([DocID],[CollectionName],[SerialValue],[OwnerID],[Payload],[UpdatedAt]) VALUES (?,?,?,?,?,?)", id, collection, serial, owner, data.ToJsonString(), DateTime.Now);
         cmd.ExecuteNonQuery();
+        Touch(c, tx, collection);
     }
     private static JsonNode? Find(OleDbConnection c, OleDbTransaction? tx, string collection, string id)
     {
@@ -184,6 +204,7 @@ public sealed class OfflineStore
     {
         using var cmd = Cmd(c, tx, "UPDATE [OfflineDocuments] SET [Payload]=?,[UpdatedAt]=? WHERE [CollectionName]=? AND [DocID]=?", data.ToJsonString(), DateTime.Now, collection, id);
         if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("הטופס לא נמצא.");
+        Touch(c, tx, collection);
     }
     private static int Next(OleDbConnection c, OleDbTransaction tx, string collection)
     {

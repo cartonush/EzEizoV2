@@ -11,6 +11,9 @@ const managerUser = await gate("manager");
 document.querySelector(".brand-copy h1").textContent = "Metis · רועי סויסה";
 let cloudIssues = [];
 let technicians = [];
+let issuesReady = false;
+let techniciansReady = false;
+const listSkeleton = () => '<div class="app-skeleton" role="status"><p>טוען נתונים מהמסד המקומי…</p><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span></div><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span></div></div>';
 const DRAFT_KEY = "ezeizo-metis-draft-v1";
 const PICKER_KEY = "ezeizo-metis-picker-v1";
 let draft = loadDraft();
@@ -385,6 +388,7 @@ function renderIssueLists() {
   pending.replaceChildren();
   delete opened.dataset.state;
   delete closed.dataset.state;
+  if (!issuesReady) { opened.innerHTML = listSkeleton(); pending.innerHTML = listSkeleton(); closed.innerHTML = listSkeleton(); return; }
   const filter = document.querySelector("#closed-filter").value;
   const matches = (selector, serial) => String(serial || "").includes(document.querySelector(selector).value.trim());
   const allClosed = cloudIssues.filter((item) => item.status === "closed" && item.closed?.record && (!filter || (item.assigneeUids || [item.assigneeUid]).includes(filter)) && matches("#closed-issue-search", item.closed.record.serial)).map((item) => item.closed.record);
@@ -450,11 +454,13 @@ document.querySelector("#reset-draft").addEventListener("click", () => {
 
 watchIssues((issues) => {
   cloudIssues = issues;
+  issuesReady = true;
   updateReportData({ issues });
   document.querySelector("#home-open-count").textContent = `${issues.filter((item) => item.status === "open").length} תקלות פתוחות`;
   document.querySelector("#home-review-count").textContent = `${issues.filter((item) => item.status === "pendingReview").length} ממתינות לסגירה · ${issues.filter((item) => item.status === "closed").length} סגורות`;
   renderIssueLists(); renderUsers();
 }, (error) => {
+  issuesReady = true;
   setStatus("#issued-list", `לא ניתן לטעון תקלות: ${error.message}`, true);
   setStatus("#closed-list", `לא ניתן לטעון תקלות: ${error.message}`, true);
 });
@@ -506,12 +512,17 @@ for (const id of ["open-issue-search", "pending-issue-search", "closed-issue-sea
 function renderUsers() {
   const list = document.querySelector("#users-list");
   const removedList = document.querySelector("#removed-users-list");
+  const activeQuery = document.querySelector('#users-search').value.trim().toLocaleLowerCase('he');
+  const removedQuery = document.querySelector('#removed-users-search').value.trim().toLocaleLowerCase('he');
+  const matches = (person,query) => !query || person.name.toLocaleLowerCase('he').includes(query) || String(person.personalNumber || person.email || '').includes(query);
   list.replaceChildren();
   removedList.replaceChildren();
-  if (!technicians.some((person) => person.active && !person.deleted)) list.textContent = "אין טכנאים פעילים. צור משתמש חדש.";
-  if (!technicians.some((person) => !person.active && !person.deleted)) removedList.textContent = "אין משתמשים שהוסרו.";
+  if (!techniciansReady) { list.innerHTML = listSkeleton(); removedList.innerHTML = listSkeleton(); return; }
+  if (!technicians.some((person) => person.active && !person.deleted && matches(person,activeQuery))) list.textContent = activeQuery ? 'לא נמצאו משתמשים מתאימים.' : "אין טכנאים פעילים. צור משתמש חדש.";
+  if (!technicians.some((person) => !person.active && !person.deleted && matches(person,removedQuery))) removedList.textContent = removedQuery ? 'לא נמצאו משתמשים מתאימים.' : "אין משתמשים שהוסרו.";
   technicians.forEach((person) => {
     if (person.deleted) return;
+    if (!matches(person,person.active ? activeQuery : removedQuery)) return;
     const statusSelector = person.active ? "#user-status" : "#removed-user-status";
     const card = document.createElement("div"); card.className = "issue-item";
     const title = document.createElement("strong"); title.textContent = `${person.name} · ${person.active ? "פעיל" : "הוסר"}`;
@@ -570,7 +581,9 @@ function renderUsers() {
     (person.active ? list : removedList).append(card);
   });
 }
-watchTechnicians((items) => { technicians = items.sort((a, b) => a.name.localeCompare(b.name, "he")); updateReportData({ users: technicians }); updateUserSelectors(); renderUsers(); renderIssueLists(); }, (error) => {
+document.querySelector('#users-search').addEventListener('input',renderUsers);
+document.querySelector('#removed-users-search').addEventListener('input',renderUsers);
+watchTechnicians((items) => { technicians = items.sort((a, b) => a.name.localeCompare(b.name, "he")); techniciansReady = true; updateReportData({ users: technicians }); updateUserSelectors(); renderUsers(); renderIssueLists(); }, (error) => {
   setStatus("#user-status", `טעינת המשתמשים נכשלה: ${error.message}`, true);
 });
 const userForm = document.querySelector("#create-user-form");
@@ -608,6 +621,7 @@ watchKeyLoads((loads) => updateReportData({ loads }), (error) => { setStatus("#r
 renderConstants();
 renderActions();
 renderIssueLists();
+renderUsers();
 showManagerView();
 revealApp();
 const clearDispatcherSignature = attachSignaturePad(document.querySelector("#dispatcher-signature"), {
