@@ -47,8 +47,6 @@ let dispatchSignature = "";
 const saveDraft = () => draftState.setItem(draftKey, JSON.stringify(draft));
 const saveWork = () => {
   if (activeLoad && activeLoad.status === "open" && editLock?.held) {
-    try { draftState.setItem(`ezeizo-key-work:${activeLoad.id}`, JSON.stringify(work)); }
-    catch { setMessage("#work-status", "שמירת הטיוטה במכשיר נכשלה. השאר את הטופס פתוח ונסה לפנות מקום באחסון.", true); }
     clearTimeout(draftTimer);
     const id = activeLoad.id, snapshot = structuredClone(work), session = editLock.session;
     draftTimer = setTimeout(() => { draftTimer = null; void queueDraft(id, snapshot, session); }, 550);
@@ -301,6 +299,10 @@ function readWork(load) {
 function renderWork() {
   if (!activeLoad) return;
   const load = activeLoad, closed = load.status === "closed" || manager || !editLock?.held;
+  const loading = $("#key-work-loading");
+  if (loading) loading.hidden = manager || load.status !== "open" || Boolean(editLock?.held) || Boolean($("#key-edit-lock-notice strong")?.textContent && !$("#key-edit-lock-notice strong").textContent.includes("בודק"));
+  $("#save-key-draft").hidden = closed;
+  $("#reset-key-work").hidden = closed;
   const lockNotice = $("#key-edit-lock-notice");
   if (lockNotice) lockNotice.hidden = manager || load.status !== "open" || Boolean(editLock?.held);
   $("#work-summary").textContent = `${load.serial ? `${load.serial} · ` : ""}${load.date.split("-").reverse().join("/")} · ${load.time} · טייסת ${load.squadron} · דת״ק ${load.shelter} · צוות: ${load.teamNames.join(" · ")}${load.status === "closed" ? " · נסגר" : ""}`;
@@ -419,6 +421,8 @@ function validateWork() {
   }
   const required = [];
   if (work.toolsEnabled) {
+    if (!work.entryEnabled) return "כאשר נרשם כלי חובה לבצע ביקורת כניסה.";
+    if (!work.finalEnabled) return "כאשר נרשם כלי חובה לבצע ביקורת בסיום העבודה.";
     if (work.entryEnabled) required.push("entryTechnicianSignature", "entryInspectorSignature", "entryInspectorNumber");
     if (work.interimEnabled) required.push("interimTechnicianSignature", "interimInspectorNumber", "interimInspectorSignature", "interimToolsName", "interimToolsSignature");
     if (work.finalEnabled) required.push("finalTechnicianSignature", "finalInspectorNumber", "finalInspectorSignature", "finalLeadName", "finalLeadSignature", "departureTime");
@@ -431,11 +435,35 @@ function validateWork() {
   if (work.finalEnabled && !/^([01]\d|2[0-3]):[0-5]\d$/.test(work.departureTime || "")) return "יש לבחור שעת עזיבה תקינה בביקורת סיום.";
   return "";
 }
+$("#save-key-draft").addEventListener("click", async (event) => {
+  if (!editLock?.held || !activeLoad) return;
+  const button=event.currentTarget;button.disabled=true;
+  setMessage("#work-status", "שומר את הטיוטה המשותפת במסד…");
+  try {
+    clearTimeout(draftTimer);draftTimer=null;
+    await queueDraft(activeLoad.id,structuredClone(work),editLock.session);
+    await editLock.release();editLock=null;
+    location.replace("/mechanic/index.html");
+  } catch(error) { setMessage("#work-status",`השמירה נכשלה: ${error.message}`,true);button.disabled=false; }
+});
+$("#reset-key-work").addEventListener("click", async (event) => {
+  if (!editLock?.held || !activeLoad || !confirm("למחוק את כל המילוי בהטענה המשותפת ולהתחיל מחדש?")) return;
+  const button=event.currentTarget;button.disabled=true;
+  try {
+    clearTimeout(draftTimer);draftTimer=null;
+    await pendingDraft.catch(()=>{});
+    work=defaultWork(activeLoad);
+    await queueDraft(activeLoad.id,structuredClone(work),editLock.session);
+    await draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`);
+    await editLock.release();editLock=null;
+    location.reload();
+  } catch(error) { setMessage("#work-status",`האיפוס נכשל: ${error.message}`,true);button.disabled=false; }
+});
 $("#complete-key-load").addEventListener("click", async () => {
   const error = validateWork(); if (error) return setMessage("#work-status", error, true);
   const button = $("#complete-key-load"); button.disabled = true;
   const clean = { ...work }; for (const [type, columns] of Object.entries(KEY_TABLES)) clean[type] = compactRows(work[type], columns);
-  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The completed form is saved in Access. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("/mechanic/index.html"); }
+  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { await draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The completed form is saved in Access. */ } await editLock.release(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("/mechanic/index.html"); }
   catch (failure) { setMessage("#work-status", `סגירת ההטענה נכשלה: ${failure.message}`, true); }
   finally { button.disabled = false; }
 });

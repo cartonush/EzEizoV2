@@ -8,9 +8,22 @@ const update=(collection,id,operation,extra={})=>call('offline.update',{collecti
 const wrapLock=value=>value?{...value,expiresAt:{toMillis:()=>value.expiresAt}}:null;
 let user=null;
 export async function gate(role){
-  const data=await call('home');
-  if(data.role!==(role==='manager'?'manager':'mechanic'))throw new Error('אין הרשאה למסך זה.');
-  await initializeDrafts();
+  let data;
+  try {
+    data=await call('home');
+    if(data.role!==(role==='manager'?'manager':'mechanic'))throw new Error('אין הרשאה למסך זה.');
+    await initializeDrafts();
+  } catch(error) {
+    const skeleton=document.querySelector('#app-skeleton');
+    if(skeleton){
+      skeleton.replaceChildren();
+      const card=document.createElement('section');card.className='card';
+      const text=document.createElement('p');text.className='copy-status';text.dataset.state='error';text.textContent=`טעינת הדף נכשלה: ${error.message}`;
+      const retry=document.createElement('button');retry.className='secondary-button';retry.textContent='נסה שוב';retry.onclick=()=>location.reload();
+      card.append(text,retry);skeleton.append(card);
+    }
+    throw error;
+  }
   document.addEventListener('ezeizo:storage-error', (event) => {
     let notice=document.querySelector('#access-storage-error');
     if(!notice){notice=document.createElement('p');notice.id='access-storage-error';notice.className='copy-status';notice.dataset.state='error';document.querySelector('main')?.prepend(notice);}

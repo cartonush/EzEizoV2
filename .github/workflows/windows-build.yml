@@ -75,14 +75,14 @@ jobs:
             throw "Smoke test failed: $($result.ExitCode)"
           }
           Write-Host 'Login, assignment, submission and review passed'
-      - name: Prepare fresh seeded database for the release
+      - name: Prepare fresh database template for the release
         shell: pwsh
         run: |
           $desktop = [Environment]::GetFolderPath('Desktop')
           $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
           Remove-Item $generated -Force
           $exe = (Resolve-Path 'dist/EzEizo/EzEizo-Metis.exe').Path
-          $result = Start-Process -FilePath $exe -ArgumentList '--seed-manager' -Wait -PassThru
+          $result = Start-Process -FilePath $exe -ArgumentList '--seed-template' -Wait -PassThru
           if ($result.ExitCode -ne 0) {
             if (Test-Path dist/EzEizo/database-error.txt) { Get-Content dist/EzEizo/database-error.txt }
             throw "Template database creation failed: $($result.ExitCode)"
@@ -90,7 +90,9 @@ jobs:
           Copy-Item $generated dist/EzEizo/data/EzEizo.accdb
           $verify = Start-Process -FilePath $exe -ArgumentList '--verify-template' -Wait -PassThru
           if ($verify.ExitCode -ne 0) { throw 'Seeded template verification failed' }
-          Write-Host 'Seeded template database created without smoke-test data'
+          $provision = Start-Process -FilePath $exe -ArgumentList '--verify-provision' -Wait -PassThru
+          if ($provision.ExitCode -ne 0) { throw 'Local manager provisioning failed' }
+          Write-Host 'Blank template database created; manager is provisioned locally at first launch'
       - name: Check output
         shell: pwsh
         run: |
@@ -108,5 +110,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
-          $tag = 'v2.0.4-preview.1'
-          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.4 Preview 1' --notes 'One shared form for assigned technicians, manager edits unlocked open forms, soft delete and recovery, improved loading and navigation, and PDF downloads to Desktop. Preserve your existing ACCDB on upgrades. See README.txt.' --prerelease
+          $tag = 'v2.0.5-preview.1'
+          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.5 Preview 1' --notes 'Add shared team save and reset for faults and key loads, required entry and exit tool inspections, clearer loading skeletons and request timeout. Preserve your existing ACCDB on upgrades. See README.txt.' --prerelease

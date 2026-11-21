@@ -17,6 +17,7 @@ const server = http.createServer((req,res)=>{
 const mock = () => {
   const listeners=[];
   const issue={id:'test-issue',status:'open',assigneeUid:'mechanic-1',assigneeUids:['mechanic-1'],createdAt:'2026-11-21T08:00:00Z',sheet:{id:'test-issue',serial:'0000000001',squadron:'105',shelter:'14',location:'14/105',aircraft:'603',systemCode:'74A',systemName:'מכם',ewSystem:'גרניט',fault:'בדיקת ניווט',actions:[]}};
+  const keyLoad={id:'test-key',serial:'K-000000001',status:'open',teamUids:['mechanic-1','second'],teamNames:['טכנאי','בודק'],date:'2026-11-21',time:'08:00',squadron:'105',shelter:'14',period:'11-12/26',aircraftIds:['603'],rows:[{aircraft:'603',blue:true,shach:true,notes:''}],dispatcherSignature:'data:image/png;base64,aGVsbG8=',createdAt:'2026-11-21T08:00:00Z'};
   window.chrome = window.chrome || {};
   window.chrome.webview = {
     addEventListener(_name,listener){listeners.push(listener);},
@@ -25,7 +26,7 @@ const mock = () => {
       switch(request.action){
         case 'login': data={name:'רועי סויסה',role:new URLSearchParams(location.search).get('role')==='mechanic'?'mechanic':'manager'};break;
         case 'home': data={name:'רועי סויסה',uid:location.pathname.includes('/mechanic/')?'mechanic-1':'manager-1',email:'9862436',role:location.pathname.includes('/mechanic/')?'mechanic':'manager'};break;
-        case 'offline.list': data=request.payload.collection==='issues'?[issue]:[];break;
+        case 'offline.list': data=request.payload.collection==='issues'?[issue]:request.payload.collection==='keyLoads'?[keyLoad]:[];break;
         case 'offline.get': data=issue;break;
         case 'offline.drafts': data={};break;
         case 'offline.lock': data={held:true};break;
@@ -51,7 +52,7 @@ const mock = () => {
     page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
     await page.goto(`${origin}/index.html?role=manager`);
     await page.locator('#number').fill('9862436');
-    await page.locator('#password').fill('-1-1-1');
+    await page.locator('#password').fill('123456');
     await page.locator('#login-form button').click();
     await page.waitForURL('**/Metis/index.html');
     await page.locator('main:not([hidden])').waitFor();
@@ -72,9 +73,15 @@ const mock = () => {
     assert.match(await page.locator('body').innerText(),/תקלות|מפתחות/);
     await page.locator('a[href*="test-issue"]').click();
     await page.locator('#mechanic-back:not([hidden])').waitFor();
+    await page.locator('#sheet-form:visible').waitFor();
+    await page.locator('#save-sheet:visible').waitFor();
     await page.locator('#mechanic-back').click();
     await page.waitForURL('**/mechanic/index.html');
     await page.locator('a[href*="test-issue"]').waitFor();
+    await page.locator('a[href*="test-key"]').click();
+    await page.locator('#save-key-draft:visible').waitFor();
+    await page.locator('#save-key-draft').click();
+    await page.waitForURL('**/mechanic/index.html');
     assert.deepEqual(errors,[],`Browser errors: ${errors.join('\n')}`);
     console.log('Manager login, core pages, mechanic login and assets passed');
   } finally { await browser?.close();server.close(); }

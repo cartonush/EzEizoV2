@@ -135,10 +135,10 @@ public sealed class Database
         }
         catch (FormatException) { return null; }
     }
-    // Provision only once. Existing user IDs and form assignments are preserved.
+    // Provision only on first launch. Never ship a reusable administrator password.
     public void EnsureDemoManager()
     {
-        const string name = "רועי סויסה", number = "9862436", password = "-1-1-1";
+        const string name = "רועי סויסה", number = "9862436";
         using var c = Connect();
         using var lookup = Command(c, null, "SELECT TOP 1 [UserID],[DisplayName],[PersonalNumber],[PasswordHash] FROM [Users] WHERE [Role]='manager' AND [Active]=True ORDER BY [CreatedAt],[UserID]");
         using var reader = lookup.ExecuteReader();
@@ -153,7 +153,10 @@ public sealed class Database
         reader?.Close();
         if (id is null)
         {
-            CreateAccount(name, number, "manager", password);
+            var password = NewInitialPassword();
+            WriteInitialPassword(number, password);
+            try { CreateAccount(name, number, "manager", password); }
+            catch { File.Delete(Path.Combine(DataDirectory, "initial-manager.txt")); throw; }
             return;
         }
         if (oldNumber != number)
@@ -164,6 +167,8 @@ public sealed class Database
         }
         if (string.IsNullOrWhiteSpace(hashAlreadySet))
         {
+            var password = NewInitialPassword();
+            WriteInitialPassword(number, password);
             var (salt, hash) = PasswordData(password);
             using var update = Command(c, null, "UPDATE [Users] SET [DisplayName]=?,[PersonalNumber]=?,[PasswordSalt]=?,[PasswordHash]=?,[UpdatedAt]=? WHERE [UserID]=?", name, number, salt, hash, DateTime.Now, id);
             update.ExecuteNonQuery();
@@ -173,6 +178,12 @@ public sealed class Database
             using var update = Command(c, null, "UPDATE [Users] SET [DisplayName]=?,[PersonalNumber]=?,[UpdatedAt]=? WHERE [UserID]=?", name, number, DateTime.Now, id);
             update.ExecuteNonQuery();
         }
+    }
+    private static string NewInitialPassword() => RandomNumberGenerator.GetInt32(1_000_000).ToString("D6");
+    private static void WriteInitialPassword(string number, string password)
+    {
+        Directory.CreateDirectory(DataDirectory);
+        File.WriteAllText(Path.Combine(DataDirectory, "initial-manager.txt"), $"מספר אישי: {number}{Environment.NewLine}סיסמה ראשונית: {password}{Environment.NewLine}מחק קובץ זה לאחר הכניסה הראשונה.");
     }
     public void ChangeTechnicianPassword(string id, string password)
     {

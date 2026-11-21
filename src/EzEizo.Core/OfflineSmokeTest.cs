@@ -40,6 +40,13 @@ public static class OfflineSmokeTest
             throw new InvalidOperationException("טכנאי שני ערך טופס נעול.");
         try { store.Update("issues", id, "editDefinition", edit.RootElement, manager); throw new InvalidOperationException("המנהל ערך טופס נעול."); }
         catch (InvalidOperationException ex) when (ex.Message.Contains("נמצא כרגע בעריכת")) { }
+        store.ReleaseLock(id, session);
+        var secondSession = Guid.NewGuid().ToString();
+        if (store.Lock("issues", id, secondSession, second)["held"]?.GetValue<bool>() != true ||
+            store.Drafts(second)["fault-sheet-v2:" + id] != "טיוטת צוות")
+            throw new InvalidOperationException("טכנאי שני לא יכול להמשיך טיוטה לאחר שמירה.");
+        store.ReleaseLock(id, secondSession);
+        store.Lock("issues", id, session, technician);
         using var submit = Document(new { record = new { serial }, state = new { repair = "בוצע" }, session });
         store.Update("issues", id, "submit", submit.RootElement, technician);
         using var approve = Document(new { signature = "data:image/png;base64,aGVsbG8=" });

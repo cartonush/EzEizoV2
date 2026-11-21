@@ -10,14 +10,21 @@ window.chrome.webview.addEventListener('message',event=>{
   if(!request)return;
   pending.delete(response.id);
   clearTimeout(request.timer);
+  clearTimeout(request.timeout);
   if(request.visible){busyCount=Math.max(0,busyCount-1);if(!busyCount)document.querySelector('#offline-operation-status')?.setAttribute('hidden','');}
   response.ok?request.resolve(response.data):request.reject(new Error(response.error||'הפעולה נכשלה'));
 });
 export function call(action,payload={}){
   return new Promise((resolve,reject)=>{
     const id=crypto.randomUUID();
-    const request={resolve,reject,visible:false,timer:0};
+    const request={resolve,reject,visible:false,timer:0,timeout:0};
     request.timer=setTimeout(()=>{if(!pending.has(id))return;request.visible=true;busyCount++;showBusy();},500);
+    request.timeout=setTimeout(()=>{
+      if(!pending.delete(id))return;
+      clearTimeout(request.timer);
+      if(request.visible){busyCount=Math.max(0,busyCount-1);if(!busyCount)document.querySelector('#offline-operation-status')?.setAttribute('hidden','');}
+      reject(new Error('הפעולה מתארכת מעבר לצפוי. בדוק את קובץ Access ונסה שוב.'));
+    },30000);
     pending.set(id,request);
     window.chrome.webview.postMessage({id,action,payload});
   });

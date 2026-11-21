@@ -24,7 +24,7 @@
         <h1>Metis · דף מנהל</h1>
         <p class="header-subtitle">יצירת דפי תקלה לטכנאים</p>
       </div>
-      <span class="version-pill">v2.0.4</span>
+      <span class="version-pill">v2.0.5</span>
       <div id="manager-controls" class="header-actions">
         <button id="manager-back" class="secondary-button" type="button" hidden>→ חזרה</button>
         <a id="key-back-link" class="secondary-button" href="#keys/open" aria-label="חזרה להטענות" hidden>→ חזרה</a>
@@ -78,7 +78,7 @@
 <section id="open-view" class="card" hidden><div class="section-heading"><div><p class="section-kicker">מעקב צוות</p><h2>הטענות פתוחות</h2></div></div><label class="input-field list-search">חיפוש לפי מספר הטענה<input id="open-key-search" type="search" inputmode="numeric" placeholder="לדוגמה: 1" autocomplete="off"></label><p class="key-numbering-status copy-status" role="status"></p><div id="open-key-loads" class="issue-list"></div></section>
 <section id="closed-view" class="card" hidden><div class="section-heading"><div><p class="section-kicker">ארכיון הטענות</p><h2>הטענות סגורות</h2></div></div><label class="input-field list-search">חיפוש לפי מספר הטענה<input id="closed-key-search" type="search" inputmode="numeric" placeholder="לדוגמה: 1" autocomplete="off"></label><p class="key-numbering-status copy-status" role="status"></p><div id="closed-key-loads" class="issue-list"></div></section>
 <section id="work-view" hidden>
-<section id="key-edit-lock-notice" class="card edit-lock-notice" role="status" aria-live="polite" hidden><strong>בודק אם הטופס פנוי לעריכה…</strong><button id="retry-key-edit-lock" type="button" class="secondary-button">בדוק שוב</button></section>
+<section id="key-edit-lock-notice" class="card edit-lock-notice" role="status" aria-live="polite" hidden><strong>בודק אם הטופס פנוי לעריכה…</strong><button id="retry-key-edit-lock" type="button" class="secondary-button">בדוק שוב</button></section><section id="key-work-loading" class="card app-skeleton" role="status" aria-live="polite" hidden><p>טוען את טופס ההטענה…</p><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-input"></span></div><div class="skeleton-card"><span class="skeleton-line"></span><span class="skeleton-input"></span></div></section>
 <section class="card"><div class="section-heading"><div><p class="section-kicker">דף צוות</p><h2>ביצוע הטענת מפתחות</h2></div></div><div id="work-summary"></div><div id="work-manager-notes" class="key-manager-notes" hidden></div><div id="work-rows" class="table-wrap"></div><div id="work-instructions" class="instruction-table"></div></section>
 <section class="card"><div class="section-heading"><div><p class="section-kicker">12 משימות</p><h2>פעולות לביצוע</h2></div></div><details class="key-tasks-details"><summary>הצג משימות לביצוע</summary><ol id="work-tasks" class="key-task-list"></ol></details></section>
 <details class="card key-reference"><summary><strong>מידע לעזר הטכנאי</strong></summary><p>קוד ביקורת: ברק 1 – 500 · ברק 2 – 584 לביצוע מפתחות שחק.</p><p>קוד ביקורת: ברק 1 – 510 · ברק 2 – 578 לביצוע מפתחות ארז.</p><div id="reference-table" class="table-wrap"></div></details>
@@ -177,7 +177,7 @@
         </div>
       </section>
 
-</div><section class="card"><button id="complete-key-load" type="button" class="primary-button">שמור וסגור הטענה</button><p id="work-status" class="copy-status" role="status" aria-live="polite"></p><button id="reopen-key-load" type="button" class="secondary-button" hidden>החזר את ההטענה לטכנאים לעריכה</button><p id="reopen-key-status" class="copy-status" role="status" aria-live="polite"></p><details id="key-reopen-history" class="key-reopen-history" hidden><summary>היסטוריית הטופס</summary><ol id="key-reopen-events"></ol></details></section>
+</div><section class="card"><div class="toolbar"><button id="save-key-draft" type="button" class="secondary-button">שמור וחזור לרשימה</button><button id="reset-key-work" type="button" class="secondary-button danger-button">איפוס הטופס</button><button id="complete-key-load" type="button" class="primary-button">שמור וסגור הטענה</button></div><p id="work-status" class="copy-status" role="status" aria-live="polite"></p><button id="reopen-key-load" type="button" class="secondary-button" hidden>החזר את ההטענה לטכנאים לעריכה</button><p id="reopen-key-status" class="copy-status" role="status" aria-live="polite"></p><details id="key-reopen-history" class="key-reopen-history" hidden><summary>היסטוריית הטופס</summary><ol id="key-reopen-events"></ol></details></section>
 </section>
 
       </div></div>

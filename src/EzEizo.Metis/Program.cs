@@ -9,7 +9,7 @@ internal static class Program
         if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
             throw new InvalidOperationException("EzEizo requires an STA application thread.");
         ApplicationConfiguration.Initialize();
-        if (args.Contains("--create-database") || args.Contains("--self-test") || args.Contains("--seed-manager") || args.Contains("--verify-template"))
+        if (args.Contains("--create-database") || args.Contains("--self-test") || args.Contains("--seed-template") || args.Contains("--verify-template") || args.Contains("--verify-provision"))
         {
             try
             {
@@ -18,16 +18,21 @@ internal static class Program
                 {
                     var db = new Database();
                     db.Initialize();
-                    if (args.Contains("--seed-manager"))
-                    {
-                        db.EnsureDemoManager();
-                        new OfflineStore().Initialize();
-                    }
+                    if (args.Contains("--seed-template")) new OfflineStore().Initialize();
                     if (args.Contains("--verify-template"))
                     {
-                        var manager = db.Authenticate("9862436", "-1-1-1", AppRole.Manager);
-                        if (manager?.Name != "רועי סויסה" || !db.IsPrimaryManager(manager) || db.AllTechnicians().Count != 0 || db.Faults().Count != 0)
+                        if (db.HasManager() || db.AllTechnicians().Count != 0 || db.Faults().Count != 0)
                             throw new InvalidOperationException("מסד ההתקנה הראשונית אינו תקין.");
+                    }
+                    if (args.Contains("--verify-provision"))
+                    {
+                        db.EnsureDemoManager();
+                        var path = Path.Combine(Database.DataDirectory, "initial-manager.txt");
+                        var password = File.ReadAllLines(path).Single(line => line.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
+                        var manager = db.Authenticate("9862436", password, AppRole.Manager);
+                        if (manager?.Name != "רועי סויסה" || !db.IsPrimaryManager(manager))
+                            throw new InvalidOperationException("החשבון הראשי לא הופעל מהסיסמה המקומית.");
+                        File.Delete(path);
                     }
                 }
                 return;

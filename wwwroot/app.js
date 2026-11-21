@@ -8,6 +8,7 @@ import { issueTimeline } from "./lifecycle.js?v=1.6.3";
 import { createEditLock } from "./edit-lock.js?v=1.6.3";
 
 const managerClosedView = location.pathname.toLowerCase().endsWith("/metis/closed.html");
+if (managerClosedView) document.querySelector('.sheet-save-toolbar')?.setAttribute('hidden','');
 const currentUser = await gate(managerClosedView ? "manager" : "technician");
 let cloudIssues = [];
 let keyLoads = [];
@@ -31,6 +32,11 @@ const unitsToggle = document.querySelector("#units-toggle");
 const unitsArea = document.querySelector("#units-area");
 let editLock = null;
 if (selectedSheet && !managerClosedView && remoteIssue.status === "open") {
+  const formSkeleton = document.createElement("section");
+  formSkeleton.className = "card app-skeleton";
+  formSkeleton.setAttribute("role", "status");
+  formSkeleton.innerHTML = '<p>טוען טופס ונעילת עריכה…</p><div class="skeleton-card"><span class="skeleton-title"></span><span class="skeleton-line"></span><span class="skeleton-input"></span></div><div class="skeleton-card"><span class="skeleton-line"></span><span class="skeleton-input"></span></div>';
+  document.querySelector("#sheet-form").before(formSkeleton);
   const notice = document.createElement("section");
   notice.className = "card edit-lock-notice";
   notice.setAttribute("role", "status");
@@ -41,7 +47,8 @@ if (selectedSheet && !managerClosedView && remoteIssue.status === "open") {
   notice.append(message, retry);
   document.querySelector("#sheet-form").before(notice);
   editLock = createEditLock({ kind: "issue", serialOrId: sheet.serial, formId: sheet.id, user: { uid: currentUser.uid, name: currentUser.name }, onChange: ({ held, message: info }) => {
-    notice.hidden = held;
+    formSkeleton.hidden = held || !info.includes("בודק");
+    notice.hidden = held || formSkeleton.hidden === false;
     message.textContent = info;
     document.querySelector("#sheet-form").hidden = !held;
     if (held) setupSignaturePads();
@@ -109,20 +116,26 @@ function loadState() {
   catch { return { ...defaultState }; }
 }
 
+let pendingStateSave = Promise.resolve();
+async function flushState() {
+  if (saveState.timer) { clearTimeout(saveState.timer); saveState.timer = null; }
+  await pendingStateSave;
+  if (managerClosedView || state.closedAt) return;
+  pendingStateSave = draftState.setItem(STORAGE_KEY, JSON.stringify(state));
+  await pendingStateSave;
+}
 function saveState() {
   if (managerClosedView) return;
   if (state.closedAt) return;
   const status = document.querySelector("#save-state");
   status.textContent = "שומר במסד המקומי…";
-  void draftState.setItem(STORAGE_KEY, JSON.stringify(state)).then(() => {
-    delete status.dataset.state;
-    status.textContent = "נשמר עכשיו במסד המקומי";
-  }).catch((error) => {
-    status.textContent = `שמירת הטיוטה במסד נכשלה: ${error.message}`;
-    status.dataset.state = "error";
-  });
   window.clearTimeout(saveState.timer);
-  saveState.timer = window.setTimeout(() => { if (status.dataset.state !== "error") status.textContent = "נשמר אוטומטית במסד המקומי"; }, 1400);
+  saveState.timer = window.setTimeout(() => {
+    saveState.timer = null;
+    pendingStateSave = draftState.setItem(STORAGE_KEY, JSON.stringify(state));
+    pendingStateSave.then(() => { delete status.dataset.state; status.textContent = "הטיוטה נשמרה במסד המשותף"; })
+      .catch((error) => { status.textContent = `שמירת הטיוטה נכשלה: ${error.message}`; status.dataset.state = "error"; });
+  }, 400);
 }
 
 function renderSheetDetails() {
@@ -328,6 +341,7 @@ function closureRecord() {
 
 function showClosed() {
   if (!selectedSheet) return;
+  document.querySelector('.sheet-save-toolbar')?.setAttribute('hidden','');
   document.querySelector("#sheet-form").classList.add("is-closed");
   document.querySelector("#sheet-form").querySelectorAll("input, textarea, select, button").forEach((element) => {
     if (element.closest("#review-panel")) return;
@@ -395,6 +409,7 @@ async function submitTreatment() {
   for (const [type, fields] of Object.entries(TABLES)) closingState[type] = compactRows(state[type], fields);
   const record = { ...closureRecord(), closedAt, actionsComplete: true };
   try {
+    await flushState();
     await submitForReview(sheet.id, record, closingState, editLock.session);
     Object.assign(state, closingState);
     try { draftState.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* The submitted form is already saved in Access. */ }
@@ -409,6 +424,30 @@ async function submitTreatment() {
   }
 }
 document.querySelector("#close-sheet").addEventListener("click", submitTreatment);
+document.querySelector("#save-sheet")?.addEventListener("click", async (event) => {
+  if (!editLock?.held || state.closedAt) return;
+  const button=event.currentTarget;button.disabled=true;
+  document.querySelector("#save-state").textContent="שומר את הטופס המשותף…";
+  try {
+    await flushState();
+    await editLock.release();
+    location.assign('/mechanic/index.html');
+  } catch (error) {
+    const status=document.querySelector("#save-state");status.textContent=`השמירה נכשלה: ${error.message}`;status.dataset.state="error";button.disabled=false;
+  }
+});
+document.querySelector("#reset-sheet")?.addEventListener("click", async (event) => {
+  if (!editLock?.held || state.closedAt || !confirm("למחוק את כל המילוי בטופס המשותף ולהתחיל מחדש?")) return;
+  const button=event.currentTarget;button.disabled=true;
+  try {
+    state={...structuredClone(defaultState),actions:ACTIONS.map(()=>false)};
+    await flushState();
+    await editLock.release();
+    location.reload();
+  } catch(error) {
+    const status=document.querySelector("#save-state");status.textContent=`האיפוס נכשל: ${error.message}`;status.dataset.state="error";button.disabled=false;
+  }
+});
 
 watchIssues((issues) => {
   cloudIssues = issues;

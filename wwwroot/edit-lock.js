@@ -45,5 +45,11 @@ export function createEditLock({ kind, serialOrId, formId, user, onChange }) {
     if (held) void releaseEditLock(kind, serialOrId, session).catch(() => {});
     held = false;
   }
-  return { acquire, dispose, get held() { return held; }, session };
+  async function release() {
+    if (disposed) return;
+    const wasHeld=held;
+    disposed=true;clearInterval(timer);unsubscribe();held=false;
+    if (wasHeld) await releaseEditLock(kind,serialOrId,session);
+  }
+  return { acquire, dispose, release, get held() { return held; }, session };
 }
