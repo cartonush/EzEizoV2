@@ -68,6 +68,8 @@ public static class NativeDiagnostics
                     var page = controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.AutoScroll && x.BackColor == Color.FromArgb(242, 246, 248));
                     if (page is not null)
                     {
+                        if (page.HorizontalScroll.Visible)
+                            throw new InvalidOperationException($"Key form has unwanted horizontal scrolling: {page.DisplayRectangle.Width} > {page.ClientSize.Width}");
                         page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height / 2);
                         window.Update(); Capture(window, "native-new-key-middle.png");
                         page.AutoScrollPosition = new Point(0, page.DisplayRectangle.Height);
