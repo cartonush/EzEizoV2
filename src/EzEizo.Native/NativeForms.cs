@@ -1,0 +1,362 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace EzEizo.Core;
+
+public sealed partial class NativeWindow
+{
+    private string? activeFormId;
+    private string? activeSession;
+    private readonly System.Windows.Forms.Timer lockTimer = new() { Interval = 30000 };
+
+    private static JsonObject Object(JsonNode? value) => value as JsonObject ?? new JsonObject();
+    private static string V(JsonNode? value, string key) => value?[key]?.ToString() ?? "";
+    private static bool B(JsonNode? value, string key) => bool.TryParse(V(value, key), out var result) && result;
+    private static JsonElement Json(JsonNode value) => JsonSerializer.SerializeToElement(value);
+    private static JsonArray Strings(IEnumerable<string> values) => new(values.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray());
+    private async Task ReleaseForm()
+    {
+        lockTimer.Stop();
+        var id = activeFormId; var session = activeSession;
+        activeFormId = null; activeSession = null;
+        if (id is not null && session is not null)
+            try { await Work(() => { store.ReleaseLock(id, session); return true; }); }
+            catch { /* Expired locks recover automatically; never conceal a save failure. */ }
+    }
+    private async Task<bool> AcquireForm(string collection, JsonNode doc)
+    {
+        if (account is null) return false;
+        await ReleaseForm();
+        var id = V(doc, "id");
+        var session = Guid.NewGuid().ToString();
+        var result = await Work(() => store.Lock(collection, id, session, account));
+        if (!B(result, "held"))
+        {
+            status.Text = $"הטופס נמצא בעריכת {V(result, "ownerName")}.";
+            return false;
+        }
+        activeFormId = id; activeSession = session;
+        lockTimer.Tick -= RenewLock;
+        lockTimer.Tick += RenewLock;
+        lockTimer.Start();
+        return true;
+    }
+    private async void RenewLock(object? sender, EventArgs e)
+    {
+        if (activeFormId is null || activeSession is null || account is null) return;
+        var id = activeFormId; var session = activeSession; var user = account;
+        try
+        {
+            var collection = currentPage == "fault-editor" ? "issues" : "keyLoads";
+            var result = await Work(() => store.Lock(collection, id, session, user));
+            if (!B(result, "held")) throw new InvalidOperationException("נעילת הטופס אבדה. יש לפתוח אותו מחדש.");
+        }
+        catch (Exception ex) { lockTimer.Stop(); status.Text = ex.Message; }
+    }
+    private static TextBox Field(FlowLayoutPanel stack, string label, JsonObject state, string key, bool multi = false)
+    {
+        stack.Controls.Add(Label(label));
+        var input = Input(label, 2000);
+        if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; }
+        input.Text = V(state, key);
+        input.TextChanged += (_, _) => state[key] = input.Text;
+        stack.Controls.Add(input);
+        return input;
+    }
+    private static CheckBox Check(FlowLayoutPanel stack, string label, JsonObject state, string key)
+    {
+        var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 38,
+            ForeColor = Navy, Margin = new Padding(0, 0, 0, 10) };
+        box.CheckedChanged += (_, _) => state[key] = box.Checked;
+        stack.Controls.Add(box);
+        return box;
+    }
+    private static NativeSignature Signature(FlowLayoutPanel stack, string label, JsonObject state, string key, bool editable)
+    {
+        stack.Controls.Add(Label(label));
+        var pad = new NativeSignature(V(state, key)) { Enabled = editable, Margin = new Padding(0, 0, 0, 12) };
+        stack.Controls.Add(pad);
+        if (editable) stack.Controls.Add(Button("נקה חתימה", (_, _) => { pad.Clear(); state[key] = ""; }));
+        return pad;
+    }
+    private static void Section(FlowLayoutPanel stack, string title) => stack.Controls.Add(Label(title, 55, true));
+
+    private async Task AddDocumentActions(FlowLayoutPanel stack, string page, JsonNode doc)
+    {
+        var user = account;
+        if (user is null) return;
+        var statusValue = V(doc, "status");
+        if (role == AppRole.Manager)
+        {
+            if (page == "issues" && statusValue == "pendingReview")
+            {
+                var reviewer = Signature(stack, "חתימת בודק הדף", new JsonObject(), "reviewerSignature", true);
+                stack.Controls.Add(Button("בדוק וסגור", async (_, _) =>
+                {
+                    if (!reviewer.HasSignature) { status.Text = "חתימת בודק הדף חסרה."; return; }
+                    try
+                    {
+                        await Work(() => store.Update("issues", V(doc, "id"), "approve",
+                            Json(new JsonObject { ["signature"] = reviewer.DataUrl() }), user));
+                        await OpenList("issues");
+                    }
+                    catch (Exception ex) { Error(ex); }
+                }));
+            }
+            if (statusValue is "closed" or "pendingReview")
+                stack.Controls.Add(Button("החזר לטכנאי לעריכה", async (_, _) =>
+                {
+                    try
+                    {
+                        await Work(() => store.Update(page == "issues" ? "issues" : "keyLoads", V(doc, "id"), "reopen", Json(new JsonObject()), user));
+                        await OpenList(page);
+                    }
+                    catch (Exception ex) { Error(ex); }
+                }));
+            if (statusValue == "open")
+            {
+                var note = Field(stack, "הוסף הערת מנהל", new JsonObject(), "note", true);
+                stack.Controls.Add(Button("שמור הערה", async (_, _) =>
+                {
+                    try
+                    {
+                        await Work(() => store.Update(page == "issues" ? "issues" : "keyLoads", V(doc, "id"), "note",
+                            Json(new JsonObject { ["note"] = note.Text }), user));
+                        await OpenDocument(page, V(doc, "id"));
+                    }
+                    catch (Exception ex) { Error(ex); }
+                }));
+            }
+            return;
+        }
+        if (statusValue != "open") return;
+        if (!await AcquireForm(page == "issues" ? "issues" : "keyLoads", doc))
+        {
+            stack.Controls.Add(Label($"הטופס נמצא בעריכה של טכנאי אחר. {status.Text}", 72));
+            stack.Controls.Add(Button("בדוק שוב", async (_, _) => await OpenDocument(page, V(doc, "id"))));
+            return;
+        }
+        if (page == "issues") await FaultEditor(stack, doc, user);
+        else await KeyEditor(stack, doc, user);
+    }
+
+    private async Task FaultEditor(FlowLayoutPanel stack, JsonNode doc, Account user)
+    {
+        currentPage = "fault-editor";
+        var id = V(doc, "id"); var sheet = Object(doc["sheet"]);
+        var key = "fault-sheet-v2:" + id;
+        var drafts = await Work(() => store.Drafts(user));
+        var state = drafts.TryGetValue(key, out var saved) ? Object(JsonNode.Parse(saved)) :
+            Object(doc["closed"]?["state"]?.DeepClone());
+        var controls = new Dictionary<string, NativeSignature>();
+        Section(stack, "טופס טיפול בתקלה");
+        controls["safetyTechnicianSignature"] = Signature(stack, "בדיקת המטוס בטוח לאחזקה טרם התהליך: אין קסטות מוץ / נורים וכפט״ים מורכבים על המטוס. חתימת הטכנאי", state, "safetyTechnicianSignature", true);
+        Field(stack, "תיאור תיקון", state, "repair", true);
+        stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
+        Field(stack, "הערת טכנאי", state, "technicianNote", true);
+        Section(stack, "פעולות אחזקה");
+        var actionValues = state["actions"] as JsonArray ?? new JsonArray();
+        while (actionValues.Count < 12) actionValues.Add(false);
+        if (state["actions"] is null) state["actions"] = actionValues;
+        for (var i = 0; i < NativeCatalog.Actions.Length; i++)
+        {
+            var index = i;
+            if (i == 1 || i == 11)
+            {
+                var keyName = i == 1 ? "arrivalTime" : "completionTime";
+                var picker = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Today };
+                if (TimeSpan.TryParse(V(state, keyName), out var value)) picker.Value = DateTime.Today.Add(value);
+                stack.Controls.Add(Label($"{i + 1:D2}. {NativeCatalog.Actions[i]}")); stack.Controls.Add(picker);
+                var now = Button("השעה עכשיו", (_, _) => { picker.Value = DateTime.Now; state[keyName] = picker.Value.ToString("HH:mm"); actionValues[index] = true; });
+                stack.Controls.Add(now);
+                picker.ValueChanged += (_, _) => { state[keyName] = picker.Value.ToString("HH:mm"); actionValues[index] = true; };
+            }
+            else if (i == 10)
+            {
+                stack.Controls.Add(Label($"11. {NativeCatalog.Actions[i]}"));
+                var choice = new ComboBox { Width = 240, DropDownStyle = ComboBoxStyle.DropDownList };
+                choice.Items.AddRange(["בחר תוצאה", "✓ בוצע", "X לא נדרש"]);
+                choice.SelectedIndex = V(state, "action11Result") == "done" ? 1 : V(state, "action11Result") == "notRequired" ? 2 : 0;
+                choice.SelectedIndexChanged += (_, _) => { state["action11Result"] = choice.SelectedIndex == 1 ? "done" : choice.SelectedIndex == 2 ? "notRequired" : ""; actionValues[index] = choice.SelectedIndex > 0; };
+                stack.Controls.Add(choice);
+            }
+            else
+            {
+                var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.Actions[i]}", Width = 750, Height = 45,
+                    Checked = bool.TryParse(actionValues[i]?.ToString(), out var checkedValue) && checkedValue };
+                box.CheckedChanged += (_, _) => actionValues[index] = box.Checked;
+                stack.Controls.Add(box);
+            }
+        }
+        foreach (var kind in NativeCatalog.Tables.Keys)
+        {
+            var toggle = Check(stack, NativeCatalog.Tables[kind].title, state, kind == "removed" || kind == "installed" ? "unitsEnabled" : kind + "Enabled");
+            var table = Table(stack, state, kind);
+            table.Visible = toggle.Checked;
+            toggle.CheckedChanged += (_, _) => table.Visible = toggle.Checked;
+        }
+        ToolReviews(stack, state, controls);
+        controls["technicianDeclarationSignature"] = Signature(stack,
+            "אני מאשר שכל הפרטים שלמים ומדויקים, שעודכנו מערכות האחזקה ושמכשירים תקולים הועברו עם תגי בר תיקון. חתימת הטכנאי", state, "technicianDeclarationSignature", true);
+        void CaptureSignatures() { foreach (var (name, pad) in controls) state[name] = pad.DataUrl(); }
+        stack.Controls.Add(Button("שמירה", async (_, _) =>
+        {
+            try { CaptureSignatures(); await Work(() => { store.SaveDraft(key, state.ToJsonString(), user); return true; }); status.Text = "הטיוטה נשמרה במסד המשותף."; }
+            catch (Exception ex) { Error(ex); }
+        }));
+        stack.Controls.Add(Button("איפוס טופס", async (_, _) =>
+        {
+            if (MessageBox.Show(this, "לנקות את כל נתוני הטיוטה?", "איפוס", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            try { await Work(() => { store.RemoveDraft(key, user); return true; }); await ReleaseForm(); await OpenDocument("issues", id); }
+            catch (Exception ex) { Error(ex); }
+        }));
+        stack.Controls.Add(Button("שמירה וסגירה", async (_, _) =>
+        {
+            try
+            {
+                CaptureSignatures();
+                var error = ValidateFault(sheet, state);
+                if (error is not null) { status.Text = error; MessageBox.Show(this, error, "חסר מידע", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                var payload = new JsonObject { ["session"] = activeSession, ["record"] = new JsonObject { ["closedAt"] = DateTimeOffset.Now.ToString("o") }, ["state"] = state.DeepClone() };
+                await Work(() => store.Update("issues", id, "submit", Json(payload), user));
+                await ReleaseForm(); await OpenList("issues");
+            }
+            catch (Exception ex) { Error(ex); }
+        }));
+    }
+
+    private static string? ValidateFault(JsonObject sheet, JsonObject state)
+    {
+        if (string.IsNullOrWhiteSpace(V(sheet, "fault"))) return "תיאור התקלה חסר.";
+        if (string.IsNullOrWhiteSpace(V(state, "safetyTechnicianSignature"))) return "חסרה חתימת בדיקת בטיחות המטוס.";
+        if (string.IsNullOrWhiteSpace(V(state, "repair"))) return "תיאור התיקון חסר.";
+        var actions = state["actions"] as JsonArray;
+        if (actions is null || actions.Count < 12 || actions.Any(x => x?.ToString() != "true")) return "יש להשלים את כל 12 הפעולות.";
+        if (string.IsNullOrWhiteSpace(V(state, "arrivalTime")) || string.IsNullOrWhiteSpace(V(state, "completionTime"))) return "חסרה שעת הגעה או שעת סיום.";
+        if (V(state, "action11Result") is not ("done" or "notRequired")) return "יש לסמן ✓ או X בפעולה 11.";
+        foreach (var (kind, spec) in NativeCatalog.Tables)
+        {
+            var enabled = B(state, kind is "removed" or "installed" ? "unitsEnabled" : kind + "Enabled");
+            if (!enabled) continue;
+            var rows = (state[kind] as JsonArray ?? new()).Where(x => spec.fields.Any(f => !string.IsNullOrWhiteSpace(V(x, f.key)))).ToArray();
+            if (rows.Length == 0) return $"חסרה שורה בטבלת {spec.title}.";
+            foreach (var row in rows) foreach (var field in spec.fields)
+                if (!field.optional && string.IsNullOrWhiteSpace(V(row, field.key))) return $"חסר {field.label} בטבלת {spec.title}.";
+        }
+        if (B(state, "toolsEnabled"))
+        {
+            if (!B(state, "entryEnabled") || !B(state, "finalEnabled")) return "כאשר יש כלים, ביקורת כניסה וסיום הן חובה.";
+            foreach (var key in new[] { "entryTechnicianSignature", "entryInspectorSignature", "entryInspectorNumber", "finalTechnicianSignature", "finalInspectorSignature", "finalInspectorNumber", "finalLeadName", "finalLeadSignature", "departureTime" })
+                if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי ביקורת כלים.";
+        }
+        if (B(state, "takenEnabled")) foreach (var key in new[] { "takenFullName", "takenPersonalNumber", "takenRank", "takenSignature" })
+            if (string.IsNullOrWhiteSpace(V(state, key))) return "חסרים פרטי חתימה על קשיחים שנלקחו.";
+        if (string.IsNullOrWhiteSpace(V(state, "technicianDeclarationSignature"))) return "חסרה חתימת הצהרת הטכנאי.";
+        return null;
+    }
+
+    private static DataGridView Table(FlowLayoutPanel stack, JsonObject state, string kind)
+    {
+        var spec = NativeCatalog.Tables[kind];
+        var data = state[kind] as JsonArray ?? new JsonArray();
+        if (state[kind] is null) state[kind] = data;
+        var grid = new DataGridView { Width = 740, Height = 185, AllowUserToAddRows = true, AllowUserToDeleteRows = true,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White };
+        foreach (var field in spec.fields) grid.Columns.Add(field.key, field.label);
+        foreach (var row in data) grid.Rows.Add(spec.fields.Select(f => V(row, f.key)).ToArray());
+        grid.CellEndEdit += (_, _) => Sync();
+        grid.RowsRemoved += (_, _) => Sync();
+        void Sync()
+        {
+            var next = new JsonArray();
+            foreach (DataGridViewRow row in grid.Rows)
+            {
+                if (row.IsNewRow) continue;
+                var item = new JsonObject();
+                foreach (var f in spec.fields) item[f.key] = row.Cells[f.key].Value?.ToString() ?? "";
+                if (spec.fields.Any(f => !string.IsNullOrWhiteSpace(V(item, f.key)))) next.Add(item);
+            }
+            state[kind] = next;
+        }
+        stack.Controls.Add(grid);
+        return grid;
+    }
+
+    private static void ToolReviews(FlowLayoutPanel stack, JsonObject state, Dictionary<string, NativeSignature> pads)
+    {
+        foreach (var (title, toggle, fields) in new[]
+        {
+            ("ביקורת כניסה", "entryEnabled", new[] { ("entryTechnicianSignature", "חתימת טכנאי", true), ("entryInspectorSignature", "חתימת בודק", true), ("entryInspectorNumber", "מספר אישי של הבודק", false) }),
+            ("ביקורת במהלך העבודה", "interimEnabled", new[] { ("interimTechnicianSignature", "חתימת טכנאי", true), ("interimInspectorNumber", "מספר אישי של הבודק", false), ("interimInspectorSignature", "חתימת בודק", true), ("interimToolsName", "שם פ. כלים / מ״ע", false), ("interimToolsSignature", "חתימת פ. כלים / מ״ע", true) }),
+            ("ביקורת בסיום העבודה", "finalEnabled", new[] { ("finalTechnicianSignature", "חתימת טכנאי", true), ("finalInspectorNumber", "מספר אישי של הבודק", false), ("finalInspectorSignature", "חתימת בודק", true), ("finalLeadName", "שם ר״צ / מ״ע", false), ("finalLeadSignature", "חתימת ר״צ / מ״ע", true), ("departureTime", "שעת עזיבה", false) })
+        })
+        {
+            var box = Check(stack, title, state, toggle);
+            var group = new FlowLayoutPanel { Width = 750, Height = fields.Sum(f => f.Item3 ? 220 : 90), AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            foreach (var (key, label, sign) in fields)
+                if (sign) pads[key] = Signature(group, label, state, key, true);
+                else Field(group, label, state, key);
+            group.Visible = box.Checked; box.CheckedChanged += (_, _) => group.Visible = box.Checked;
+            stack.Controls.Add(group);
+        }
+    }
+
+    private async Task KeyEditor(FlowLayoutPanel stack, JsonNode doc, Account user)
+    {
+        currentPage = "key-editor";
+        var id = V(doc, "id");
+        var work = Object(doc["workDraft"]?.DeepClone() ?? doc["work"]?.DeepClone());
+        var rows = doc["rows"] as JsonArray ?? new();
+        var completed = work["aircraft"] as JsonArray ?? new JsonArray();
+        while (completed.Count < rows.Count) completed.Add(new JsonObject());
+        if (work["aircraft"] is null) work["aircraft"] = completed;
+        Section(stack, "רשימת מטוסים להטענה");
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var index = i; var row = rows[i]; var state = Object(completed[i]); if (completed[i] is null) completed[i] = state;
+            stack.Controls.Add(Label($"מטוס {row?["aircraft"]} · הערת מנהל: {row?["notes"]}", 45, true));
+            if (B(row, "blue")) Check(stack, "ארז כחול בוצע", state, "blueDone");
+            if (B(row, "shach")) Check(stack, "שחק בוצע", state, "shachDone");
+            Field(stack, "הערת טכנאי (לא חובה)", state, "technicianNote", true);
+        }
+        Section(stack, "פעולות לביצוע");
+        var actions = work["actions"] as JsonArray ?? new JsonArray();
+        while (actions.Count < 12) actions.Add(false);
+        actions[0] = true; if (work["actions"] is null) work["actions"] = actions;
+        for (var i = 0; i < 12; i++)
+        {
+            var index = i;
+            var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", Width = 745, Height = 48,
+                Checked = i == 0 || bool.TryParse(actions[i]?.ToString(), out var b) && b, Enabled = i != 0 };
+            box.CheckedChanged += (_, _) => actions[index] = box.Checked;
+            stack.Controls.Add(box);
+        }
+        var pads = new Dictionary<string, NativeSignature>();
+        foreach (var kind in new[] { "tools", "taken", "rejected" })
+        {
+            var box = Check(stack, NativeCatalog.Tables[kind].title, work, kind + "Enabled");
+            var grid = Table(stack, work, kind); grid.Visible = box.Checked; box.CheckedChanged += (_, _) => grid.Visible = box.Checked;
+        }
+        ToolReviews(stack, work, pads);
+        void Capture() { foreach (var (name, pad) in pads) work[name] = pad.DataUrl(); }
+        stack.Controls.Add(Button("שמירה", async (_, _) =>
+        {
+            try { Capture(); await Work(() => store.Update("keyLoads", id, "draft", Json(new JsonObject { ["session"] = activeSession, ["work"] = work.DeepClone() }), user)); status.Text = "הטיוטה נשמרה במסד המשותף."; }
+            catch (Exception ex) { Error(ex); }
+        }));
+        stack.Controls.Add(Button("איפוס טופס", async (_, _) =>
+        {
+            if (MessageBox.Show(this, "לנקות את מילוי הטופס?", "איפוס", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            try { await Work(() => store.Update("keyLoads", id, "draft", Json(new JsonObject { ["session"] = activeSession, ["work"] = new JsonObject() }), user)); await ReleaseForm(); await OpenDocument("keys", id); }
+            catch (Exception ex) { Error(ex); }
+        }));
+        stack.Controls.Add(Button("סיים הטענה", async (_, _) =>
+        {
+            Capture();
+            if (actions.Any(x => x?.ToString() != "true") || rows.Where((row, i) => B(row, "blue") && !B(completed[i], "blueDone") || B(row, "shach") && !B(completed[i], "shachDone")).Any())
+            { status.Text = "יש להשלים את המשימות ואת כל המפתחות שנבחרו."; return; }
+            try { await Work(() => store.Update("keyLoads", id, "complete", Json(new JsonObject { ["session"] = activeSession, ["work"] = work.DeepClone() }), user)); await ReleaseForm(); await OpenList("keys"); }
+            catch (Exception ex) { Error(ex); }
+        }));
+    }
+}
