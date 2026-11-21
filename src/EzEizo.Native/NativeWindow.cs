@@ -19,6 +19,7 @@ public sealed class NativeWindow : Form
     private readonly Label heading = new() { Dock = DockStyle.Fill, ForeColor = Color.White, Font = new Font("Segoe UI", 19, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight };
     private Account? account;
     private string currentPage = "";
+    private string searchTerm = "";
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 10000 };
 
     public NativeWindow(AppRole role)
@@ -156,10 +157,14 @@ public sealed class NativeWindow : Form
             var nav = new FlowLayoutPanel { Width = 780, Height = 65, WrapContents = false, FlowDirection = FlowDirection.LeftToRight };
             nav.Controls.Add(Button("תקלות", async (_, _) => await OpenList("issues")));
             nav.Controls.Add(Button("מפתחות", async (_, _) => await OpenList("keys")));
+            if (role == AppRole.Manager) nav.Controls.Add(Button("משתמשים", async (_, _) => await OpenUsers()));
+            nav.Controls.Add(Button("רענון", async (_, _) => await OpenList(page)));
             nav.Controls.Add(Button("התנתק", (_, _) => { account = null; Login(); }));
+            nav.Width = 970;
             stack.Controls.Add(nav);
             stack.Controls.Add(Label(page == "issues" ? "תקלות" : "הטענות מפתחות", 55, true));
             var search = Input("חפש מספר סידורי", 20);
+            search.Text = searchTerm;
             stack.Controls.Add(search);
             var cards = new FlowLayoutPanel { Width = 780, Height = 530, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
@@ -182,10 +187,64 @@ public sealed class NativeWindow : Form
                     cards.Controls.Add(card);
                 }
             }
-            search.TextChanged += (_, _) => Render();
+            search.TextChanged += (_, _) => { searchTerm = search.Text; Render(); };
             Render();
             content.Controls.Clear(); content.Controls.Add(stack);
             status.Text = $"{data.Count} טפסים · עודכן {DateTime.Now:HH:mm:ss}";
+        }
+        catch (Exception ex) { Error(ex); }
+    }
+
+    private async Task OpenUsers()
+    {
+        if (role != AppRole.Manager || account is null) return;
+        refreshTimer.Stop();
+        Loading("טוען משתמשים…");
+        try
+        {
+            var users = await Work(() => database.AllTechnicians());
+            currentPage = "users";
+            var stack = Stack();
+            stack.Controls.Add(Button("חזרה לתקלות", async (_, _) => await OpenList("issues")));
+            stack.Controls.Add(Label("ניהול משתמשים", 55, true));
+            var search = Input("חפש שם או מספר אישי", 80);
+            stack.Controls.Add(search);
+            var list = new FlowLayoutPanel { Width = 780, Height = 320, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            stack.Controls.Add(list);
+            void Render()
+            {
+                list.Controls.Clear();
+                foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
+                {
+                    var row = new FlowLayoutPanel { Width = 745, Height = 54, WrapContents = false };
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = 450, Height = 45, TextAlign = ContentAlignment.MiddleRight });
+                    row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
+                    {
+                        try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
+                        catch (Exception ex) { Error(ex); }
+                    }));
+                    list.Controls.Add(row);
+                }
+            }
+            search.TextChanged += (_, _) => Render();
+            Render();
+            stack.Controls.Add(Label("יצירת טכנאי", 45, true));
+            var name = Input("שם מלא", 100); stack.Controls.Add(name);
+            var number = Input("מספר אישי · 7 ספרות", 7); stack.Controls.Add(number);
+            var password = Input("סיסמה · 6 ספרות", 6, true); stack.Controls.Add(password);
+            stack.Controls.Add(Button("צור טכנאי", async (_, _) =>
+            {
+                try
+                {
+                    if (number.Text.Length != 7 || !number.Text.All(char.IsAsciiDigit) || password.Text.Length != 6 || !password.Text.All(char.IsAsciiDigit))
+                        throw new ArgumentException("מספר אישי חייב להיות בן 7 ספרות וסיסמה בת 6 ספרות.");
+                    await Work(() => database.CreateAccount(name.Text, number.Text, "mechanic", password.Text));
+                    await OpenUsers();
+                }
+                catch (Exception ex) { Error(ex); }
+            }));
+            content.Controls.Clear(); content.Controls.Add(stack);
+            status.Text = $"{users.Count} משתמשים במסד המקומי";
         }
         catch (Exception ex) { Error(ex); }
     }
