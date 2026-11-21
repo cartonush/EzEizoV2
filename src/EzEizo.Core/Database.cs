@@ -243,7 +243,7 @@ public sealed class Database
         using var c = Connect();
         using var cmd = Command(c, null, "SELECT [UserID],[DisplayName],[PersonalNumber],[Active],[DeletedAt] FROM [Users] WHERE [Role]='mechanic' ORDER BY [DisplayName]");
         using var r = cmd.ExecuteReader();
-        while (r is not null && r.Read()) list.Add(new TechnicianRecord(r.GetString(0),r.GetString(1),r.GetString(2),Convert.ToBoolean(r.GetValue(3)),!r.IsDBNull(4)));
+        while (r is not null && r.Read()) list.Add(new TechnicianRecord(r.GetString(0),r.GetString(1),r.GetString(2),Convert.ToBoolean(r.GetValue(3)),false));
         return list;
     }
     public void SetTechnicianActive(string id, bool active)
@@ -255,7 +255,7 @@ public sealed class Database
     public void DeleteTechnician(string id)
     {
         using var c=Connect();
-        using var cmd=Command(c,null,"DELETE FROM [Users] WHERE [UserID]=? AND [Role]='mechanic' AND [Active]=False",id);
+        using var cmd=Command(c,null,"DELETE FROM [Users] WHERE [UserID]=? AND [Role]='mechanic' AND [Active]=False AND [DeletedAt] IS NOT NULL",id);
         if(cmd.ExecuteNonQuery()!=1)throw new InvalidOperationException("אפשר למחוק סופית רק טכנאי שהוסר.");
     }
 

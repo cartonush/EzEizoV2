@@ -18,12 +18,12 @@ export async function gate(role){
   });
   user={uid:data.uid,name:data.name,email:data.email};
   const logout=document.createElement('button');logout.className='secondary-button auth-logout';logout.type='button';logout.textContent='התנתק';
-  logout.onclick=async()=>{await call('logout');location.href=location.pathname.includes('/Metis/')?'../index.html?role=manager':'../index.html?role=mechanic';};
+  logout.onclick=async()=>{await call('logout');location.href=location.pathname.includes('/Metis/')?'/index.html?role=manager':'/index.html?role=mechanic';};
   document.querySelector('.header-actions')?.append(logout);
   return user;
 }
 export function revealApp(){document.querySelector('#app-skeleton')?.remove();document.querySelector('main').hidden=false;}
-export function watchIssues(onChange,onError,technicianUid=null){return observe('offline.list',{collection:'issues'},items=>onChange(technicianUid?items.filter(x=>x.assigneeUid===technicianUid):items),onError);}
+export function watchIssues(onChange,onError,technicianUid=null){return observe('offline.list',{collection:'issues'},items=>onChange(technicianUid?items.filter(x=>(x.assigneeUids||[x.assigneeUid]).includes(technicianUid)):items),onError);}
 export function watchKeyLoads(onChange,onError,technicianUid=null){return observe('offline.list',{collection:'keyLoads'},items=>onChange(technicianUid?items.filter(x=>(x.teamUids||[]).includes(technicianUid)):items),onError);}
 export function watchTechnicians(onChange,onError){return observe('offline.technicians',{},onChange,onError);}
 export function watchAircraftConstants(onChange,onError){return observe('offline.constants',{},onChange,onError);}
@@ -43,12 +43,13 @@ export function approveIssue(id,reviewerUid,signature){return update('issues',id
 export function reopenIssue(id){return update('issues',id,'reopen');}
 export function appendIssueManagerNote(id,note){return update('issues',id,'note',{note});}
 export function assignIssue(id,uid,name){return update('issues',id,'assign',{uid,name});}
+export function editOpenForm(collection,id,changes,teamUids){return update(collection,id,'editDefinition',{changes,teamUids});}
 export function createTechnician(name,number,password){return call('offline.createTechnician',{name,number,password});}
 export function changeTechnicianPassword(uid,password){return call('offline.changeTechnicianPassword',{uid,password});}
 export function setTechnicianActive(uid,active){return call('offline.setTechnicianActive',{uid,active});}
 export function deleteTechnicianPermanently(uid){return call('offline.deleteTechnician',{uid});}
 export function watchEditLock(kind,serialOrId,onChange,onError){
-  // The issue serial is shared by assignees; the lock is keyed by the form ID.
+  // All assigned technicians share one form ID and one edit lock.
   const id=kind==='key'?serialOrId:location.search?new URLSearchParams(location.search).get('id'):serialOrId;
   return observe('offline.readLock',{id},lock=>onChange(wrapLock(lock)),onError);
 }

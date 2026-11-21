@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -10,7 +11,11 @@ public sealed class MainWindow : Form
     private readonly Database db = new();
     private readonly OfflineStore store = new();
     private readonly WebView2 web = new() { Dock = DockStyle.Fill };
+    private readonly Label startup = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
+        Font = new Font("Segoe UI", 16), Text = "טוען את המסד המקומי…" };
+    private readonly BlockingCollection<(Func<object?> work, TaskCompletionSource<object?> done)> jobs = new();
     private Account? account;
+    private DateTime accountVerifiedAt = DateTime.MinValue;
 
     public MainWindow(AppRole role)
     {
@@ -19,23 +24,52 @@ public sealed class MainWindow : Form
         MinimumSize = new Size(760, 600);
         Size = new Size(1100, 800);
         Controls.Add(web);
+        Controls.Add(startup);
+        var worker = new Thread(() =>
+        {
+            foreach (var (work, done) in jobs.GetConsumingEnumerable())
+            {
+                try { done.SetResult(work()); }
+                catch (Exception ex) { done.SetException(ex); }
+            }
+        }) { IsBackground = true, Name = "EzEizo Access worker" };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
         Shown += async (_, _) => await StartAsync();
+        FormClosed += (_, _) => jobs.CompleteAdding();
+    }
+    private async Task<T> WithDatabase<T>(Func<T> work)
+    {
+        var done = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        jobs.Add((() => work(), done));
+        return (T)(await done.Task)!;
     }
 
     private async Task StartAsync()
     {
         try
         {
-            db.Initialize();
-            db.EnsureDemoManager();
-            store.Initialize();
+            var databaseReady = WithDatabase(() => { db.Initialize(); db.EnsureDemoManager(); store.Initialize(); return true; });
             var assets = Path.Combine(AppContext.BaseDirectory, "wwwroot");
             if (!File.Exists(Path.Combine(assets, "index.html")))
                 throw new FileNotFoundException("קובצי הממשק חסרים. יש להעתיק גם את תיקיית wwwroot.");
             await web.EnsureCoreWebView2Async();
+            await databaseReady;
             web.CoreWebView2.SetVirtualHostNameToFolderMapping("ezeizo.local", assets,
                 CoreWebView2HostResourceAccessKind.DenyCors);
             web.CoreWebView2.WebMessageReceived += MessageReceived;
+            web.CoreWebView2.DownloadStarting += (_, e) =>
+            {
+                var suggested = Path.GetFileName(e.ResultFilePath);
+                if (!suggested.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) return;
+                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                if (string.IsNullOrWhiteSpace(desktop) || !Directory.Exists(desktop)) return;
+                var name = Path.GetFileNameWithoutExtension(suggested);
+                var destination = Path.Combine(desktop, suggested);
+                for (var i = 1; File.Exists(destination); i++)
+                    destination = Path.Combine(desktop, $"{name} ({i}).pdf");
+                e.ResultFilePath = destination;
+            };
             web.CoreWebView2.NavigationStarting += (_, e) =>
             {
                 if (!e.Uri.StartsWith("https://ezeizo.local/", StringComparison.OrdinalIgnoreCase)) e.Cancel = true;
@@ -49,11 +83,15 @@ public sealed class MainWindow : Form
                 e.Response = web.CoreWebView2.Environment.CreateWebResourceResponse(null, 403, "Offline application", "Content-Type: text/plain");
             };
             web.Source = new Uri($"https://ezeizo.local/index.html?role={(role == AppRole.Manager ? "manager" : "mechanic")}");
+            Controls.Remove(startup);
+            startup.Dispose();
         }
         catch (Exception ex)
         {
             Controls.Remove(web);
             web.Dispose();
+            Controls.Remove(startup);
+            startup.Dispose();
             Controls.Add(new Label { Dock = DockStyle.Fill, Padding = new Padding(30),
                 Font = new Font("Segoe UI", 13), TextAlign = ContentAlignment.MiddleCenter,
                 Text = $"לא ניתן לטעון את EzEizo: {ex.Message}\nמסד הנתונים: {Database.FilePath}" });
@@ -69,8 +107,16 @@ public sealed class MainWindow : Form
             var request = doc.RootElement;
             id = Get(request, "id");
             var action = Get(request, "action");
-            var p = request.GetProperty("payload");
-            object? data = action switch
+            var p = request.GetProperty("payload").Clone();
+            object? data = await WithDatabase(() => Process(action, p));
+            Reply(id, true, data, null);
+        }
+        catch (Exception ex) { Reply(id, false, null, ex.Message); }
+    }
+
+    private object? Process(string action, JsonElement p)
+    {
+        return action switch
             {
                 "login" => Login(Get(p, "number"), Get(p, "password")),
                 "logout" => Logout(),
@@ -102,17 +148,17 @@ public sealed class MainWindow : Form
                 "offline.removeDraft" => RemoveLocalDraft(p),
                 _ => throw new InvalidOperationException("פעולה לא מוכרת.")
             };
-            Reply(id, true, data, null);
-        }
-        catch (Exception ex) { Reply(id, false, null, ex.Message); }
-        await Task.CompletedTask;
     }
 
     private static string Get(JsonElement p, string key) => p.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
     private Account RequireLogin()
     {
         var current = account ?? throw new UnauthorizedAccessException("יש להתחבר מחדש.");
-        if (db.SignIn(current.PersonalNumber, role)?.Id != current.Id) throw new UnauthorizedAccessException("המשתמש אינו פעיל. התחבר מחדש.");
+        if (DateTime.UtcNow - accountVerifiedAt > TimeSpan.FromSeconds(4))
+        {
+            if (db.SignIn(current.PersonalNumber, role)?.Id != current.Id) { account = null; throw new UnauthorizedAccessException("המשתמש אינו פעיל. התחבר מחדש."); }
+            accountVerifiedAt = DateTime.UtcNow;
+        }
         return current;
     }
     private Account RequireManager()
@@ -130,9 +176,10 @@ public sealed class MainWindow : Form
         if (role == AppRole.Manager && !db.IsPrimaryManager(found))
             throw new UnauthorizedAccessException("הכניסה למנהל הראשי בלבד.");
         account = found;
+        accountVerifiedAt = DateTime.UtcNow;
         return new { found.Name, found.Role };
     }
-    private object Logout() { account = null; return new { }; }
+    private object Logout() { account = null; accountVerifiedAt = DateTime.MinValue; return new { }; }
     private object Home() { var current = RequireLogin(); return new { current.Name, current.Role, uid = current.Id, email = current.PersonalNumber }; }
     private object Users() { RequireManager(); return db.Technicians(); }
     private object CreateUser(JsonElement p)

@@ -1,5 +1,5 @@
 import { draftState } from "../access-state.js";
-import { gate, revealApp, watchKeyLoads, watchTechnicians, createKeyLoad, assignLegacyKeyLoadSerial, closeKeyLoad, reopenKeyLoad, appendKeyLoadManagerNote, saveKeyWorkDraft } from "../access-sync.js?v=1.6.3";
+import { gate, revealApp, watchKeyLoads, watchTechnicians, createKeyLoad, assignLegacyKeyLoadSerial, closeKeyLoad, reopenKeyLoad, appendKeyLoadManagerNote, saveKeyWorkDraft, editOpenForm } from "../access-sync.js?v=1.6.3";
 import { attachSignaturePad } from "../signature-canvas.js?v=1.6.3";
 import { KEY_SQUADRONS, KEY_TASKS, KEY_TABLES, aircraftFor, sheltersFor, periodFor, compactRows, validateRows, keyHistoryByAircraft } from "./data.js?v=1.6.3";
 import { attachTimeNow } from "../time-now.js?v=1.6.3";
@@ -189,6 +189,63 @@ function renderHistory() {
   });
   table.append(body); $("#history-table").replaceChildren(table);
 }
+function makeKeyEditor(load) {
+  const editor = make("details", undefined, "manager-note-editor");
+  editor.append(make("summary", "ערוך פרטי הטענה וצוות"));
+  const form = document.createElement("form"); form.className = "form-grid";
+  const field = (label, type, value) => {
+    const holder = make("label", label, "input-field");
+    const input = document.createElement("input"); input.type = type; input.value = value || ""; input.required = true;
+    holder.append(input); form.append(holder); return input;
+  };
+  const date = field("תאריך", "date", load.date), time = field("שעה", "time", load.time);
+  const squadronLabel = make("label", "טייסת", "input-field"), squadron = document.createElement("select");
+  KEY_SQUADRONS.forEach((name) => squadron.append(new Option(name, name))); squadron.value = load.squadron; squadronLabel.append(squadron); form.append(squadronLabel);
+  const shelterLabel = make("label", "דת״ק", "input-field"), shelter = document.createElement("select");
+  const shelters = () => { const previous=shelter.value; shelter.replaceChildren(...sheltersFor(squadron.value).map((name)=>new Option(name,name))); shelter.value = sheltersFor(squadron.value).includes(previous) ? previous : sheltersFor(squadron.value)[0]; };
+  shelters(); shelter.value = load.shelter; shelterLabel.append(shelter); form.append(shelterLabel);
+  const team = document.createElement("fieldset"); team.className = "assignee-fieldset"; team.append(make("legend", "צוות · שני טכנאים לפחות"));
+  technicians.filter((person) => person.active).forEach((person) => {
+    const label = make("label", undefined, "assignee"), checkbox = document.createElement("input");
+    checkbox.type = "checkbox"; checkbox.value = person.uid; checkbox.checked = load.teamUids.includes(person.uid);
+    label.append(checkbox, document.createTextNode(person.name)); team.append(label);
+  }); form.append(team);
+  const rows = document.createElement("div"); rows.className = "issue-list";
+  let draftRows = load.rows.map((row) => ({ ...row }));
+  const renderRows = () => {
+    rows.replaceChildren();
+    draftRows.forEach((row, index) => {
+      const line = make("div", undefined, "assignee-row");
+      const aircraft = document.createElement("select");
+      aircraftFor(squadron.value).forEach((number) => aircraft.append(new Option(number, number)));
+      aircraft.value = row.aircraft; aircraft.addEventListener("change", () => { row.aircraft = aircraft.value; });
+      const blue = make("label", "ארז כחול"), blueBox = document.createElement("input"); blueBox.type = "checkbox"; blueBox.checked = Boolean(row.blue); blueBox.onchange = () => { row.blue = blueBox.checked; }; blue.prepend(blueBox);
+      const shach = make("label", "שחק"), shachBox = document.createElement("input"); shachBox.type = "checkbox"; shachBox.checked = Boolean(row.shach); shachBox.onchange = () => { row.shach = shachBox.checked; }; shach.prepend(shachBox);
+      const notes = document.createElement("input"); notes.placeholder = "הערות (לא חובה)"; notes.value = row.notes || ""; notes.oninput = () => { row.notes = notes.value; };
+      const remove = make("button", "הסר שורה", "secondary-button"); remove.type = "button"; remove.onclick = () => { draftRows.splice(index,1); renderRows(); };
+      line.append(aircraft, blue, shach, notes, remove); rows.append(line);
+    });
+  };
+  squadron.addEventListener("change", () => { shelters(); draftRows = []; renderRows(); });
+  renderRows(); form.append(rows);
+  const add = make("button", "+ הוסף מטוס", "secondary-button"); add.type = "button";
+  add.onclick = () => { draftRows.push({ aircraft: aircraftFor(squadron.value)[0], blue: true, shach: false, notes: "" }); renderRows(); };
+  const save = make("button", "שמור שינויים", "primary-button"); save.type = "submit";
+  const feedback = make("p", "", "copy-status"); feedback.setAttribute("role", "status"); form.append(add, save, feedback);
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const teamUids = [...team.querySelectorAll("input:checked")].map((box)=>box.value);
+    if (teamUids.length < 2 || !draftRows.length || new Set(draftRows.map((row)=>row.aircraft)).size !== draftRows.length || draftRows.some((row)=>!(row.blue || row.shach)))
+      return setMessageOnNode(feedback, "בחר שני טכנאים לפחות ומטוסים ייחודיים עם לפחות מפתח אחד לכל מטוס.", true);
+    const changes = { date:date.value, time:time.value, squadron:squadron.value, shelter:shelter.value, rows:draftRows, aircraftIds:draftRows.map((row)=>row.aircraft), period:periodFor(date.value).label };
+    save.disabled = true; setMessageOnNode(feedback, "שומר במסד המקומי…");
+    try { await editOpenForm("keyLoads", load.id, changes, teamUids); setMessageOnNode(feedback, "פרטי ההטענה עודכנו."); }
+    catch(error){setMessageOnNode(feedback, `העריכה נכשלה: ${error.message}`, true);}
+    finally{save.disabled=false;}
+  };
+  editor.append(form); return editor;
+}
+
 function renderOpen() {
   const container = $("#open-key-loads"); container.replaceChildren();
   const search = $("#open-key-search")?.value || "";
@@ -212,7 +269,7 @@ function renderOpen() {
         finally { send.disabled = false; }
       });
       editor.append(make("summary", "הערות מנהל"), make("p", load.managerNotes || "עדיין אין הערות.", "manager-note-text"), note, send, feedback);
-      card.append(editor);
+      card.append(editor, makeKeyEditor(load));
     }
   });
 }
@@ -378,7 +435,7 @@ $("#complete-key-load").addEventListener("click", async () => {
   const error = validateWork(); if (error) return setMessage("#work-status", error, true);
   const button = $("#complete-key-load"); button.disabled = true;
   const clean = { ...work }; for (const [type, columns] of Object.entries(KEY_TABLES)) clean[type] = compactRows(work[type], columns);
-  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The completed form is saved in Access. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("./index.html"); }
+  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { draftState.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The completed form is saved in Access. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("/mechanic/index.html"); }
   catch (failure) { setMessage("#work-status", `סגירת ההטענה נכשלה: ${failure.message}`, true); }
   finally { button.disabled = false; }
 });
@@ -402,7 +459,7 @@ function showView() {
   const workId = hash.startsWith("work/") ? hash.slice(5) : null;
   activeLoad = workId ? loads.find((item) => item.id === workId) : null;
   if (activeLoad && !manager && !activeLoad.teamUids.includes(user.uid)) activeLoad = null;
-  if (!manager && loadsReady && !activeLoad) { location.replace("./index.html"); return; }
+  if (!manager && loadsReady && !activeLoad) { location.replace("/mechanic/index.html"); return; }
   const view = activeLoad ? "work" : manager && ["history", "create", "open", "closed"].includes(hash) ? hash : "open";
   const wantsLock = !manager && view === "work" && activeLoad?.status === "open";
   if (!wantsLock || lockedLoadId !== activeLoad.id) {
@@ -426,7 +483,7 @@ function showView() {
   if (manager && !embedded) $("#keys-manager-nav").hidden = false;
   $("#keys-nav").hidden = !manager || view === "work";
   $(backSelector).hidden = manager && view !== "work";
-  $(backSelector).href = manager ? view === "work" ? `#${route(activeLoad?.status === "closed" ? "closed" : "open")}` : embedded ? "#home" : "../Metis/#home" : "./";
+  $(backSelector).href = manager ? view === "work" ? `#${route(activeLoad?.status === "closed" ? "closed" : "open")}` : embedded ? "#home" : "/Metis/index.html#home" : "/mechanic/index.html";
   $(backSelector).textContent = "→ חזרה";
   $(backSelector).setAttribute("aria-label", view === "work" ? `חזרה להטענות ${activeLoad?.status === "closed" ? "סגורות" : "פתוחות"}` : "חזרה");
   $("#keys-nav").querySelectorAll("button").forEach((button) => { if (button.dataset.view === view) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current"); });

@@ -16,6 +16,7 @@ const server = http.createServer((req,res)=>{
 });
 const mock = () => {
   const listeners=[];
+  const issue={id:'test-issue',status:'open',assigneeUid:'mechanic-1',assigneeUids:['mechanic-1'],createdAt:'2026-11-21T08:00:00Z',sheet:{id:'test-issue',serial:'0000000001',squadron:'105',shelter:'14',location:'14/105',aircraft:'603',systemCode:'74A',systemName:'מכם',ewSystem:'גרניט',fault:'בדיקת ניווט',actions:[]}};
   window.chrome = window.chrome || {};
   window.chrome.webview = {
     addEventListener(_name,listener){listeners.push(listener);},
@@ -23,8 +24,12 @@ const mock = () => {
       let data;
       switch(request.action){
         case 'login': data={name:'רועי סויסה',role:new URLSearchParams(location.search).get('role')==='mechanic'?'mechanic':'manager'};break;
-        case 'home': data={name:'רועי סויסה',uid:'manager-1',email:'9862436',role:location.pathname.includes('/mechanic/')?'mechanic':'manager'};break;
-        case 'offline.list': case 'offline.technicians': case 'offline.constants': data=[];break;
+        case 'home': data={name:'רועי סויסה',uid:location.pathname.includes('/mechanic/')?'mechanic-1':'manager-1',email:'9862436',role:location.pathname.includes('/mechanic/')?'mechanic':'manager'};break;
+        case 'offline.list': data=request.payload.collection==='issues'?[issue]:[];break;
+        case 'offline.get': data=issue;break;
+        case 'offline.drafts': data={};break;
+        case 'offline.lock': data={held:true};break;
+        case 'offline.technicians': case 'offline.constants': data=[];break;
         case 'offline.readLock': data=null;break;
         default: data={};
       }
@@ -37,7 +42,7 @@ const mock = () => {
   const origin=`http://127.0.0.1:${server.address().port}`;
   let browser;
   try {
-    browser=await chromium.launch({channel:'msedge',headless:true});
+    browser=await chromium.launch(process.platform==='win32'?{channel:'msedge',headless:true}:{executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
     const page=await browser.newPage();
     await page.addInitScript(mock);
     const errors=[];
@@ -65,6 +70,11 @@ const mock = () => {
     await page.waitForURL('**/mechanic/index.html');
     await page.locator('main:not([hidden])').waitFor();
     assert.match(await page.locator('body').innerText(),/תקלות|מפתחות/);
+    await page.locator('a[href*="test-issue"]').click();
+    await page.locator('#mechanic-back:not([hidden])').waitFor();
+    await page.locator('#mechanic-back').click();
+    await page.waitForURL('**/mechanic/index.html');
+    await page.locator('a[href*="test-issue"]').waitFor();
     assert.deepEqual(errors,[],`Browser errors: ${errors.join('\n')}`);
     console.log('Manager login, core pages, mechanic login and assets passed');
   } finally { await browser?.close();server.close(); }

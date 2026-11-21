@@ -36,14 +36,20 @@
     pending.delete(result.id);
     result.ok ? request.resolve(result.data) : request.reject(new Error(result.error || 'הפעולה נכשלה'));
   });
-  function loading(){ app.innerHTML='<section class="card"><div class="skeleton"></div><div class="skeleton short"></div><div class="skeleton"></div></section>'; }
+  function loading(){ shell('home'); app.innerHTML=`<section class="card" role="status" aria-live="polite"><p>מתחבר וטוען את דף הבית…</p><div class="skeleton"></div><div class="skeleton short"></div></section><div class="manager-home-grid"><section class="card"><div class="skeleton"></div><div class="skeleton short"></div></section><section class="card"><div class="skeleton"></div><div class="skeleton short"></div></section></div>`; }
   function message(error){ const box=app.querySelector('#message'); if(box){ box.textContent=error?.message || String(error); box.hidden=false; } }
   function heading(kicker,title){ return `<div class="section-heading"><div><p class="section-kicker">${kicker}</p><h2>${title}</h2></div><span class="step-badge">01</span></div>`; }
   function shell(target){ page=target; nav.hidden=role!=='manager'||!account; logout.hidden=!account; back.hidden=target==='login'||target==='home'||['new','open','closed','users'].includes(target)&&role==='manager';
     nav.querySelectorAll('button').forEach(button=>button.setAttribute('aria-current',button.dataset.page===target?'page':'false'));
   }
   function login(){ account=null; shell('login'); app.innerHTML=`<section class="card auth-card">${heading('גישה למערכת',role==='manager'?'כניסה למנהל':'כניסה לטכנאי')}<p>התחבר באמצעות מספר אישי בן 7 ספרות.</p><form id="login-form"><label class="field-label" for="number">מספר אישי</label><input id="number" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required autocomplete="off" autofocus><label class="field-label" for="password">סיסמה</label><input id="password" type="password" maxlength="6" minlength="6" required autocomplete="current-password"><div class="toolbar"><button class="primary-button">התחבר</button></div><p class="status" id="message" hidden></p></form></section>`;
-    app.querySelector('form').onsubmit=async e=>{e.preventDefault(); try{account=await call('login',{number:app.querySelector('#number').value,password:app.querySelector('#password').value}); location.href = role === 'manager' ? './Metis/index.html' : './mechanic/index.html';}catch(err){message(err);} };
+    app.querySelector('form').onsubmit=async e=>{
+      e.preventDefault();
+      const number=app.querySelector('#number').value, password=app.querySelector('#password').value;
+      loading();
+      try { account=await call('login',{number,password}); location.href = role === 'manager' ? '/Metis/index.html' : '/mechanic/index.html'; }
+      catch(err){ login(); app.querySelector('#number').value=number; message(new Error(err.message.includes('שגויים')?'מספר אישי או סיסמה שגויים.':err.message)); }
+    };
   }
   async function home(){ shell('home');
     if(role==='mechanic'){await list('open');return;}

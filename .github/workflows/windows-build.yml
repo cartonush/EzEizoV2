@@ -108,5 +108,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
-          $tag = 'v2.0.3-preview.1'
-          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.3 Preview 1' --notes 'Keep published forms and unfinished drafts in local Access, block external resource requests, remove Firestore text. Bundle a fresh seeded template; preserve your existing ACCDB on upgrades. See README.txt.' --prerelease
+          $tag = 'v2.0.4-preview.1'
+          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.4 Preview 1' --notes 'One shared form for assigned technicians, manager edits unlocked open forms, soft delete and recovery, improved loading and navigation, and PDF downloads to Desktop. Preserve your existing ACCDB on upgrades. See README.txt.' --prerelease

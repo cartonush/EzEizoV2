@@ -1,6 +1,6 @@
 import { draftState } from "../access-state.js";
 import "../sheet-data.js?v=1.6.3";
-import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, changeTechnicianPassword, assignIssue, appendIssueManagerNote } from "../access-sync.js?v=1.6.3";
+import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, changeTechnicianPassword, assignIssue, editOpenForm, appendIssueManagerNote } from "../access-sync.js?v=1.6.3";
 import { SQUADRONS, SYSTEMS, WORKSHOPS, EW_SYSTEMS, validateCatalogSelection } from "./catalog.js?v=1.6.3";
 import { resolveAssignees } from "./assignee-selection.js?v=1.6.3";
 import { attachSignaturePad } from "../signature-canvas.js?v=1.6.3";
@@ -260,11 +260,64 @@ document.querySelector("#create-link").addEventListener("click", async () => {
     acknowledgment.checked = false;
     draft.dispatcherSignature = "";
     clearDispatcherSignature();
-    setStatus("#created-status", `תקלה מספר ${sheet.serial} הוקצתה ל־${assignees.map((person) => person.name).join(" ו־")}. לכל טכנאי דף מילוי משלו.`);
+    setStatus("#created-status", `תקלה מספר ${sheet.serial} נפתחה כטופס אחד לצוות: ${assignees.map((person) => person.name).join(" ו־")}.`);
     window.location.hash = "open";
   } catch (error) { setStatus("#created-status", `פתיחת התקלה נכשלה: ${error.message}`, true); }
   finally { button.disabled = false; }
 });
+
+function makeIssueEditor(issue) {
+  const details = document.createElement("details"); details.className = "manager-note-editor";
+  const summary = document.createElement("summary"); summary.textContent = "ערוך פרטי תקלה וצוות";
+  const form = document.createElement("form"); form.className = "form-grid";
+  const sheet = issue.sheet;
+  const field = (label, key, options) => {
+    const wrapper = document.createElement("label"); wrapper.className = "input-field"; wrapper.textContent = label;
+    const input = options ? document.createElement("select") : document.createElement(key === "fault" || key === "managerNotes" ? "textarea" : "input");
+    input.name = key; if (options) for (const value of options) input.append(new Option(value, value));
+    input.value = sheet[key] || ""; wrapper.append(input); form.append(wrapper); return input;
+  };
+  const squadron = field("טייסת", "squadron", Object.keys(SQUADRONS));
+  const shelter = field("דת״ק", "shelter", SQUADRONS[sheet.squadron]?.shelters || [sheet.shelter]);
+  const aircraft = field("מספר מטוס", "aircraft", SQUADRONS[sheet.squadron]?.aircraft || [sheet.aircraft]);
+  const workshop = field("מוסך", "workshop", ["", ...WORKSHOPS]);
+  field("שם מערכת", "systemName", SYSTEMS.map((item) => item.name));
+  field("חליפת ל״א", "ewSystem", EW_SYSTEMS);
+  field("תיאור תקלה", "fault").required = true;
+  field("הערות מנהל", "managerNotes");
+  const refresh = () => {
+    shelter.replaceChildren(...SQUADRONS[squadron.value].shelters.map((value) => new Option(value, value)));
+    aircraft.replaceChildren(...SQUADRONS[squadron.value].aircraft.map((value) => new Option(value, value)));
+    workshop.value = "";
+  };
+  squadron.addEventListener("change", refresh);
+  const team = document.createElement("fieldset"); team.className = "assignee-fieldset";
+  const legend = document.createElement("legend"); legend.textContent = "טכנאים משויכים · לפחות אחד"; team.append(legend);
+  technicians.filter((person) => person.active).forEach((person) => {
+    const label = document.createElement("label"); label.className = "assignee";
+    const input = document.createElement("input"); input.type = "checkbox"; input.value = person.uid;
+    input.checked = (issue.assigneeUids || [issue.assigneeUid]).includes(person.uid);
+    label.append(input, document.createTextNode(person.name)); team.append(label);
+  });
+  form.append(team);
+  const save = document.createElement("button"); save.type = "submit"; save.className = "primary-button"; save.textContent = "שמור שינויים";
+  const feedback = document.createElement("p"); feedback.className = "copy-status"; feedback.setAttribute("role", "status");
+  form.append(save, feedback);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const teamUids = [...team.querySelectorAll("input:checked")].map((input) => input.value);
+    if (!teamUids.length) { feedback.textContent = "בחר לפחות טכנאי אחד."; feedback.dataset.state = "error"; return; }
+    const changes = Object.fromEntries([...new FormData(form).entries()].filter(([key]) => key !== ""));
+    changes.workshop = changes.shelter === "מוסך" ? changes.workshop : "";
+    changes.systemCode = SYSTEMS.find((item) => item.name === changes.systemName)?.code || "";
+    if (!changes.systemCode || !changes.fault.trim()) { feedback.textContent = "בחר מערכת ומלא תיאור תקלה."; feedback.dataset.state = "error"; return; }
+    save.disabled = true; feedback.textContent = "שומר במסד המקומי…";
+    try { await editOpenForm("issues", issue.id, changes, teamUids); feedback.textContent = "הטופס עודכן לצוות."; delete feedback.dataset.state; }
+    catch (error) { feedback.textContent = `העריכה נכשלה: ${error.message}`; feedback.dataset.state = "error"; }
+    finally { save.disabled = false; }
+  });
+  details.append(summary, form); return details;
+}
 
 function addIssueCard(container, item, mode) {
   const card = document.createElement("div");
@@ -273,7 +326,7 @@ function addIssueCard(container, item, mode) {
   title.textContent = `תקלה ${item.serial || "ללא מספר"} · מטוס ${item.aircraft || "—"} · ${item.location || "—"}`;
   const subtitle = document.createElement("span");
   const fullIssue = cloudIssues.find((issue) => issue.id === item.id);
-  subtitle.textContent = `${item.fault || "ללא תיאור"} · ${mode === "closed" ? "סגורה" : mode === "pendingReview" ? "ממתינה לבודק הדף" : "פתוחה"} · ${fullIssue?.assigneeName || "לא שובצה"}`;
+  subtitle.textContent = `${item.fault || "ללא תיאור"} · ${mode === "closed" ? "סגורה" : mode === "pendingReview" ? "ממתינה לבודק הדף" : "פתוחה"} · ${(fullIssue?.assigneeNames || [fullIssue?.assigneeName || "לא שובצה"]).join(" · ")}`;
   card.append(title, subtitle);
   if (mode !== "open") {
     const view = document.createElement("a");
@@ -284,7 +337,7 @@ function addIssueCard(container, item, mode) {
   } else {
     const assignLabel = document.createElement("label");
     assignLabel.className = "input-field";
-    assignLabel.textContent = "טכנאי משויך";
+    assignLabel.textContent = "מוביל התקלה";
     const select = document.createElement("select");
     select.setAttribute("aria-label", `שיוך תקלה ${item.serial}`);
     select.append(new Option("לא משויכת", ""));
@@ -318,7 +371,7 @@ function addIssueCard(container, item, mode) {
       catch (error) { feedback.textContent = `הוספת ההערה נכשלה: ${error.message}`; feedback.dataset.state = "error"; }
       finally { send.disabled = false; }
     });
-    editor.append(summary, existing, note, send, feedback); card.append(editor);
+    editor.append(summary, existing, note, send, feedback); card.append(editor, makeIssueEditor(fullIssue));
   }
   container.append(card);
 }
@@ -334,7 +387,7 @@ function renderIssueLists() {
   delete closed.dataset.state;
   const filter = document.querySelector("#closed-filter").value;
   const matches = (selector, serial) => String(serial || "").includes(document.querySelector(selector).value.trim());
-  const allClosed = cloudIssues.filter((item) => item.status === "closed" && item.closed?.record && (!filter || item.assigneeUid === filter) && matches("#closed-issue-search", item.closed.record.serial)).map((item) => item.closed.record);
+  const allClosed = cloudIssues.filter((item) => item.status === "closed" && item.closed?.record && (!filter || (item.assigneeUids || [item.assigneeUid]).includes(filter)) && matches("#closed-issue-search", item.closed.record.serial)).map((item) => item.closed.record);
   const awaiting = cloudIssues.filter((item) => item.status === "pendingReview" && item.closed?.record && matches("#pending-issue-search", item.closed.record.serial)).map((item) => item.closed.record);
   const active = cloudIssues.filter((item) => item.status === "open" && matches("#open-issue-search", item.sheet?.serial)).map((item) => item.sheet);
   active.forEach((item) => addIssueCard(opened, item, "open"));
@@ -348,8 +401,8 @@ function renderIssueLists() {
 let keyPagesStarted = false;
 function showManagerView() {
   const requested = window.location.hash.slice(1);
-  const selected = requested === "keys" || requested.startsWith("keys/") ? "keys" : ["home", "management", "reports", "aircraft-constants", "new", "open", "pending", "closed", "users"].includes(requested) ? requested : "home";
-  document.querySelector("#manager-back").hidden = !["users", "reports", "aircraft-constants"].includes(selected);
+  const selected = requested === "keys" || requested.startsWith("keys/") ? "keys" : ["home", "management", "reports", "aircraft-constants", "new", "open", "pending", "closed", "users", "deleted-users"].includes(requested) ? requested : "home";
+  document.querySelector("#manager-back").hidden = !["users", "deleted-users", "reports", "aircraft-constants"].includes(selected);
   document.querySelector("#reset-draft").hidden = requested !== "new" && requested !== "keys/create";
   if (selected !== "keys") document.querySelector("#key-back-link").hidden = true;
   document.querySelector("#fault-nav").hidden = !["new", "open", "pending", "closed"].includes(selected);
@@ -357,7 +410,7 @@ function showManagerView() {
   document.querySelector("#pending-section").hidden = selected !== "pending";
   document.querySelector("#closed-section").hidden = selected === "pending";
   document.querySelectorAll("[data-view-link]").forEach((link) => {
-    const nav = ["new", "open", "pending", "closed"].includes(selected) ? "faults" : ["users", "reports", "aircraft-constants"].includes(selected) ? "management" : selected;
+    const nav = ["new", "open", "pending", "closed"].includes(selected) ? "faults" : ["users", "deleted-users", "reports", "aircraft-constants"].includes(selected) ? "management" : selected;
     if (link.dataset.viewLink === nav) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
@@ -366,7 +419,7 @@ function showManagerView() {
   if (selected === "keys" && !keyPagesStarted) { keyPagesStarted = true; initKeyPages({ user: managerUser, embedded: true }); }
   if (selected !== "new") renderIssueLists();
 }
-document.querySelector("#manager-back").addEventListener("click", () => { if (location.hash === "#aircraft-constants" && closeConstantsEditor()) return; location.hash = "management"; });
+document.querySelector("#manager-back").addEventListener("click", () => { if (location.hash === "#aircraft-constants" && closeConstantsEditor()) return; location.hash = location.hash === "#deleted-users" ? "users" : "management"; });
 window.addEventListener("hashchange", showManagerView);
 function resetFaultDraft() {
   draft = EzEizoData.normalizeSheet(EzEizoData.defaultSheet);
@@ -459,10 +512,11 @@ function renderUsers() {
   if (!technicians.some((person) => !person.active && !person.deleted)) removedList.textContent = "אין משתמשים שהוסרו.";
   technicians.forEach((person) => {
     if (person.deleted) return;
+    const statusSelector = person.active ? "#user-status" : "#removed-user-status";
     const card = document.createElement("div"); card.className = "issue-item";
     const title = document.createElement("strong"); title.textContent = `${person.name} · ${person.active ? "פעיל" : "הוסר"}`;
     const email = document.createElement("span"); email.textContent = person.email || person.uid;
-    const assigned = cloudIssues.filter((issue) => issue.assigneeUid === person.uid);
+    const assigned = cloudIssues.filter((issue) => (issue.assigneeUids || [issue.assigneeUid]).includes(person.uid));
     const closed = assigned.filter((issue) => issue.status === "closed");
     const history = document.createElement("p");
     history.textContent = `תקלות פתוחות: ${assigned.filter((issue) => issue.status === "open").length} · לסגירה: ${assigned.filter((issue) => issue.status === "pendingReview").length} · סגורות: ${closed.length} · מספרים סידוריים: ${closed.map((issue) => issue.sheet.serial).join(", ") || "אין"}`;
@@ -472,15 +526,18 @@ function renderUsers() {
     action.textContent = person.active ? "מחק משתמש" : "שחזר משתמש";
     action.addEventListener("click", async () => {
       if (person.active && assigned.some((issue) => issue.status === "open")) {
-        setStatus("#user-status", `יש לשייך מחדש את התקלות הפתוחות של ${person.name} בדף ״תקלות פתוחות״ לפני הסרת המשתמש.`, true);
+        setStatus(statusSelector, `יש לשייך מחדש את התקלות הפתוחות של ${person.name} בדף ״תקלות פתוחות״ לפני הסרת המשתמש.`, true);
         return;
       }
       action.disabled = true;
       try {
-        await setTechnicianActive(person.uid, !person.active);
-        setStatus("#user-status", person.active ? `${person.name} הוסר מהמערכת והגישה שלו נחסמה. היסטוריית התקלות נשמרה.` : `${person.name} שוחזר.`);
+        const wasActive = person.active;
+        await setTechnicianActive(person.uid, !wasActive);
+        setStatus(statusSelector, wasActive ? `${person.name} הוסר מהמערכת והגישה שלו נחסמה. היסטוריית התקלות נשמרה.` : `${person.name} שוחזר.`);
+        person.active = !wasActive;
+        renderUsers();
       }
-      catch (error) { setStatus("#user-status", `שינוי המשתמש נכשל: ${error.message}`, true); }
+      catch (error) { setStatus(statusSelector, `שינוי המשתמש נכשל: ${error.message}`, true); }
       finally { action.disabled = false; }
     });
     const passwordRow = document.createElement("div"); passwordRow.className = "toolbar";
@@ -489,10 +546,10 @@ function renderUsers() {
     newPassword.setAttribute("aria-label", "סיסמה חדשה עבור " + person.name);
     const savePassword = document.createElement("button"); savePassword.type = "button"; savePassword.className = "secondary-button"; savePassword.textContent = "עדכן סיסמה";
     savePassword.addEventListener("click", async () => {
-      if (!/^[0-9]{6}$/.test(newPassword.value)) { setStatus("#user-status", "סיסמת טכנאי חייבת להכיל שש ספרות.", true); return; }
+      if (!/^[0-9]{6}$/.test(newPassword.value)) { setStatus(statusSelector, "סיסמת טכנאי חייבת להכיל שש ספרות.", true); return; }
       savePassword.disabled = true;
-      try { await changeTechnicianPassword(person.uid, newPassword.value); newPassword.value = ""; setStatus("#user-status", "הסיסמה עודכנה עבור " + person.name); }
-      catch (error) { setStatus("#user-status", "עדכון סיסמה נכשל: " + error.message, true); }
+      try { await changeTechnicianPassword(person.uid, newPassword.value); newPassword.value = ""; setStatus(statusSelector, "הסיסמה עודכנה עבור " + person.name); }
+      catch (error) { setStatus(statusSelector, "עדכון סיסמה נכשל: " + error.message, true); }
       finally { savePassword.disabled = false; }
     });
     passwordRow.append(newPassword, savePassword);
@@ -503,9 +560,9 @@ function renderUsers() {
       destroy.addEventListener("click", async () => {
         if (!window.confirm(`למחוק סופית את חשבון ההתחברות של ${person.name} (${person.email || person.uid})? לא ניתן לשחזר אותו; תקלות סגורות יישמרו.`)) return;
         destroy.disabled = true;
-        setStatus("#user-status", `מוחק את חשבון ההתחברות של ${person.name}…`);
-        try { await deleteTechnicianPermanently(person.uid); setStatus("#user-status", `${person.name} נמחק סופית ממסד המשתמשים. היסטוריית התקלות נשמרה.`); }
-        catch (error) { setStatus("#user-status", `המחיקה הסופית נכשלה: ${error.message}`, true); }
+        setStatus(statusSelector, `מוחק את חשבון ההתחברות של ${person.name}…`);
+        try { await deleteTechnicianPermanently(person.uid); technicians = technicians.filter((item) => item.uid !== person.uid); renderUsers(); setStatus(statusSelector, `${person.name} נמחק סופית ממסד המשתמשים. היסטוריית התקלות נשמרה.`); }
+        catch (error) { setStatus(statusSelector, `המחיקה הסופית נכשלה: ${error.message}`, true); }
         finally { destroy.disabled = false; }
       });
       card.append(destroy);

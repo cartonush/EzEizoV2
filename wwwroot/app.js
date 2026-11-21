@@ -19,7 +19,7 @@ if (selectedId) {
   catch (error) { const list = document.querySelector("#mechanic-issues"); list.textContent = `טעינת התקלה נכשלה: ${error.message}`; list.dataset.state = "error"; }
 }
 const sheet = EzEizoData.normalizeSheet(remoteIssue?.sheet || EzEizoData.defaultSheet);
-const selectedSheet = Boolean(remoteIssue && (managerClosedView ? ["closed", "pendingReview"].includes(remoteIssue.status) : remoteIssue.assigneeUid === currentUser.uid));
+const selectedSheet = Boolean(remoteIssue && (managerClosedView ? ["closed", "pendingReview"].includes(remoteIssue.status) : (remoteIssue.assigneeUids || [remoteIssue.assigneeUid]).includes(currentUser.uid)));
 document.querySelector("#sheet-form").hidden = !selectedSheet || (!managerClosedView && remoteIssue?.status === "open");
 document.querySelector("#mechanic-back").hidden = !selectedSheet && !managerClosedView;
 document.querySelector(".queue-card").hidden = selectedSheet;
@@ -40,7 +40,7 @@ if (selectedSheet && !managerClosedView && remoteIssue.status === "open") {
   retry.addEventListener("click", () => editLock?.acquire());
   notice.append(message, retry);
   document.querySelector("#sheet-form").before(notice);
-  editLock = createEditLock({ kind: "issue", serialOrId: sheet.serial, formId: sheet.id, user: { uid: currentUser.uid, name: remoteIssue.assigneeName }, onChange: ({ held, message: info }) => {
+  editLock = createEditLock({ kind: "issue", serialOrId: sheet.serial, formId: sheet.id, user: { uid: currentUser.uid, name: currentUser.name }, onChange: ({ held, message: info }) => {
     notice.hidden = held;
     message.textContent = info;
     document.querySelector("#sheet-form").hidden = !held;
@@ -342,13 +342,13 @@ function showClosed() {
 
 if (managerClosedView && selectedSheet) {
   document.querySelector(".brand-copy h1").textContent = remoteIssue.status === "pendingReview" ? "Metis · תקלה לסגירה" : "Metis · דף תקלה סגורה";
-  document.querySelector("#mechanic-back").href = remoteIssue.status === "pendingReview" ? "./index.html#pending" : "./index.html#closed";
+  document.querySelector("#mechanic-back").href = remoteIssue.status === "pendingReview" ? "/Metis/index.html#pending" : "/Metis/index.html#closed";
   const panel = document.querySelector("#manager-edit-panel");
   panel.hidden = false;
   document.querySelector("#manager-edit-open").addEventListener("click", async (event) => {
     if (!window.confirm("להחזיר את התקלה לטכנאי לעריכה? כל הפרטים שמולאו יישמרו והוא יוכל לסגור שוב.")) return;
     const button = event.currentTarget; button.disabled = true;
-    try { await reopenIssue(sheet.id, currentUser.uid); location.replace("./index.html#open"); }
+    try { await reopenIssue(sheet.id, currentUser.uid); location.replace("/Metis/index.html#open"); }
     catch (error) { document.querySelector("#manager-edit-status").textContent = `ההחזרה נכשלה: ${error.message}`; button.disabled = false; }
   });
   const reviewPanel = document.querySelector("#review-panel");
@@ -368,7 +368,7 @@ if (managerClosedView && selectedSheet) {
     document.querySelector("#approve-sheet").addEventListener("click", async (event) => {
       if (!signature) { document.querySelector("#review-status").textContent = "יש לחתום כבודק הדף לפני הסגירה."; return; }
       const button = event.currentTarget; button.disabled = true;
-      try { await approveIssue(sheet.id, currentUser.uid, signature); location.replace("./index.html#closed"); }
+      try { await approveIssue(sheet.id, currentUser.uid, signature); location.replace("/Metis/index.html#closed"); }
       catch (error) { document.querySelector("#review-status").textContent = `הסגירה נכשלה: ${error.message}`; button.disabled = false; }
     });
   }

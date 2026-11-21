@@ -46,6 +46,54 @@ public sealed class OfflineStore
             using var index = Cmd(c, null, "CREATE UNIQUE INDEX [UX_OfflineDraft] ON [OfflineDrafts] ([UserID],[DraftKey])");
             index.ExecuteNonQuery();
         }
+        ConsolidateLegacyIssues(c);
+    }
+    private static void ConsolidateLegacyIssues(OleDbConnection c)
+    {
+        using var duplicates = Cmd(c, null, "SELECT [SerialValue] FROM [OfflineDocuments] WHERE [CollectionName]='issues' GROUP BY [SerialValue] HAVING COUNT(*)>1");
+        var serials = new List<string>();
+        using (var reader = duplicates.ExecuteReader())
+            while (reader is not null && reader.Read()) serials.Add(reader.GetString(0));
+        foreach (var serial in serials)
+        {
+            using var tx = c.BeginTransaction();
+            try
+            {
+                var entries = new List<(string id, JsonNode data)>();
+                using (var cmd = Cmd(c, tx, "SELECT [DocID],[Payload] FROM [OfflineDocuments] WHERE [CollectionName]='issues' AND [SerialValue]=? ORDER BY [UpdatedAt]", serial))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader is not null && reader.Read()) entries.Add((reader.GetString(0), JsonNode.Parse(reader.GetString(1))!));
+                if (entries.Count < 2 || entries.Any(x => Value(x.data, "status") != "open" || x.data["assigneeUids"] is not null)) { tx.Commit(); continue; }
+                var comparable = entries.Select(x => {
+                    var sheet = x.data["sheet"]!.DeepClone().AsObject();
+                    sheet.Remove("id"); sheet.Remove("technicians");
+                    return sheet.ToJsonString();
+                }).Distinct().Count() == 1;
+                if (!comparable || entries.Select(x => Value(x.data,"assigneeUid")).Distinct().Count() != entries.Count) { tx.Commit(); continue; }
+                var busy = false;
+                foreach (var entry in entries)
+                {
+                    using var lockQuery = Cmd(c, tx, "SELECT [ExpiresAt] FROM [EditLocks] WHERE [FormID]=?", entry.id);
+                    if (lockQuery.ExecuteScalar() is DateTime expiry && expiry > DateTime.Now) { busy = true; break; }
+                    using var draftQuery = Cmd(c, tx, "SELECT COUNT(*) FROM [OfflineDrafts] WHERE [DraftKey]=?", "fault-sheet-v2:" + entry.id);
+                    if (Convert.ToInt32(draftQuery.ExecuteScalar()) > 0) { busy = true; break; }
+                }
+                if (busy) { tx.Commit(); continue; }
+                var ids = entries.Select(x => Value(x.data, "assigneeUid")).ToArray();
+                var names = entries.Select(x => Value(x.data, "assigneeName")).ToArray();
+                var merged = entries[0].data;
+                merged["assigneeUids"] = Names(ids); merged["assigneeNames"] = Names(names);
+                merged["sheet"]!["technicians"] = string.Join(" · ", names);
+                Replace(c, tx, "issues", entries[0].id, merged);
+                foreach (var (id, _) in entries.Skip(1))
+                {
+                    using var archive = Cmd(c, tx, "UPDATE [OfflineDocuments] SET [CollectionName]='legacyIssues' WHERE [DocID]=?", id);
+                    archive.ExecuteNonQuery();
+                }
+                tx.Commit();
+            }
+            catch { tx.Rollback(); throw; }
+        }
     }
     private static void CheckDraftKey(string key)
     {
@@ -59,20 +107,44 @@ public sealed class OfflineStore
         using var reader = cmd.ExecuteReader();
         var result = new Dictionary<string, string>();
         while (reader is not null && reader.Read()) result.Add(reader.GetString(0), reader.GetString(1));
+        reader?.Close();
+        using var shared = Cmd(c, null, "SELECT [DraftKey],[Payload] FROM [OfflineDrafts] WHERE [UserID]='shared' AND [DraftKey] LIKE 'fault-sheet-v2:%'");
+        var sharedEntries = new List<(string key, string value)>();
+        using (var sharedReader = shared.ExecuteReader())
+            while (sharedReader is not null && sharedReader.Read())
+                sharedEntries.Add((sharedReader.GetString(0), sharedReader.GetString(1)));
+        foreach (var (key, value) in sharedEntries)
+        {
+            var issue = Find(c, null, "issues", key["fault-sheet-v2:".Length..]);
+            if (issue is not null && (actor.Role == "manager" || IssueMember(issue, actor.Id)))
+                result[key] = value;
+        }
         return result;
+    }
+    private static string DraftOwner(OleDbConnection c, string key, Account actor)
+    {
+        if (!key.StartsWith("fault-sheet-v2:")) return actor.Id;
+        var id = key["fault-sheet-v2:".Length..];
+        var issue = Find(c, null, "issues", id) ?? throw new InvalidOperationException("הטופס אינו קיים.");
+        if (!IssueMember(issue, actor.Id)) throw new UnauthorizedAccessException("אינך משויך לטופס.");
+        using var lockQuery = Cmd(c, null, "SELECT [OwnerUserID],[ExpiresAt] FROM [EditLocks] WHERE [FormID]=?", id);
+        using var lockReader = lockQuery.ExecuteReader();
+        if (lockReader is not null && lockReader.Read() && lockReader.GetDateTime(1) > DateTime.Now && lockReader.GetString(0) != actor.Id)
+            throw new InvalidOperationException("הטופס נמצא בעריכת טכנאי אחר.");
+        return "shared";
     }
     public void SaveDraft(string key, string value, Account actor)
     {
         CheckDraftKey(key);
         if (value.Length > 5_000_000) throw new ArgumentException("הטיוטה גדולה מדי.");
-        using var c = Open(); using var tx = c.BeginTransaction();
+        using var c = Open(); var owner = DraftOwner(c,key,actor); using var tx = c.BeginTransaction();
         try
         {
-            using var lookup = Cmd(c, tx, "SELECT [DraftID] FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", actor.Id, key);
+            using var lookup = Cmd(c, tx, "SELECT [DraftID] FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", owner, key);
             var id = lookup.ExecuteScalar() as string;
             if (id is null)
             {
-                using var insert = Cmd(c, tx, "INSERT INTO [OfflineDrafts] ([DraftID],[UserID],[DraftKey],[Payload],[UpdatedAt]) VALUES (?,?,?,?,?)", Guid.NewGuid().ToString(), actor.Id, key, value, DateTime.Now);
+                using var insert = Cmd(c, tx, "INSERT INTO [OfflineDrafts] ([DraftID],[UserID],[DraftKey],[Payload],[UpdatedAt]) VALUES (?,?,?,?,?)", Guid.NewGuid().ToString(), owner, key, value, DateTime.Now);
                 insert.ExecuteNonQuery();
             }
             else
@@ -88,10 +160,13 @@ public sealed class OfflineStore
     {
         CheckDraftKey(key);
         using var c = Open();
-        using var cmd = Cmd(c, null, "DELETE FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", actor.Id, key);
+        var owner = DraftOwner(c,key,actor);
+        using var cmd = Cmd(c, null, "DELETE FROM [OfflineDrafts] WHERE [UserID]=? AND [DraftKey]=?", owner, key);
         cmd.ExecuteNonQuery();
     }
     private static string Value(JsonNode? node, string key) => node?[key]?.ToString() ?? "";
+    private static bool IssueMember(JsonNode data, string userId) =>
+        (data["assigneeUids"] as JsonArray)?.Any(x => x?.ToString() == userId) ?? (Value(data, "assigneeUid") == userId);
     private static string Now() => DateTimeOffset.Now.ToString("o");
     private static JsonNode Parse(JsonElement value) => JsonNode.Parse(value.GetRawText()) ?? new JsonObject();
     private static void Put(OleDbConnection c, OleDbTransaction tx, string collection, string id, string serial, string owner, JsonNode data)
@@ -141,7 +216,7 @@ public sealed class OfflineStore
         while (r is not null && r.Read())
         {
             var data = JsonNode.Parse(r.GetString(0)); if (data is null) continue;
-            if (actor.Role != "manager" && (collection == "issues" ? Value(data, "assigneeUid") != actor.Id :
+            if (actor.Role != "manager" && (collection == "issues" ? !IssueMember(data, actor.Id) :
                 !(data["teamUids"] as JsonArray ?? new JsonArray()).Any(x => x?.ToString() == actor.Id))) continue;
             result.Add(data);
         }
@@ -152,7 +227,7 @@ public sealed class OfflineStore
         using var c = Open();
         var data = Find(c, null, collection, id);
         if (data is null) return null;
-        if (actor.Role != "manager" && (collection == "issues" ? Value(data, "assigneeUid") != actor.Id :
+        if (actor.Role != "manager" && (collection == "issues" ? !IssueMember(data, actor.Id) :
             !(data["teamUids"] as JsonArray ?? new JsonArray()).Any(x => x?.ToString() == actor.Id))) throw new UnauthorizedAccessException("אין גישה לטופס.");
         return data;
     }
@@ -172,14 +247,15 @@ public sealed class OfflineStore
             {
                 var next = Next(c, tx, "issues");
                 var serial = next.ToString("D10");
-                foreach (var person in assignees)
-                {
-                    var id = Guid.NewGuid().ToString();
-                    var copy = sheet.DeepClone(); copy["id"] = id; copy["serial"] = serial;
-                    copy["technicians"] = string.Join(" · ", assignees.Select(x => Value(x,"name")));
-                    var data = new JsonObject { ["id"] = id, ["sheet"] = copy, ["status"] = "open", ["assigneeUid"] = Value(person,"uid"), ["assigneeName"] = Value(person,"name"), ["createdAt"] = Now() };
-                    Put(c, tx, "issues", id, serial, Value(person,"uid"), data);
-                }
+                var id = Guid.NewGuid().ToString();
+                var copy = sheet.DeepClone(); copy["id"] = id; copy["serial"] = serial;
+                copy["technicians"] = string.Join(" · ", assignees.Select(x => Value(x,"name")));
+                var data = new JsonObject { ["id"] = id, ["sheet"] = copy, ["status"] = "open",
+                    ["assigneeUid"] = Value(assignees[0],"uid"), ["assigneeName"] = Value(assignees[0],"name"),
+                    ["assigneeUids"] = new JsonArray(assignees.Select(x => (JsonNode?)JsonValue.Create(Value(x,"uid"))).ToArray()),
+                    ["assigneeNames"] = new JsonArray(assignees.Select(x => (JsonNode?)JsonValue.Create(Value(x,"name"))).ToArray()),
+                    ["createdAt"] = Now() };
+                Put(c, tx, "issues", id, serial, Value(assignees[0],"uid"), data);
                 tx.Commit(); return serial;
             }
             catch { tx.Rollback(); throw; }
@@ -213,6 +289,14 @@ public sealed class OfflineStore
         if(r is null||!r.Read()||r.GetString(0)!=actor.Id||r.GetString(1)!=session||r.GetDateTime(2)<=DateTime.Now)
             throw new InvalidOperationException("נעילת העריכה אבדה. פתח את הטופס מחדש.");
     }
+    private static void RequireNoActiveLock(OleDbConnection c, OleDbTransaction tx, string id)
+    {
+        using var cmd = Cmd(c, tx, "SELECT [ExpiresAt] FROM [EditLocks] WHERE [FormID]=?", id);
+        var value = cmd.ExecuteScalar();
+        if (value is DateTime expiry && expiry > DateTime.Now)
+            throw new InvalidOperationException("הטופס נמצא כרגע בעריכת טכנאי. נסה שוב לאחר שיצא ממנו.");
+    }
+    private static JsonArray Names(IEnumerable<string> values) => new(values.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray());
     public JsonNode Update(string collection, string id, string operation, JsonElement payload, Account actor)
     {
         using var c = Open(); using var tx = c.BeginTransaction();
@@ -220,7 +304,7 @@ public sealed class OfflineStore
         {
             var data = Find(c,tx,collection,id) ?? throw new InvalidOperationException("הטופס אינו קיים.");
             bool manager = actor.Role == "manager";
-            bool member = collection == "issues" ? Value(data,"assigneeUid") == actor.Id :
+            bool member = collection == "issues" ? IssueMember(data, actor.Id) :
                 (data["teamUids"] as JsonArray ?? new JsonArray()).Any(x=>x?.ToString()==actor.Id);
             if (!manager && !member) throw new UnauthorizedAccessException("אינך משויך לטופס.");
             switch (operation)
@@ -260,7 +344,63 @@ public sealed class OfflineStore
                     break;
                 case "assign":
                     if (!manager || collection != "issues" || Value(data,"status") != "open") throw new InvalidOperationException("התקלה אינה פתוחה.");
-                    data["assigneeUid"] = payload.GetProperty("uid").GetString();data["assigneeName"] = payload.GetProperty("name").GetString();
+                    RequireNoActiveLock(c,tx,id);
+                    var assignedUid = payload.GetProperty("uid").GetString()!;
+                    var assignedAccount = new Database().Technicians().FirstOrDefault(x => x.Id == assignedUid)
+                        ?? throw new ArgumentException("בחר טכנאי פעיל.");
+                    var team = (data["assigneeUids"] as JsonArray)?.Select(x => x?.ToString() ?? "").ToList() ?? [Value(data,"assigneeUid")];
+                    if (team.Skip(1).Contains(assignedUid)) throw new ArgumentException("הטכנאי כבר משויך לתקלה.");
+                    team[0] = assignedUid;
+                    var names = new Database().Technicians().ToDictionary(x => x.Id, x => x.Name);
+                    data["assigneeUid"] = assignedUid; data["assigneeName"] = assignedAccount.Name;
+                    data["assigneeUids"] = Names(team); data["assigneeNames"] = Names(team.Select(uid => names.GetValueOrDefault(uid, "טכנאי שהוסר")));
+                    data["sheet"]!["technicians"] = string.Join(" · ", team.Select(uid => names.GetValueOrDefault(uid, "טכנאי שהוסר")));
+                    break;
+                case "editDefinition":
+                    if (!manager || Value(data,"status") != "open") throw new InvalidOperationException("ניתן לערוך פרטי טופס פתוח בלבד.");
+                    RequireNoActiveLock(c,tx,id);
+                    var changes = Parse(payload.GetProperty("changes"));
+                    var allowed = collection == "issues"
+                        ? new HashSet<string> { "squadron", "shelter", "workshop", "aircraft", "systemCode", "systemName", "ewSystem", "fault", "managerNotes" }
+                        : collection == "keyLoads"
+                            ? new HashSet<string> { "date", "time", "squadron", "shelter", "rows", "aircraftIds", "period" }
+                            : throw new ArgumentException("סוג טופס לא תקין.");
+                    if (changes is not JsonObject changeObject || changeObject.Any(entry => !allowed.Contains(entry.Key)))
+                        throw new ArgumentException("פרטי עריכה לא תקינים.");
+                    if (collection == "issues")
+                    {
+                        var originalSheet = data["sheet"] ?? throw new InvalidOperationException("פרטי התקלה חסרים.");
+                        foreach (var item in changeObject) originalSheet[item.Key] = item.Value?.DeepClone();
+                        if (string.IsNullOrWhiteSpace(Value(originalSheet,"fault")) || string.IsNullOrWhiteSpace(Value(originalSheet,"squadron")) || string.IsNullOrWhiteSpace(Value(originalSheet,"aircraft")))
+                            throw new ArgumentException("יש למלא תיאור תקלה, טייסת ומספר מטוס.");
+                        originalSheet["location"] = string.Join("/", new[] { Value(originalSheet,"shelter") == "מוסך" ? Value(originalSheet,"workshop") : Value(originalSheet,"shelter"), Value(originalSheet,"squadron") }.Where(x => x.Length > 0));
+                    }
+                    else
+                    {
+                        if (data["workDraft"] is not null && (changes["rows"]?.ToJsonString() != data["rows"]?.ToJsonString() || changes["aircraftIds"]?.ToJsonString() != data["aircraftIds"]?.ToJsonString()))
+                            throw new InvalidOperationException("כבר קיימת טיוטת טכנאי. אין לשנות את רשימת המטוסים; ניתן לשנות פרטים אחרים.");
+                        foreach (var item in changeObject) data[item.Key] = item.Value?.DeepClone();
+                        if (string.IsNullOrWhiteSpace(Value(data,"date")) || string.IsNullOrWhiteSpace(Value(data,"squadron")) || data["rows"] is not JsonArray rows || rows.Count == 0)
+                            throw new ArgumentException("יש למלא תאריך, טייסת ולפחות מטוס אחד.");
+                    }
+                    if (payload.TryGetProperty("teamUids", out var members))
+                    {
+                        var requested = members.EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+                        var minimum = collection == "issues" ? 1 : 2;
+                        var activeNames = new Database().Technicians().ToDictionary(x => x.Id, x => x.Name);
+                        if (requested.Length < minimum || requested.Distinct().Count() != requested.Length || requested.Any(uid => !activeNames.ContainsKey(uid)))
+                            throw new ArgumentException("בחר טכנאים פעילים ושונים.");
+                        if (collection == "issues")
+                        {
+                            data["assigneeUid"] = requested[0]; data["assigneeName"] = activeNames[requested[0]];
+                            data["assigneeUids"] = Names(requested); data["assigneeNames"] = Names(requested.Select(uid => activeNames[uid]));
+                            data["sheet"]!["technicians"] = string.Join(" · ", requested.Select(uid => activeNames[uid]));
+                        }
+                        else { data["teamUids"] = Names(requested); data["teamNames"] = Names(requested.Select(uid => activeNames[uid])); }
+                    }
+                    var edits = data["managerEdits"] as JsonArray ?? new JsonArray();
+                    edits.Add(new JsonObject { ["at"] = Now(), ["by"] = actor.Id });
+                    data["managerEdits"] = edits.DeepClone();
                     break;
                 case "serial":
                     if (!manager || collection != "keyLoads") throw new UnauthorizedAccessException();
@@ -279,7 +419,7 @@ public sealed class OfflineStore
         {
             var data=Find(c,tx,collection,id) ?? throw new InvalidOperationException("הטופס אינו קיים.");
             if (Value(data,"status")!="open") throw new InvalidOperationException("הטופס אינו פתוח.");
-            var assigned=collection=="issues"?Value(data,"assigneeUid")==actor.Id:(data["teamUids"] as JsonArray ?? new JsonArray()).Any(x=>x?.ToString()==actor.Id);
+            var assigned=collection=="issues"?IssueMember(data,actor.Id):(data["teamUids"] as JsonArray ?? new JsonArray()).Any(x=>x?.ToString()==actor.Id);
             if (!assigned) throw new UnauthorizedAccessException("אינך משויך לטופס.");
             using var lookup=Cmd(c,tx,"SELECT [OwnerUserID],[SessionID],[ExpiresAt] FROM [EditLocks] WHERE [FormID]=?",id);
             using var r=lookup.ExecuteReader(); string owner="",existing="";DateTime expires=DateTime.MinValue;

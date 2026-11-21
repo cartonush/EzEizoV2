@@ -24,7 +24,7 @@
         <h1>Metis · דף מנהל</h1>
         <p class="header-subtitle">יצירת דפי תקלה לטכנאים</p>
       </div>
-      <span class="version-pill">v2.0.3</span>
+      <span class="version-pill">v2.0.4</span>
       <div id="manager-controls" class="header-actions">
         <button id="manager-back" class="secondary-button" type="button" hidden>→ חזרה</button>
         <a id="key-back-link" class="secondary-button" href="#keys/open" aria-label="חזרה להטענות" hidden>→ חזרה</a>
@@ -289,7 +289,14 @@
           </form>
           <p id="user-status" class="copy-status" role="status" aria-live="polite"></p>
           <div id="users-list" class="issue-list"></div>
-          <details class="removed-users"><summary>משתמשים שהוסרו</summary><div id="removed-users-list" class="issue-list"></div></details>
+          <a class="secondary-button" href="#deleted-users">משתמשים שהוסרו</a>
+        </section>
+      </div>
+      <div id="view-deleted-users" data-manager-view="deleted-users" hidden>
+        <section class="card"><div class="section-heading"><div><p class="section-kicker">ניהול משתמשים</p><h2>משתמשים שהוסרו</h2></div></div>
+          <p>משתמש שהוסר אינו יכול להתחבר. ניתן לשחזר אותו, או למחוק את החשבון לצמיתות מכאן בלבד.</p>
+          <p id="removed-user-status" class="copy-status" role="status" aria-live="polite"></p>
+          <div id="removed-users-list" class="issue-list"></div>
         </section>
       </div>
     </main>

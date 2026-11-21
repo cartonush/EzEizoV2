@@ -241,3 +241,5 @@ td input:focus { border-color: #5da8c5; }
 }
 .server-connection-warning[hidden], .edit-lock-notice[hidden] { display: none; }
 .edit-lock-notice { border: 2px solid #d01b1b; color: #b01212; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; }
+#offline-operation-status { position:fixed; z-index:9999; bottom:1rem; left:1rem; padding:.65rem 1rem; border-radius:.65rem; background:#173b5d; color:white; box-shadow:0 4px 18px #132b4250; font:600 .9rem Arial,sans-serif; }
+#offline-operation-status[hidden] { display:none; }
