@@ -1,0 +1,135 @@
+name: Build native UI preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [native-ui]
+    paths:
+      - 'src/EzEizo.Native/**'
+      - 'src/EzEizo.Native.Metis/**'
+      - 'src/EzEizo.Native.Mechanic/**'
+      - '.github/workflows/native-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile manager native UI
+        run: dotnet build src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release
+      - name: Compile mechanic native UI
+        run: dotnet build src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release
+      - name: Publish native apps
+        shell: pwsh
+        run: |
+          dotnet publish src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/manager
+          dotnet publish src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/mechanic
+          New-Item -ItemType Directory -Force dist/native-preview/program | Out-Null
+          Copy-Item dist/manager/* dist/native-preview/program/ -Recurse -Force
+          $mechanicRoot = (Resolve-Path dist/mechanic).Path
+          Get-ChildItem $mechanicRoot -File -Recurse | ForEach-Object {
+            $relative = $_.FullName.Substring($mechanicRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
+            $destination = Join-Path (Resolve-Path dist/native-preview/program).Path $relative
+            if (Test-Path $destination) {
+              if ((Get-FileHash $_.FullName).Hash -ne (Get-FileHash $destination).Hash) { throw "Shared runtime differs: $relative" }
+            } else {
+              New-Item -ItemType Directory -Force (Split-Path $destination) | Out-Null
+              Copy-Item $_.FullName $destination
+            }
+          }
+          if (Test-Path dist/native-preview/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - name: Install Access engine for offline tests
+        shell: pwsh
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
+          Invoke-WebRequest 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $download
+          $process = Start-Process -FilePath $download -ArgumentList '/quiet' -Wait -PassThru
+          if ($process.ExitCode -notin @(0,3010)) { throw "Access Engine installation failed: $($process.ExitCode)" }
+      - name: Test native offline database workflow
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--self-test' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'Offline manager and mechanic workflow failed'
+          }
+      - name: Test native PDF and ZIP export
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--verify-pdf' -Wait -PassThru
+          if ($result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'PDF or ZIP export failed'
+          }
+      - name: Test simultaneous Access startup
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/native-preview/program/EzEizo-Native-Mechanic.exe).Path
+          $jobs = @((Start-Process $manager -ArgumentList '--probe-startup' -PassThru), (Start-Process $mechanic -ArgumentList '--probe-startup' -PassThru))
+          foreach ($process in $jobs) {
+            if (!$process.WaitForExit(60000) -or $process.ExitCode -ne 0) {
+              if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+              throw 'Simultaneous Access startup failed'
+            }
+          }
+      - name: Package a clean Access template and launchers
+        shell: pwsh
+        run: |
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $db = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
+          Remove-Item $db -Force
+          $initial = Join-Path $desktop 'EzEizo/data/initial-manager.txt'
+          if (Test-Path $initial) { Remove-Item $initial -Force }
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--seed-template' -Wait -PassThru
+          if ($result.ExitCode -ne 0 -or !(Test-Path $db)) { throw 'Clean ACCDB template creation failed' }
+          New-Item -ItemType Directory -Force dist/native-preview/data | Out-Null
+          Copy-Item $db dist/native-preview/data/EzEizo.accdb
+          Set-Content -Path dist/native-preview/Metis.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Metis.exe"') -Encoding ASCII
+          Set-Content -Path dist/native-preview/Mechanic.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Mechanic.exe"') -Encoding ASCII
+          if (Test-Path dist/native-preview/program/wwwroot) { throw 'Native package contains the old website' }
+      - name: Launch both native windows
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/native-preview/program/EzEizo-Native-Mechanic.exe).Path
+          $processes = @((Start-Process $manager -PassThru), (Start-Process $mechanic -PassThru))
+          Start-Sleep -Seconds 10
+          foreach ($process in $processes) {
+            if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
+            $process.Kill()
+          }
+      - name: Smoke test native manager login and navigation
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/native-preview/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--ui-smoke' -PassThru
+          if (!$result.WaitForExit(60000) -or $result.ExitCode -ne 0) {
+            if (Test-Path dist/native-preview/program/native-test-error.txt) { Get-Content dist/native-preview/program/native-test-error.txt }
+            throw 'Native manager login or navigation failed'
+          }
+      - name: Save UI screenshot outside the distributable package
+        shell: pwsh
+        run: |
+          if (!(Test-Path dist/native-preview/program/native-ui-screenshot.png)) { throw 'No native UI screenshot captured' }
+          Copy-Item dist/native-preview/program/native-ui-screenshot.png dist/native-ui-screenshot.png
+          Remove-Item dist/native-preview/program/native-ui-screenshot.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-native-ui-screenshot
+          path: dist/native-ui-screenshot.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-native-ui-experiment
+          path: dist/native-preview
+          retention-days: 14

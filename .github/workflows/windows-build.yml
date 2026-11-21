@@ -1,4 +1,4 @@
-name: Build Windows prototype
+name: Build EzEizo Windows 2.5.0
 
 on:
   workflow_dispatch:
@@ -6,9 +6,6 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'wwwroot/**'
-      - 'tests/**'
-      - 'launch/**'
       - 'INSTALL-WINDOWS.md'
       - '.github/workflows/windows-build.yml'
 
@@ -16,131 +13,138 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  compile:
     runs-on: windows-latest
-    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Check local UI in Edge
+      - name: Compile manager native UI
+        run: dotnet build src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release
+      - name: Compile mechanic native UI
+        run: dotnet build src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release
+      - name: Publish native apps
         shell: pwsh
         run: |
-          npm install --no-save playwright@1.56.1
-          node tests/ui-smoke.cjs
-      - name: Publish manager
-        shell: pwsh
-        run: dotnet publish src/EzEizo.Metis/EzEizo.Metis.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/Metis
-      - name: Publish mechanic
-        shell: pwsh
-        run: dotnet publish src/EzEizo.Mechanic/EzEizo.Mechanic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/Mechanic
-      - name: Prepare desktop folder
-        shell: pwsh
-        run: |
+          dotnet publish src/EzEizo.Native.Metis/EzEizo.Native.Metis.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/manager
+          dotnet publish src/EzEizo.Native.Mechanic/EzEizo.Native.Mechanic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -o dist/mechanic
           New-Item -ItemType Directory -Force dist/EzEizo/program | Out-Null
-          Copy-Item dist/Metis/* dist/EzEizo/program/ -Recurse -Force
-          $mechanicRoot = (Resolve-Path dist/Mechanic).Path
+          Copy-Item dist/manager/* dist/EzEizo/program/ -Recurse -Force
+          $mechanicRoot = (Resolve-Path dist/mechanic).Path
           Get-ChildItem $mechanicRoot -File -Recurse | ForEach-Object {
             $relative = $_.FullName.Substring($mechanicRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
             $destination = Join-Path (Resolve-Path dist/EzEizo/program).Path $relative
             if (Test-Path $destination) {
-              if ((Get-FileHash $_.FullName).Hash -ne (Get-FileHash $destination).Hash) { throw "Shared runtime file differs: $relative" }
+              if ((Get-FileHash $_.FullName).Hash -ne (Get-FileHash $destination).Hash) { throw "Shared runtime differs: $relative" }
             } else {
               New-Item -ItemType Directory -Force (Split-Path $destination) | Out-Null
               Copy-Item $_.FullName $destination
             }
           }
-          Copy-Item wwwroot dist/EzEizo/program/wwwroot -Recurse
-          New-Item -ItemType Directory -Force dist/EzEizo/data | Out-Null
-          Copy-Item INSTALL-WINDOWS.md dist/EzEizo/README.txt
-          Copy-Item launch/Metis.cmd dist/EzEizo/Metis.cmd
-          Copy-Item launch/Mechanic.cmd dist/EzEizo/Mechanic.cmd
-      - name: Install Access Engine on disposable build runner
+          if (Test-Path dist/EzEizo/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - name: Install Access engine for offline tests
         shell: pwsh
         run: |
           $download = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
           Invoke-WebRequest 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $download
           $process = Start-Process -FilePath $download -ArgumentList '/quiet' -Wait -PassThru
           if ($process.ExitCode -notin @(0,3010)) { throw "Access Engine installation failed: $($process.ExitCode)" }
-      - name: Try creating an Access database on Windows
+      - name: Test native offline database workflow
         shell: pwsh
         run: |
-          $desktop = [Environment]::GetFolderPath('Desktop')
-          $exe = (Resolve-Path 'dist/EzEizo/program/EzEizo-Metis.exe').Path
-          $result = Start-Process -FilePath $exe -ArgumentList '--create-database' -Wait -PassThru
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--self-test' -Wait -PassThru
           if ($result.ExitCode -ne 0) {
-            if (Test-Path dist/EzEizo/program/database-error.txt) { Get-Content dist/EzEizo/program/database-error.txt }
-            throw "Database generation failed: $($result.ExitCode)"
+            if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
+            throw 'Offline manager and mechanic workflow failed'
           }
-          $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
-          if (!(Test-Path $generated)) { throw 'No ACCDB generated' }
-          Write-Host 'Created real EzEizo.accdb with all tables'
-      - name: Smoke test local manager and mechanic workflow
+      - name: Test native PDF and ZIP export
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/EzEizo/program/EzEizo-Metis.exe').Path
-          $result = Start-Process -FilePath $exe -ArgumentList '--self-test' -Wait -PassThru
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--verify-pdf' -Wait -PassThru
           if ($result.ExitCode -ne 0) {
-            if (Test-Path dist/EzEizo/program/database-error.txt) { Get-Content dist/EzEizo/program/database-error.txt }
-            throw "Smoke test failed: $($result.ExitCode)"
+            if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
+            throw 'PDF or ZIP export failed'
           }
-          Write-Host 'Login, assignment, submission and review passed'
-      - name: Prepare fresh database template for the release
+      - name: Test simultaneous Access startup
         shell: pwsh
         run: |
-          $desktop = [Environment]::GetFolderPath('Desktop')
-          $generated = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
-          Remove-Item $generated -Force
-          $exe = (Resolve-Path 'dist/EzEizo/program/EzEizo-Metis.exe').Path
-          $result = Start-Process -FilePath $exe -ArgumentList '--seed-template' -Wait -PassThru
-          if ($result.ExitCode -ne 0) {
-            if (Test-Path dist/EzEizo/program/database-error.txt) { Get-Content dist/EzEizo/program/database-error.txt }
-            throw "Template database creation failed: $($result.ExitCode)"
-          }
-          Copy-Item $generated dist/EzEizo/data/EzEizo.accdb
-          $verify = Start-Process -FilePath $exe -ArgumentList '--verify-template' -Wait -PassThru
-          if ($verify.ExitCode -ne 0) { throw 'Seeded template verification failed' }
-          $provision = Start-Process -FilePath $exe -ArgumentList '--verify-provision' -Wait -PassThru
-          if ($provision.ExitCode -ne 0) { throw 'Local manager provisioning failed' }
-          Write-Host 'Blank template database created; manager is provisioned locally at first launch'
-      - name: Start manager and mechanic together against Access
-        shell: pwsh
-        run: |
-          $manager = (Resolve-Path 'dist/EzEizo/program/EzEizo-Metis.exe').Path
-          $mechanic = (Resolve-Path 'dist/EzEizo/program/EzEizo-Mechanic.exe').Path
-          $processes = @(
-            (Start-Process -FilePath $manager -ArgumentList '--probe-startup' -PassThru),
-            (Start-Process -FilePath $mechanic -ArgumentList '--probe-startup' -PassThru)
-          )
-          foreach ($process in $processes) {
-            if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Parallel database startup timed out' }
-            if ($process.ExitCode -ne 0) {
-              if (Test-Path dist/EzEizo/program/database-error.txt) { Get-Content dist/EzEizo/program/database-error.txt }
-              throw "Parallel database startup failed: $($process.ExitCode)"
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe).Path
+          $jobs = @((Start-Process $manager -ArgumentList '--probe-startup' -PassThru), (Start-Process $mechanic -ArgumentList '--probe-startup' -PassThru))
+          foreach ($process in $jobs) {
+            if (!$process.WaitForExit(60000) -or $process.ExitCode -ne 0) {
+              if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
+              throw 'Simultaneous Access startup failed'
             }
           }
-          Write-Host 'Both desktop programs opened the same ACCDB concurrently'
-      - name: Check output
+      - name: Package a clean Access template and launchers
         shell: pwsh
         run: |
-          if (!(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/Metis.cmd) -or !(Test-Path dist/EzEizo/Mechanic.cmd) -or !(Test-Path dist/EzEizo/program/EzEizo-Metis.exe) -or !(Test-Path dist/EzEizo/program/EzEizo-Mechanic.exe) -or !(Test-Path dist/EzEizo/program/EzEizo.Core.dll) -or !(Test-Path dist/EzEizo/program/wwwroot/Metis/management-pages.js) -or !(Test-Path dist/EzEizo/program/wwwroot/access-state.js) -or !(Test-Path dist/EzEizo/program/wwwroot/access-sync.js) -or !(Test-Path dist/EzEizo/program/wwwroot/mechanic/index.html)) { throw 'Missing launcher, executable, shared runtime or UI assets' }
-          $bytes = (Get-ChildItem dist/EzEizo -Recurse -File | Measure-Object -Property Length -Sum).Sum
-          Write-Host ("Uncompressed package size: {0:N1} MiB" -f ($bytes / 1MB))
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $db = Join-Path $desktop 'EzEizo/data/EzEizo.accdb'
+          Remove-Item $db -Force
+          $initial = Join-Path $desktop 'EzEizo/data/initial-manager.txt'
+          if (Test-Path $initial) { Remove-Item $initial -Force }
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--seed-template' -Wait -PassThru
+          if ($result.ExitCode -ne 0 -or !(Test-Path $db)) { throw 'Clean ACCDB template creation failed' }
+          New-Item -ItemType Directory -Force dist/EzEizo/data | Out-Null
+          Copy-Item $db dist/EzEizo/data/EzEizo.accdb
+          Set-Content -Path dist/EzEizo/Metis.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Metis.exe"') -Encoding ASCII
+          Set-Content -Path dist/EzEizo/Mechanic.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Mechanic.exe"') -Encoding ASCII
+          if (Test-Path dist/EzEizo/program/wwwroot) { throw 'Native package contains the old website' }
+      - name: Launch both native windows
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $mechanic = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe).Path
+          $processes = @((Start-Process $manager -PassThru), (Start-Process $mechanic -PassThru))
+          Start-Sleep -Seconds 10
+          foreach ($process in $processes) {
+            if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
+            $process.Kill()
+          }
+      - name: Smoke test native manager login and navigation
+        shell: pwsh
+        run: |
+          $manager = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Metis.exe).Path
+          $result = Start-Process -FilePath $manager -ArgumentList '--ui-smoke' -PassThru
+          if (!$result.WaitForExit(60000) -or $result.ExitCode -ne 0) {
+            if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
+            throw 'Native manager login or navigation failed'
+          }
+      - name: Save UI screenshot outside the distributable package
+        shell: pwsh
+        run: |
+          if (!(Test-Path dist/EzEizo/program/native-ui-screenshot.png)) { throw 'No native UI screenshot captured' }
+          Copy-Item dist/EzEizo/program/native-ui-screenshot.png dist/native-ui-screenshot.png
+          Remove-Item dist/EzEizo/program/native-ui-screenshot.png
       - uses: actions/upload-artifact@v4
         with:
-          name: EzEizo-Windows-x64
+          name: EzEizo-native-ui-screenshot
+          path: dist/native-ui-screenshot.png
+          retention-days: 7
+      - name: Include install guide and verify package
+        shell: pwsh
+        run: |
+          Copy-Item INSTALL-WINDOWS.md dist/EzEizo/README.txt
+          if (!(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Metis.exe) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe)) { throw 'Incomplete release package' }
+          $bytes = (Get-ChildItem dist/EzEizo -Recurse -File | Measure-Object Length -Sum).Sum
+          Write-Host ("Package size: {0:N1} MiB" -f ($bytes / 1MB))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EzEizo-Windows-2.5.0-files
           path: dist/EzEizo
-          if-no-files-found: error
           retention-days: 30
-      - name: Publish downloadable Windows ZIP
+      - name: Publish versioned Windows ZIP
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-x64.zip -Force
-          $tag = 'v2.0.7-preview.1'
-          gh release create $tag dist/EzEizo-Windows-x64.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.0.7 Preview 1' --notes 'Organize shared Windows runtime and UI under program/, keep Access data under data/, add two top-level launchers and validate database access from both executable roles. For an existing installation preserve your data folder. See README.txt.' --prerelease
+          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.0.zip -Force
+          $tag = 'v2.5.0'
+          $notes = 'Native Windows manager and technician applications using local Access without WebView2 or Internet. Extract EzEizo to Desktop. Preserve the existing data folder when updating. See README.txt.'
+          gh release create $tag dist/EzEizo-Windows-2.5.0.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.0' --notes $notes

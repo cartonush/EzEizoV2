@@ -1,11 +1,9 @@
 # EzEizoV2
 
-גרסת Windows מקומית לטכנאי ולמנהל. פיתוח נפרד מ־[EzEizo](https://github.com/cartonush/EzEizo).
+גרסת Windows ‏2.5.0 של EzEizo: שתי תוכנות מקומיות, מנהל וטכנאי, עם ממשק Windows מקורי (WinForms) ומסד Access משותף. אין WebView2, דפדפן, Firebase או דרישה לאינטרנט במהלך השימוש. קוד המקור נמצא ב־`src/EzEizo.Native*` ודרישות ההתקנה ב־[INSTALL-WINDOWS.md](INSTALL-WINDOWS.md).
 
-הגיבוי המדויק של גרסת האתר 1.6.3: `EzEizo` branch `backup-v1.6.3-2026-11-20`, commit `d3c7efa8eac925aa206a4fda40f086fa27001a99`.
+הורד את `EzEizo-Windows-2.5.0.zip` מ־[Releases](https://github.com/cartonush/EzEizoV2/releases). חלץ את תיקיית `EzEizo` לשולחן העבודה, התקן Microsoft Access Database Engine/Runtime x64 אם הוא חסר, והפעל `Metis.cmd` או `Mechanic.cmd`. שני היישומים משתמשים בקובץ `Desktop/EzEizo/data/EzEizo.accdb`.
 
-## גרסת Windows ראשונית
+המסד המצורף הוא תבנית ריקה. בהפעלה הראשונה נוצר חשבון מנהל ראשי, והסיסמה הראשונית נכתבת מקומית ל־`data/initial-manager.txt`. בעת עדכון, שמור את תיקיית `data` הישנה במקום התבנית המצורפת; אחרת תאבד את המשתמשים והטפסים שלך.
 
-קוד המקור לשני יישומי WinForms x64 נמצא ב־`src/`. תהליך הבנייה ב־`.github/workflows/windows-build.yml` יוצר חבילה מלאה להורדה עם `EzEizo-Metis.exe`, `EzEizo-Mechanic.exe`, הממשק המקומי ו־`data/EzEizo.accdb` התחלתי. חשבון המנהל וסיסמה אקראית נוצרים בהפעלה הראשונה במחשב המקומי. הוראות והיקף ההדגמה מפורטים ב־`INSTALL-WINDOWS.md`.
-
-מסכי האתר 1.6.3 הועתקו ל־`wwwroot` והותאמו לנתונים מקומיים ב־Access; טפסים וטיוטות נשמרים ב־ACCDB לפי משתמש. זו גרסת אב טיפוס לבדיקה; הממשק משתמש ב־WebView2 להצגת HTML מקומי. בדיקות הבנייה כוללות בדיקת מסכים בדפדפן ובדיקת מסד לתהליך כניסה, תקלה, מפתחות וקבועים. אין להעלות מסד עם נתוני אמת או חתימות למאגר ציבורי.
+האתר המקורי 1.6.3 גובה בענף `backup-v1.6.3-2026-11-20` של [EzEizo](https://github.com/cartonush/EzEizo), commit `d3c7efa8eac925aa206a4fda40f086fa27001a99`. מסד הדוגמה והיישום מיועדים לבחינת אב טיפוס, ללא נתוני אמת.
