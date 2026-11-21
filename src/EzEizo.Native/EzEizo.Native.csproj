@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>2.5.0</Version>
+    <Version>2.5.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Data.OleDb" Version="10.0.0" />
@@ -23,5 +23,6 @@
     <Compile Include="NativeManagement.cs" />
     <Compile Include="NativePdf.cs" />
     <Compile Include="NativeDiagnostics.cs" />
+    <Compile Include="NativeTheme.cs" />
   </ItemGroup>
 </Project>

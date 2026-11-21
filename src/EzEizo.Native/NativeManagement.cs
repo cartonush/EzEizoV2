@@ -14,7 +14,6 @@ public sealed partial class NativeWindow
             var records = await Work(() => store.Constants(user));
             currentPage = "constants"; refreshTimer.Stop();
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה", async (_, _) => await OpenList("issues")));
             Section(stack, "עדכון קבועים לפי מטוס");
             var squad = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
             var plane = Choice(stack, "מטוס", []);
@@ -51,7 +50,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "בחר מטוס כדי לראות ולערוך את הקבועים שלו.";
         }
         catch (Exception ex) { Error(ex); }
@@ -67,7 +66,6 @@ public sealed partial class NativeWindow
             var loads = await Work(() => store.List("keyLoads", user));
             currentPage = "key-history"; refreshTimer.Stop();
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה למפתחות", async (_, _) => await OpenList("keys")));
             Section(stack, "היסטוריית מפתחות");
             var squad = Choice(stack, "טייסת", ["101", "105", "109"]);
             var grid = new DataGridView { Width = 745, Height = 500, ReadOnly = true, RowHeadersVisible = false,
@@ -97,7 +95,7 @@ public sealed partial class NativeWindow
                     grid.Rows.Add(plane, Date(blue), V(blue, "period"), Date(shach), V(shach, "period"));
                 }
             };
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "כל סוג מפתח מחושב לפי ההטענה האחרונה שהושלמה עבורו.";
         }
         catch (Exception ex) { Error(ex); }
@@ -115,7 +113,6 @@ public sealed partial class NativeWindow
                 (store.List("issues", user), store.List("keyLoads", user), database.AllTechnicians()));
             currentPage = "reports"; refreshTimer.Stop();
             var stack = Stack();
-            stack.Controls.Add(Button("חזרה", async (_, _) => await OpenList("issues")));
             Section(stack, "הפקת דוחות");
             var report = Choice(stack, "סוג הדוח", ["יומן פעילות", "יומן טייסת", "היסטוריית מטוס", "היסטוריית תקלות טכנאי", "תקלות פתוחות", "דפים ממתינים לסגירה", "תקלות סגורות"]);
             var squadrons = new CheckedListBox { Width = 440, Height = 100, CheckOnClick = true };
@@ -214,7 +211,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            content.Controls.Clear(); content.Controls.Add(stack);
+            Present(stack);
             status.Text = "בחר דוח, סננים ותאריכים.";
         }
         catch (Exception ex) { Error(ex); }

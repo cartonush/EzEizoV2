@@ -1,4 +1,4 @@
-name: Build EzEizo Windows 2.5.0
+name: Build EzEizo Windows 2.5.1
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/**'
       - 'INSTALL-WINDOWS.md'
+      - 'launch/NativeLauncher.cpp'
       - '.github/workflows/windows-build.yml'
 
 permissions:
@@ -43,6 +44,18 @@ jobs:
             }
           }
           if (Test-Path dist/EzEizo/program/Microsoft.Web.WebView2.Core.dll) { throw 'Native build unexpectedly contains WebView2' }
+      - name: Build two direct EXE launchers
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'Visual C++ build tools not found' }
+          $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+          $output = (Resolve-Path dist/EzEizo).Path + '\Metis.exe'
+          $line = 'call "' + $devcmd + '" -arch=x64 >nul && cl.exe /nologo /O2 /MT /EHsc /DUNICODE /D_UNICODE /Fe:"' + $output + '" launch\NativeLauncher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib /OUT:"' + $output + '"'
+          cmd /c $line
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $output)) { throw 'Native launcher compilation failed' }
+          Copy-Item $output dist/EzEizo/Mechanic.exe
       - name: Install Access engine for offline tests
         shell: pwsh
         run: |
@@ -93,8 +106,6 @@ jobs:
           if ($result.ExitCode -ne 0 -or !(Test-Path $db)) { throw 'Clean ACCDB template creation failed' }
           New-Item -ItemType Directory -Force dist/EzEizo/data | Out-Null
           Copy-Item $db dist/EzEizo/data/EzEizo.accdb
-          Set-Content -Path dist/EzEizo/Metis.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Metis.exe"') -Encoding ASCII
-          Set-Content -Path dist/EzEizo/Mechanic.cmd -Value @('@echo off','start "" "%~dp0program\EzEizo-Native-Mechanic.exe"') -Encoding ASCII
           if (Test-Path dist/EzEizo/program/wwwroot) { throw 'Native package contains the old website' }
       - name: Launch both native windows
         shell: pwsh
@@ -107,6 +118,17 @@ jobs:
             if ($process.HasExited) { throw "Native window exited unexpectedly: $($process.ExitCode)" }
             $process.Kill()
           }
+      - name: Verify direct launchers open both applications
+        shell: pwsh
+        run: |
+          Start-Process (Resolve-Path dist/EzEizo/Metis.exe).Path
+          Start-Process (Resolve-Path dist/EzEizo/Mechanic.exe).Path
+          Start-Sleep -Seconds 4
+          $manager = Get-Process 'EzEizo-Native-Metis' -ErrorAction SilentlyContinue
+          $mechanic = Get-Process 'EzEizo-Native-Mechanic' -ErrorAction SilentlyContinue
+          if (!$manager -or !$mechanic) { throw 'Direct EXE launch failed' }
+          $manager | Stop-Process -Force
+          $mechanic | Stop-Process -Force
       - name: Smoke test native manager login and navigation
         shell: pwsh
         run: |
@@ -116,27 +138,38 @@ jobs:
             if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
             throw 'Native manager login or navigation failed'
           }
+      - name: Smoke test technician login and task queue
+        shell: pwsh
+        run: |
+          $mechanic = (Resolve-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe).Path
+          $result = Start-Process -FilePath $mechanic -ArgumentList '--ui-smoke-tech' -PassThru
+          if (!$result.WaitForExit(60000) -or $result.ExitCode -ne 0) {
+            if (Test-Path dist/EzEizo/program/native-test-error.txt) { Get-Content dist/EzEizo/program/native-test-error.txt }
+            throw 'Native technician login or queue failed'
+          }
       - name: Save UI screenshot outside the distributable package
         shell: pwsh
         run: |
-          if (!(Test-Path dist/EzEizo/program/native-ui-screenshot.png)) { throw 'No native UI screenshot captured' }
-          Copy-Item dist/EzEizo/program/native-ui-screenshot.png dist/native-ui-screenshot.png
-          Remove-Item dist/EzEizo/program/native-ui-screenshot.png
+          New-Item -ItemType Directory -Force dist/screenshots | Out-Null
+          $screens = Get-ChildItem dist/EzEizo/program/native-*.png
+          if ($screens.Count -lt 8) { throw 'Missing native UI screenshots' }
+          Copy-Item $screens.FullName dist/screenshots/
+          Remove-Item $screens.FullName
       - uses: actions/upload-artifact@v4
         with:
           name: EzEizo-native-ui-screenshot
-          path: dist/native-ui-screenshot.png
+          path: dist/screenshots
           retention-days: 7
       - name: Include install guide and verify package
         shell: pwsh
         run: |
           Copy-Item INSTALL-WINDOWS.md dist/EzEizo/README.txt
-          if (!(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Metis.exe) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe)) { throw 'Incomplete release package' }
+          if (!(Test-Path dist/EzEizo/Metis.exe) -or !(Test-Path dist/EzEizo/Mechanic.exe) -or !(Test-Path dist/EzEizo/data/EzEizo.accdb) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Metis.exe) -or !(Test-Path dist/EzEizo/program/EzEizo-Native-Mechanic.exe)) { throw 'Incomplete release package' }
           $bytes = (Get-ChildItem dist/EzEizo -Recurse -File | Measure-Object Length -Sum).Sum
           Write-Host ("Package size: {0:N1} MiB" -f ($bytes / 1MB))
       - uses: actions/upload-artifact@v4
         with:
-          name: EzEizo-Windows-2.5.0-files
+          name: EzEizo-Windows-2.5.1-files
           path: dist/EzEizo
           retention-days: 30
       - name: Publish versioned Windows ZIP
@@ -144,7 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.0.zip -Force
-          $tag = 'v2.5.0'
+          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.1.zip -Force
+          $tag = 'v2.5.1'
           $notes = 'Native Windows manager and technician applications using local Access without WebView2 or Internet. Extract EzEizo to Desktop. Preserve the existing data folder when updating. See README.txt.'
-          gh release create $tag dist/EzEizo-Windows-2.5.0.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.0' --notes $notes
+          gh release create $tag dist/EzEizo-Windows-2.5.1.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.1' --notes $notes

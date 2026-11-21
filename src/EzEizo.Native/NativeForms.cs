@@ -55,9 +55,11 @@ public sealed partial class NativeWindow
     }
     private static TextBox Field(FlowLayoutPanel stack, string label, JsonObject state, string key, bool multi = false)
     {
-        stack.Controls.Add(Label(label, label.Length > 80 ? 110 : 34));
+        var caption = Label(label, label.Length > 80 ? 100 : 32);
+        caption.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        stack.Controls.Add(caption);
         var input = Input(label, 2000);
-        if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; }
+        if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; input.Width = 735; }
         input.Text = V(state, key);
         input.TextChanged += (_, _) => state[key] = input.Text;
         stack.Controls.Add(input);
@@ -65,8 +67,9 @@ public sealed partial class NativeWindow
     }
     private static CheckBox Check(FlowLayoutPanel stack, string label, JsonObject state, string key)
     {
-        var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 38,
-            ForeColor = Navy, Margin = new Padding(0, 0, 0, 10) };
+        var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 49,
+            ForeColor = Navy, BackColor = Color.FromArgb(249, 251, 252), Padding = new Padding(12, 0, 12, 0),
+            Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
         box.CheckedChanged += (_, _) => state[key] = box.Checked;
         stack.Controls.Add(box);
         return box;
@@ -79,10 +82,19 @@ public sealed partial class NativeWindow
         if (editable) stack.Controls.Add(Button("נקה חתימה", (_, _) => { pad.Clear(); state[key] = ""; }));
         return pad;
     }
-    private static void Section(FlowLayoutPanel stack, string title) => stack.Controls.Add(Label(title, 55, true));
+    private static void Section(FlowLayoutPanel stack, string title)
+    {
+        var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White, Margin = new Padding(0, 12, 0, 8) };
+        heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
+        heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = new Font("Segoe UI", 16, FontStyle.Bold) });
+        heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
+        stack.Controls.Add(heading);
+    }
     private static FlowLayoutPanel EditorBar(FlowLayoutPanel stack)
     {
-        var bar = new FlowLayoutPanel { Width = 745, Height = 65, WrapContents = false,
+        var bar = new FlowLayoutPanel { Name = "EditorToolbar", Width = 745, Height = 65, WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight, BackColor = Color.White,
             Padding = new Padding(8, 8, 8, 0), Margin = new Padding(0, 0, 0, 15) };
         stack.Controls.Add(bar);
