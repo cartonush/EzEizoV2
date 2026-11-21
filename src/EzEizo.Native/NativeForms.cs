@@ -422,6 +422,9 @@ public sealed partial class NativeWindow
             if (B(row, "shach")) Check(stack, "שחק בוצע", state, "shachDone");
             Field(stack, "הערת טכנאי (לא חובה)", state, "technicianNote", true);
         }
+        stack.Controls.Add(Label($"אחזקה נדרשת: הטענת מטוסים במסגרת שינוי מפתחות לחודשים {V(doc, "period")}", 55));
+        stack.Controls.Add(Label("יש לוודא כי לא מופיעות תקלות EREZ 78 לאחר טעינה ושידור PTT בארז, SAK 7 / 34 בשחק.", 55));
+        stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים: מ.כ 2020 + חרב אש", 48));
         Section(stack, "פעולות לביצוע");
         var actions = work["actions"] as JsonArray ?? new JsonArray();
         while (actions.Count < 12) actions.Add(false);
@@ -434,6 +437,25 @@ public sealed partial class NativeWindow
             box.CheckedChanged += (_, _) => actions[index] = box.Checked;
             stack.Controls.Add(box);
         }
+        stack.Controls.Add(Label("חתימת משלח המשימה"));
+        stack.Controls.Add(new NativeSignature(V(doc, "dispatcherSignature")) { Enabled = false });
+        var infoButton = Button("מידע לעזר הטכנאי · הצג / הסתר", (_, _) => { });
+        var reference = new FlowLayoutPanel { Width = 745, Height = 300, FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false };
+        reference.Controls.Add(Label("קוד ביקורת: ברק 1 – 500, ברק 2 – 584 לביצוע שחק.", 40));
+        reference.Controls.Add(Label("קוד ביקורת: ברק 1 – 510, ברק 2 – 578 לביצוע ארז.", 40));
+        var table = new DataGridView { Width = 735, Height = 195, ReadOnly = true, RowHeadersVisible = false,
+            AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+        table.Columns.Add("item", "שם הפריט"); table.Columns.Add("code", "סימול"); table.Columns.Add("meaning", "משמעות"); table.Columns.Add("valid", "תוקף");
+        var periodDate = DateTime.TryParse(V(doc, "date"), out var parsed) ? parsed : DateTime.Today;
+        var nextDate = periodDate.AddMonths(1);
+        table.Rows.Add("כר־156 · ארז כחול", "6003-216", "כרטיס מחיקה שנתי", periodDate.ToString("yyyy"));
+        table.Rows.Add("כר־156 · ארז כחול", "6001-295", "חודש נוכחי", periodDate.ToString("MM/yy"));
+        table.Rows.Add("כר־156 · ארז כחול", "6001-296", "חודש הבא", nextDate.ToString("MM/yy"));
+        table.Rows.Add("כר־116 · שחק", "6016-385", "חודש נוכחי", periodDate.ToString("MM/yy"));
+        table.Rows.Add("כר־116 · שחק", "6016-386", "חודש הבא", nextDate.ToString("MM/yy"));
+        reference.Controls.Add(table);
+        infoButton.Click += (_, _) => reference.Visible = !reference.Visible;
+        stack.Controls.Add(infoButton); stack.Controls.Add(reference);
         var pads = new Dictionary<string, NativeSignature>();
         foreach (var kind in new[] { "tools", "taken", "rejected" })
         {
