@@ -27,6 +27,7 @@ public sealed class MainWindow : Form
         try
         {
             db.Initialize();
+            db.EnsureDemoManager();
             store.Initialize();
             var assets = Path.Combine(AppContext.BaseDirectory, "wwwroot");
             if (!File.Exists(Path.Combine(assets, "index.html")))
@@ -63,7 +64,7 @@ public sealed class MainWindow : Form
             var p = request.GetProperty("payload");
             object? data = action switch
             {
-                "login" => Login(Get(p, "number")),
+                "login" => Login(Get(p, "number"), Get(p, "password")),
                 "logout" => Logout(),
                 "home" => Home(),
                 "users" => Users(),
@@ -85,6 +86,7 @@ public sealed class MainWindow : Form
                 "offline.saveConstants" => SaveConstants(p),
                 "offline.technicians" => OfflineTechnicians(),
                 "offline.createTechnician" => CreateTechnician(p),
+                "offline.changeTechnicianPassword" => ChangeTechnicianPassword(p),
                 "offline.setTechnicianActive" => SetTechnicianActive(p),
                 "offline.deleteTechnician" => DeleteTechnician(p),
                 _ => throw new InvalidOperationException("פעולה לא מוכרת.")
@@ -109,10 +111,11 @@ public sealed class MainWindow : Form
             throw new UnauthorizedAccessException("פעולה זו מותרת למנהל הראשי בלבד.");
         return current;
     }
-    private object Login(string number)
+    private object Login(string number, string password)
     {
         if (!Database.ValidPersonalNumber(number)) throw new ArgumentException("מספר אישי חייב להכיל בדיוק 7 ספרות.");
-        var found = db.SignIn(number, role) ?? throw new UnauthorizedAccessException("לא נמצא משתמש פעיל בתפקיד המתאים.");
+        if (password.Length != 6) throw new ArgumentException("סיסמה חייבת להכיל שישה תווים.");
+        var found = db.Authenticate(number, password, role) ?? throw new UnauthorizedAccessException("מספר אישי או סיסמה שגויים.");
         if (role == AppRole.Manager && !db.IsPrimaryManager(found))
             throw new UnauthorizedAccessException("הכניסה למנהל הראשי בלבד.");
         account = found;
@@ -124,7 +127,7 @@ public sealed class MainWindow : Form
     private object CreateUser(JsonElement p)
     {
         RequireManager();
-        return db.CreateAccount(Get(p, "name"), Get(p, "number"), "mechanic");
+        return db.CreateAccount(Get(p, "name"), Get(p, "number"), "mechanic", Get(p, "password"));
     }
     private object Faults() { var current = RequireLogin(); return db.Faults(role == AppRole.Mechanic ? current : null); }
     private object CreateFault(JsonElement p)
@@ -167,8 +170,10 @@ public sealed class MainWindow : Form
     }
     private object CreateTechnician(JsonElement p)
     {
-        RequireManager(); var created=db.CreateAccount(Get(p,"name"),Get(p,"number"),"mechanic");return new { uid=created.Id };
+        RequireManager(); var created=db.CreateAccount(Get(p,"name"),Get(p,"number"),"mechanic",Get(p,"password"));return new { uid=created.Id };
     }
+    private object ChangeTechnicianPassword(JsonElement p)
+    { RequireManager(); db.ChangeTechnicianPassword(Get(p,"uid"),Get(p,"password")); return new { }; }
     private object SetTechnicianActive(JsonElement p)
     { RequireManager(); db.SetTechnicianActive(Get(p,"uid"),p.GetProperty("active").GetBoolean());return new { }; }
     private object DeleteTechnician(JsonElement p)

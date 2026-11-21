@@ -1,5 +1,5 @@
 import "../sheet-data.js?v=1.6.3";
-import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, assignIssue, appendIssueManagerNote } from "../firebase-sync.js?v=1.6.3";
+import { gate, revealApp, watchIssues, watchKeyLoads, watchTechnicians, createIssue, createAssignedIssues, createTechnician, setTechnicianActive, deleteTechnicianPermanently, changeTechnicianPassword, assignIssue, appendIssueManagerNote } from "../firebase-sync.js?v=1.6.3";
 import { SQUADRONS, SYSTEMS, WORKSHOPS, EW_SYSTEMS, validateCatalogSelection } from "./catalog.js?v=1.6.3";
 import { resolveAssignees } from "./assignee-selection.js?v=1.6.3";
 import { attachSignaturePad } from "../signature-canvas.js?v=1.6.3";
@@ -7,7 +7,7 @@ import { initKeyPages } from "../keys/app.js?v=1.6.3";
 import { initReports, updateReportData, initAircraftConstants, constantsForAircraft, closeConstantsEditor } from "./management-pages.js?v=1.6.3";
 
 const managerUser = await gate("manager");
-document.querySelector(".brand-copy h1").textContent = "Metis · נימר";
+document.querySelector(".brand-copy h1").textContent = "Metis · רועי סויסה";
 let cloudIssues = [];
 let technicians = [];
 const DRAFT_KEY = "ezeizo-metis-draft-v1";
@@ -481,7 +481,20 @@ function renderUsers() {
       catch (error) { setStatus("#user-status", `שינוי המשתמש נכשל: ${error.message}`, true); }
       finally { action.disabled = false; }
     });
-    card.append(title, email, history, view, action);
+    const passwordRow = document.createElement("div"); passwordRow.className = "toolbar";
+    const newPassword = document.createElement("input"); newPassword.type = "password"; newPassword.inputMode = "numeric";
+    newPassword.pattern = "[0-9]{6}"; newPassword.maxLength = 6; newPassword.placeholder = "סיסמה חדשה · שש ספרות";
+    newPassword.setAttribute("aria-label", "סיסמה חדשה עבור " + person.name);
+    const savePassword = document.createElement("button"); savePassword.type = "button"; savePassword.className = "secondary-button"; savePassword.textContent = "עדכן סיסמה";
+    savePassword.addEventListener("click", async () => {
+      if (!/^[0-9]{6}$/.test(newPassword.value)) { setStatus("#user-status", "סיסמת טכנאי חייבת להכיל שש ספרות.", true); return; }
+      savePassword.disabled = true;
+      try { await changeTechnicianPassword(person.uid, newPassword.value); newPassword.value = ""; setStatus("#user-status", "הסיסמה עודכנה עבור " + person.name); }
+      catch (error) { setStatus("#user-status", "עדכון סיסמה נכשל: " + error.message, true); }
+      finally { savePassword.disabled = false; }
+    });
+    passwordRow.append(newPassword, savePassword);
+    card.append(title, email, history, view, action, passwordRow);
     if (!person.active) {
       const destroy = document.createElement("button"); destroy.type = "button"; destroy.className = "secondary-button danger-button";
       destroy.textContent = "מחק סופית";
@@ -507,7 +520,7 @@ userForm.addEventListener("submit", async (event) => {
   const button = userForm.querySelector('button[type="submit"]'); button.disabled = true;
   setStatus("#user-status", "יוצר משתמש…");
   try {
-    await createTechnician(userForm.elements.name.value, userForm.elements.personalNumber.value, "");
+    await createTechnician(userForm.elements.name.value, userForm.elements.personalNumber.value, userForm.elements.password.value);
     userForm.reset(); setStatus("#user-status", "הטכנאי נוצר. מסור לו את המספר האישי.");
   } catch (error) { setStatus("#user-status", `יצירת המשתמש נכשלה: ${error.message}`, true); }
   finally { button.disabled = false; }

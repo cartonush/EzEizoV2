@@ -24,7 +24,7 @@
         <h1>Metis · דף מנהל</h1>
         <p class="header-subtitle">יצירת דפי תקלה לטכנאים</p>
       </div>
-      <span class="version-pill">v2.0.1</span>
+      <span class="version-pill">v2.0.2</span>
       <div id="manager-controls" class="header-actions">
         <button id="manager-back" class="secondary-button" type="button" hidden>→ חזרה</button>
         <a id="key-back-link" class="secondary-button" href="#keys/open" aria-label="חזרה להטענות" hidden>→ חזרה</a>
@@ -46,7 +46,7 @@
         <a class="manager-nav-link" href="#management" data-view-link="management">ניהול</a>
       </nav>
       <div id="view-home" data-manager-view="home">
-        <section class="card manager-home-intro"><div class="section-heading"><div><p class="section-kicker">דף בית</p><h2>שלום נימר</h2></div></div><p>בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.</p></section>
+        <section class="card manager-home-intro"><div class="section-heading"><div><p class="section-kicker">דף בית</p><h2>שלום רועי סויסה</h2></div></div><p>בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.</p></section>
         <div class="manager-home-grid">
           <a href="#new" class="manager-home-tile"><strong>פתיחת תקלה</strong><span>יצירת דף טיפול חדש לטכנאים</span></a>
           <a href="#open" class="manager-home-tile"><strong>תקלות פתוחות</strong><span id="home-open-count">משימות טיפול פעילות</span></a>
@@ -280,10 +280,11 @@
       <div id="view-users" data-manager-view="users" hidden>
         <section class="card" aria-labelledby="users-title">
           <div class="section-heading"><div><p class="section-kicker">ניהול צוות</p><h2 id="users-title">משתמשים</h2></div></div>
-          <p>נימר יכול ליצור טכנאים ולהסיר אותם מהמערכת. ההסרה חוסמת גישה ושומרת היסטוריית תקלות; היסטוריית הטפסים נשמרת במסד המקומי.</p>
+          <p>רועי סויסה יכול ליצור טכנאים ולהסיר אותם מהמערכת. ההסרה חוסמת גישה ושומרת היסטוריית תקלות; היסטוריית הטפסים נשמרת במסד המקומי.</p>
           <form id="create-user-form" class="user-form">
             <label class="input-field">שם הטכנאי<input name="name" required maxlength="80" autocomplete="off"></label>
             <label class="input-field">מספר אישי<input name="personalNumber" type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" required autocomplete="off"></label>
+            <label class="input-field">סיסמה בת שש ספרות<input name="password" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" required autocomplete="new-password"></label>
             <button class="primary-button" type="submit">צור משתמש טכנאי</button>
           </form>
           <p id="user-status" class="copy-status" role="status" aria-live="polite"></p>

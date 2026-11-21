@@ -1,5 +1,6 @@
 using System.Data.OleDb;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace EzEizo.Core;
@@ -23,7 +24,7 @@ public sealed class Database
     {
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "signatures"));
-        if (File.Exists(FilePath)) { using var check = Connect(); return; }
+        if (File.Exists(FilePath)) { using var check = Connect(); EnsurePasswordColumns(check); return; }
         var provider = Type.GetTypeFromProgID("DAO.DBEngine.120")
             ?? throw new InvalidOperationException("רכיב Microsoft Access Database Engine x64 חסר במחשב.");
         object? instance = null;
@@ -47,12 +48,25 @@ public sealed class Database
             using var command = new OleDbCommand(sql, connection);
             command.ExecuteNonQuery();
         }
+        EnsurePasswordColumns(connection);
     }
 
-    // The database is provisioned as a blank schema, never with personnel data in the public repository.
+    private static void EnsurePasswordColumns(OleDbConnection c)
+    {
+        var columns = c.GetSchema("Columns").Rows.Cast<System.Data.DataRow>()
+            .Where(r => string.Equals(Convert.ToString(r["TABLE_NAME"]), "Users", StringComparison.OrdinalIgnoreCase))
+            .Select(r => Convert.ToString(r["COLUMN_NAME"]))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!columns.Contains("PasswordSalt"))
+            using (var cmd = new OleDbCommand("ALTER TABLE [Users] ADD COLUMN [PasswordSalt] TEXT(64)", c)) cmd.ExecuteNonQuery();
+        if (!columns.Contains("PasswordHash"))
+            using (var cmd = new OleDbCommand("ALTER TABLE [Users] ADD COLUMN [PasswordHash] TEXT(128)", c)) cmd.ExecuteNonQuery();
+    }
+
+    // A fresh release template contains the primary demo manager; existing databases are migrated in place.
     private static readonly string[] Schema =
     [
-        "CREATE TABLE [Users] ([UserID] TEXT(36) PRIMARY KEY, [DisplayName] TEXT(100), [PersonalNumber] TEXT(7), [Role] TEXT(20), [Active] BIT, [CreatedAt] DATETIME, [DeletedAt] DATETIME, [UpdatedAt] DATETIME)",
+        "CREATE TABLE [Users] ([UserID] TEXT(36) PRIMARY KEY, [DisplayName] TEXT(100), [PersonalNumber] TEXT(7), [Role] TEXT(20), [PasswordSalt] TEXT(64), [PasswordHash] TEXT(128), [Active] BIT, [CreatedAt] DATETIME, [DeletedAt] DATETIME, [UpdatedAt] DATETIME)",
         "CREATE UNIQUE INDEX [UX_Users_Personal] ON [Users] ([PersonalNumber])",
         "CREATE TABLE [Squadrons] ([SquadronID] TEXT(36) PRIMARY KEY, [Name] TEXT(50))",
         "CREATE TABLE [Aircraft] ([AircraftID] TEXT(36) PRIMARY KEY, [SquadronID] TEXT(36), [AircraftNumber] TEXT(12), [DefaultEWSuite] TEXT(100), [Active] BIT)",
@@ -97,6 +111,78 @@ public sealed class Database
         return cmd;
     }
 
+    public static bool ValidTechnicianPassword(string? value) => value is not null && Regex.IsMatch(value, @"\A[0-9]{6}\z");
+    private static (string salt, string hash) PasswordData(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, 180_000, HashAlgorithmName.SHA256, 32);
+        return (Convert.ToHexString(salt), Convert.ToHexString(hash));
+    }
+    public Account? Authenticate(string number, string password, AppRole role)
+    {
+        if (!ValidPersonalNumber(number) || password.Length != 6) return null;
+        using var c = Connect();
+        using var cmd = Command(c, null, "SELECT [UserID],[DisplayName],[PersonalNumber],[Role],[PasswordSalt],[PasswordHash] FROM [Users] WHERE [PersonalNumber]=? AND [Role]=? AND [Active]=True", number, role == AppRole.Manager ? "manager" : "mechanic");
+        using var reader = cmd.ExecuteReader();
+        if (reader is null || !reader.Read() || reader.IsDBNull(4) || reader.IsDBNull(5)) return null;
+        try
+        {
+            var salt = Convert.FromHexString(reader.GetString(4));
+            var expected = Convert.FromHexString(reader.GetString(5));
+            var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, 180_000, HashAlgorithmName.SHA256, 32);
+            return CryptographicOperations.FixedTimeEquals(expected, actual)
+                ? new Account(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)) : null;
+        }
+        catch (FormatException) { return null; }
+    }
+    // Provision only once. Existing user IDs and form assignments are preserved.
+    public void EnsureDemoManager()
+    {
+        const string name = "רועי סויסה", number = "9862436", password = "-1-1-1";
+        using var c = Connect();
+        using var lookup = Command(c, null, "SELECT TOP 1 [UserID],[DisplayName],[PersonalNumber],[PasswordHash] FROM [Users] WHERE [Role]='manager' AND [Active]=True ORDER BY [CreatedAt],[UserID]");
+        using var reader = lookup.ExecuteReader();
+        string? id = null, oldName = null, oldNumber = null, hashAlreadySet = null;
+        if (reader is not null && reader.Read())
+        {
+            id = reader.GetString(0);
+            oldName = reader.GetString(1);
+            oldNumber = reader.GetString(2);
+            hashAlreadySet = reader.IsDBNull(3) ? null : reader.GetString(3);
+        }
+        reader?.Close();
+        if (id is null)
+        {
+            CreateAccount(name, number, "manager", password);
+            return;
+        }
+        if (oldNumber != number)
+        {
+            using var conflict = Command(c, null, "SELECT COUNT(*) FROM [Users] WHERE [PersonalNumber]=? AND [UserID]<>?", number, id);
+            if (Convert.ToInt32(conflict.ExecuteScalar()) != 0)
+                throw new InvalidOperationException("המספר האישי של המנהל הראשי כבר משויך למשתמש אחר.");
+        }
+        if (string.IsNullOrWhiteSpace(hashAlreadySet))
+        {
+            var (salt, hash) = PasswordData(password);
+            using var update = Command(c, null, "UPDATE [Users] SET [DisplayName]=?,[PersonalNumber]=?,[PasswordSalt]=?,[PasswordHash]=?,[UpdatedAt]=? WHERE [UserID]=?", name, number, salt, hash, DateTime.Now, id);
+            update.ExecuteNonQuery();
+        }
+        else if (oldNumber != number || oldName != name)
+        {
+            using var update = Command(c, null, "UPDATE [Users] SET [DisplayName]=?,[PersonalNumber]=?,[UpdatedAt]=? WHERE [UserID]=?", name, number, DateTime.Now, id);
+            update.ExecuteNonQuery();
+        }
+    }
+    public void ChangeTechnicianPassword(string id, string password)
+    {
+        if (!ValidTechnicianPassword(password)) throw new ArgumentException("סיסמת טכנאי חייבת להכיל שש ספרות בדיוק.");
+        var (salt, hash) = PasswordData(password);
+        using var c = Connect();
+        using var cmd = Command(c, null, "UPDATE [Users] SET [PasswordSalt]=?,[PasswordHash]=?,[UpdatedAt]=? WHERE [UserID]=? AND [Role]='mechanic'", salt, hash, DateTime.Now, id);
+        if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("הטכנאי לא נמצא.");
+    }
+
     public bool HasManager()
     {
         using var c = Connect();
@@ -123,16 +209,19 @@ public sealed class Database
         return r is not null && r.Read() ? new Account(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3)) : null;
     }
 
-    public Account CreateAccount(string name, string number, string role)
+    public Account CreateAccount(string name, string number, string role, string password)
     {
         if (!ValidPersonalNumber(number)) throw new ArgumentException("מספר אישי חייב להכיל בדיוק 7 ספרות.");
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("יש להזין שם.");
         if (role is not ("manager" or "mechanic")) throw new ArgumentException("תפקיד לא תקין.");
+        if (role == "mechanic" && !ValidTechnicianPassword(password)) throw new ArgumentException("סיסמת טכנאי חייבת להכיל שש ספרות בדיוק.");
+        if (role == "manager" && password.Length != 6) throw new ArgumentException("סיסמת מנהל חייבת להכיל שישה תווים.");
         if (role == "manager" && HasManager()) throw new InvalidOperationException("המנהל הראשוני כבר הוגדר.");
         var account = new Account(Id(), name.Trim(), number, role);
         using var c = Connect();
-        using var cmd = Command(c, null, "INSERT INTO [Users] ([UserID],[DisplayName],[PersonalNumber],[Role],[Active],[CreatedAt],[UpdatedAt]) VALUES (?,?,?,?,?,?,?)",
-            account.Id, account.Name, account.PersonalNumber, account.Role, true, DateTime.Now, DateTime.Now);
+        var (salt, hash) = PasswordData(password);
+        using var cmd = Command(c, null, "INSERT INTO [Users] ([UserID],[DisplayName],[PersonalNumber],[Role],[PasswordSalt],[PasswordHash],[Active],[CreatedAt],[UpdatedAt]) VALUES (?,?,?,?,?,?,?,?,?)",
+            account.Id, account.Name, account.PersonalNumber, account.Role, salt, hash, true, DateTime.Now, DateTime.Now);
         cmd.ExecuteNonQuery();
         return account;
     }

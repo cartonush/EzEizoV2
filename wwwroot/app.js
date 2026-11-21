@@ -337,13 +337,13 @@ function showClosed() {
 
 if (managerClosedView && selectedSheet) {
   document.querySelector(".brand-copy h1").textContent = remoteIssue.status === "pendingReview" ? "Metis · תקלה לסגירה" : "Metis · דף תקלה סגורה";
-  document.querySelector("#mechanic-back").href = remoteIssue.status === "pendingReview" ? "./#pending" : "./#closed";
+  document.querySelector("#mechanic-back").href = remoteIssue.status === "pendingReview" ? "./index.html#pending" : "./index.html#closed";
   const panel = document.querySelector("#manager-edit-panel");
   panel.hidden = false;
   document.querySelector("#manager-edit-open").addEventListener("click", async (event) => {
     if (!window.confirm("להחזיר את התקלה לטכנאי לעריכה? כל הפרטים שמולאו יישמרו והוא יוכל לסגור שוב.")) return;
     const button = event.currentTarget; button.disabled = true;
-    try { await reopenIssue(sheet.id, currentUser.uid); location.replace("./#open"); }
+    try { await reopenIssue(sheet.id, currentUser.uid); location.replace("./index.html#open"); }
     catch (error) { document.querySelector("#manager-edit-status").textContent = `ההחזרה נכשלה: ${error.message}`; button.disabled = false; }
   });
   const reviewPanel = document.querySelector("#review-panel");
@@ -363,7 +363,7 @@ if (managerClosedView && selectedSheet) {
     document.querySelector("#approve-sheet").addEventListener("click", async (event) => {
       if (!signature) { document.querySelector("#review-status").textContent = "יש לחתום כבודק הדף לפני הסגירה."; return; }
       const button = event.currentTarget; button.disabled = true;
-      try { await approveIssue(sheet.id, currentUser.uid, signature); location.replace("./#closed"); }
+      try { await approveIssue(sheet.id, currentUser.uid, signature); location.replace("./index.html#closed"); }
       catch (error) { document.querySelector("#review-status").textContent = `הסגירה נכשלה: ${error.message}`; button.disabled = false; }
     });
   }

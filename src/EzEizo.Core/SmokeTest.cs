@@ -6,10 +6,13 @@ public static class SmokeTest
     {
         var db = new Database();
         db.Initialize();
-        var manager = db.CreateAccount("בדיקת מנהל", "1234567", "manager");
-        var mechanic = db.CreateAccount("בדיקת טכנאי", "7654321", "mechanic");
+        var manager = db.CreateAccount("בדיקת מנהל", "1234567", "manager", "654321");
+        var mechanic = db.CreateAccount("בדיקת טכנאי", "7654321", "mechanic", "123456");
         if (db.SignIn(manager.PersonalNumber, AppRole.Manager)?.Id != manager.Id ||
             db.SignIn(mechanic.PersonalNumber, AppRole.Mechanic)?.Id != mechanic.Id ||
+            db.Authenticate(manager.PersonalNumber, "654321", AppRole.Manager)?.Id != manager.Id ||
+            db.Authenticate(mechanic.PersonalNumber, "123456", AppRole.Mechanic)?.Id != mechanic.Id ||
+            db.Authenticate(mechanic.PersonalNumber, "654321", AppRole.Mechanic) is not null ||
             db.SignIn("123456", AppRole.Manager) is not null ||
             db.SignIn(mechanic.PersonalNumber, AppRole.Manager) is not null)
             throw new InvalidOperationException("בדיקת התחברות נכשלה.");

@@ -26,7 +26,7 @@ public static class OfflineSmokeTest
         store.Update("issues", id, "approve", approve.RootElement, manager);
         if (store.Get("issues", id, manager)?["status"]?.ToString() != "closed")
             throw new InvalidOperationException("סגירת טופס מלא נכשלה.");
-        var second = db.CreateAccount("בדיקת טכנאי נוסף", "9876543", "mechanic");
+        var second = db.CreateAccount("בדיקת טכנאי נוסף", "9876543", "mechanic", "246810");
         using var keyLoad = Document(new { squadron = "105", teamUids = new[] { technician.Id, second.Id }, rows = new[] { new { aircraft = "603", blue = true } } });
         var key = store.CreateKey(keyLoad.RootElement, manager);
         if (!key["serial"]!.ToString().StartsWith("K-")) throw new InvalidOperationException("מספר הטענה אינו תקין.");

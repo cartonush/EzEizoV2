@@ -36,7 +36,8 @@ export function approveIssue(id,reviewerUid,signature){return update('issues',id
 export function reopenIssue(id){return update('issues',id,'reopen');}
 export function appendIssueManagerNote(id,note){return update('issues',id,'note',{note});}
 export function assignIssue(id,uid,name){return update('issues',id,'assign',{uid,name});}
-export function createTechnician(name,number){return call('offline.createTechnician',{name,number});}
+export function createTechnician(name,number,password){return call('offline.createTechnician',{name,number,password});}
+export function changeTechnicianPassword(uid,password){return call('offline.changeTechnicianPassword',{uid,password});}
 export function setTechnicianActive(uid,active){return call('offline.setTechnicianActive',{uid,active});}
 export function deleteTechnicianPermanently(uid){return call('offline.deleteTechnician',{uid});}
 export function watchEditLock(kind,serialOrId,onChange,onError){

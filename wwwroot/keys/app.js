@@ -377,7 +377,7 @@ $("#complete-key-load").addEventListener("click", async () => {
   const error = validateWork(); if (error) return setMessage("#work-status", error, true);
   const button = $("#complete-key-load"); button.disabled = true;
   const clean = { ...work }; for (const [type, columns] of Object.entries(KEY_TABLES)) clean[type] = compactRows(work[type], columns);
-  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { localStorage.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The server already saved the completed form. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("./"); }
+  try { clearTimeout(draftTimer); draftTimer = null; await pendingDraft.catch(() => {}); await closeKeyLoad(activeLoad.id, user.uid, clean, editLock.session); try { localStorage.removeItem(`ezeizo-key-work:${activeLoad.id}`); } catch { /* The server already saved the completed form. */ } editLock.dispose(); editLock = null; if (manager) { location.hash = route("open"); showView(); } else location.replace("./index.html"); }
   catch (failure) { setMessage("#work-status", `סגירת ההטענה נכשלה: ${failure.message}`, true); }
   finally { button.disabled = false; }
 });
@@ -401,7 +401,7 @@ function showView() {
   const workId = hash.startsWith("work/") ? hash.slice(5) : null;
   activeLoad = workId ? loads.find((item) => item.id === workId) : null;
   if (activeLoad && !manager && !activeLoad.teamUids.includes(user.uid)) activeLoad = null;
-  if (!manager && loadsReady && !activeLoad) { location.replace("./"); return; }
+  if (!manager && loadsReady && !activeLoad) { location.replace("./index.html"); return; }
   const view = activeLoad ? "work" : manager && ["history", "create", "open", "closed"].includes(hash) ? hash : "open";
   const wantsLock = !manager && view === "work" && activeLoad?.status === "open";
   if (!wantsLock || lockedLoadId !== activeLoad.id) {
