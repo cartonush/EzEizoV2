@@ -28,28 +28,46 @@ public static class NativeDiagnostics
                 {
                     var file = Path.Combine(Database.DataDirectory, "initial-manager.txt");
                     if (!File.Exists(file)) return;
+                    Capture(window, "native-login.png");
                     var password = File.ReadAllLines(file).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
                     controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = "9862436";
                     controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = password;
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
                 }
-                if (stage == 1 && window.DiagnosticPage == "issues")
+                if (stage == 1 && window.DiagnosticPage == "home")
                 {
-                    using var screenshot = new Bitmap(window.Width, window.Height);
-                    window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
-                    screenshot.Save(Path.Combine(AppContext.BaseDirectory, "native-ui-screenshot.png"));
-                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 2;
+                    Capture(window, "native-home.png");
+                    controls.OfType<Button>().First(x => x.Text == "תקלות").PerformClick(); stage = 2;
                 }
-                if (stage == 2 && window.DiagnosticPage == "keys")
-                { controls.OfType<Button>().First(x => x.Text == "משתמשים").PerformClick(); stage = 3; }
-                if (stage == 3 && window.DiagnosticPage == "users") { stage = 4; window.Close(); }
+                if (stage == 2 && window.DiagnosticPage == "issues")
+                {
+                    Capture(window, "native-issues.png");
+                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 3;
+                }
+                if (stage == 3 && window.DiagnosticPage == "keys")
+                {
+                    Capture(window, "native-keys.png");
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 4;
+                }
+                if (stage == 4 && window.DiagnosticPage == "management")
+                {
+                    Capture(window, "native-management.png");
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("ניהול משתמשים")).PerformClick(); stage = 5;
+                }
+                if (stage == 5 && window.DiagnosticPage == "users") { Capture(window, "native-users.png"); stage = 6; window.Close(); }
             }
             catch (Exception ex) { failure = ex.ToString(); window.Close(); }
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 4) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 6) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+    }
+    private static void Capture(Form window, string file)
+    {
+        using var screenshot = new Bitmap(window.Width, window.Height);
+        window.DrawToBitmap(screenshot, new Rectangle(Point.Empty, window.Size));
+        screenshot.Save(Path.Combine(AppContext.BaseDirectory, file));
     }
     public static void VerifyPdf()
     {
