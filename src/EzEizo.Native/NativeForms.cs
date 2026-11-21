@@ -94,7 +94,7 @@ public sealed partial class NativeWindow
     }
     private static FlowLayoutPanel EditorBar(FlowLayoutPanel stack)
     {
-        var bar = new FlowLayoutPanel { Width = 745, Height = 65, WrapContents = false,
+        var bar = new FlowLayoutPanel { Name = "EditorToolbar", Width = 745, Height = 65, WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight, BackColor = Color.White,
             Padding = new Padding(8, 8, 8, 0), Margin = new Padding(0, 0, 0, 15) };
         stack.Controls.Add(bar);
