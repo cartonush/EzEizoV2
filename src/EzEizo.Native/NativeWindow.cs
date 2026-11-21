@@ -20,6 +20,7 @@ public sealed partial class NativeWindow : Form
     private Account? account;
     private string currentPage = "";
     private string searchTerm = "";
+    private int? lastListVersion;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 10000 };
 
     public NativeWindow(AppRole role)
@@ -53,7 +54,13 @@ public sealed partial class NativeWindow : Form
         refreshTimer.Tick += async (_, _) =>
         {
             if (account is null || currentPage is not ("issues" or "keys")) return;
-            await OpenList(currentPage, silent: true);
+            var page = currentPage; var user = account;
+            try
+            {
+                var revision = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
+                if (account == user && currentPage == page && revision != lastListVersion) await OpenList(page, silent: true);
+            }
+            catch (Exception ex) { status.Text = "בדיקת עדכונים נכשלה: " + ex.Message; }
         };
         FormClosed += (_, _) => { refreshTimer.Stop(); jobs.CompleteAdding(); };
     }
@@ -151,6 +158,7 @@ public sealed partial class NativeWindow : Form
         try
         {
             var data = await Work(() => store.List(page == "issues" ? "issues" : "keyLoads", user));
+            lastListVersion = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
             if (account != user || silent && currentPage != page) return;
             currentPage = page;
             refreshTimer.Start();
