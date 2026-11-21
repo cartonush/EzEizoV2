@@ -1,4 +1,4 @@
-name: Build EzEizo Windows 2.5.1
+name: Build EzEizo Windows 2.5.2
 
 on:
   workflow_dispatch:
@@ -52,7 +52,7 @@ jobs:
           if (!$vs) { throw 'Visual C++ build tools not found' }
           $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
           $output = (Resolve-Path dist/EzEizo).Path + '\Metis.exe'
-          $line = 'call "' + $devcmd + '" -arch=x64 >nul && cl.exe /nologo /O2 /MT /EHsc /DUNICODE /D_UNICODE /Fe:"' + $output + '" launch\NativeLauncher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib /OUT:"' + $output + '"'
+          $line = 'call "' + $devcmd + '" -arch=x64 >nul && cl.exe /nologo /O2 /MT /EHsc /utf-8 /DUNICODE /D_UNICODE /Fe:"' + $output + '" launch\NativeLauncher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib /OUT:"' + $output + '"'
           cmd /c $line
           if ($LASTEXITCODE -ne 0 -or !(Test-Path $output)) { throw 'Native launcher compilation failed' }
           Copy-Item $output dist/EzEizo/Mechanic.exe
@@ -169,7 +169,7 @@ jobs:
           Write-Host ("Package size: {0:N1} MiB" -f ($bytes / 1MB))
       - uses: actions/upload-artifact@v4
         with:
-          name: EzEizo-Windows-2.5.1-files
+          name: EzEizo-Windows-2.5.2-files
           path: dist/EzEizo
           retention-days: 30
       - name: Publish versioned Windows ZIP
@@ -177,7 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.1.zip -Force
-          $tag = 'v2.5.1'
+          Compress-Archive -Path dist/EzEizo -DestinationPath dist/EzEizo-Windows-2.5.2.zip -Force
+          $tag = 'v2.5.2'
           $notes = 'Native Windows manager and technician applications using local Access without WebView2 or Internet. Extract EzEizo to Desktop. Preserve the existing data folder when updating. See README.txt.'
-          gh release create $tag dist/EzEizo-Windows-2.5.1.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.1' --notes $notes
+          gh release create $tag dist/EzEizo-Windows-2.5.2.zip --target $env:GITHUB_SHA --title 'EzEizo Windows 2.5.2' --notes $notes

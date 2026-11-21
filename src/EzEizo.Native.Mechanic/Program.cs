@@ -5,7 +5,9 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        ApplicationConfiguration.Initialize();
+        NativeStartup.Mark("Mechanic", "Main started");
+        try { ApplicationConfiguration.Initialize(); }
+        catch (Exception ex) { NativeStartup.Failure("Mechanic", ex); return; }
         if (args.Contains("--probe-startup") || args.Contains("--ui-smoke-tech"))
         {
             try
@@ -16,6 +18,13 @@ internal static class Program
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "native-test-error.txt"), ex.ToString()); Environment.Exit(1); }
         }
-        Application.Run(new EzEizo.Core.NativeWindow(AppRole.Mechanic));
+        try
+        {
+            Application.ThreadException += (_, eventArgs) => NativeStartup.Failure("Mechanic", eventArgs.Exception);
+            NativeStartup.Mark("Mechanic", "Opening native window");
+            Application.Run(new EzEizo.Core.NativeWindow(AppRole.Mechanic));
+            NativeStartup.Mark("Mechanic", "Window closed normally");
+        }
+        catch (Exception ex) { NativeStartup.Failure("Mechanic", ex); }
     }
 }

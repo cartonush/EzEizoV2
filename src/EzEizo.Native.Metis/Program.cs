@@ -5,7 +5,9 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        ApplicationConfiguration.Initialize();
+        NativeStartup.Mark("Metis", "Main started");
+        try { ApplicationConfiguration.Initialize(); }
+        catch (Exception ex) { NativeStartup.Failure("Metis", ex); return; }
         if (args.Contains("--self-test") || args.Contains("--verify-pdf") || args.Contains("--probe-startup") || args.Contains("--seed-template") || args.Contains("--ui-smoke"))
         {
             try
@@ -23,6 +25,13 @@ internal static class Program
                 Environment.Exit(1);
             }
         }
-        Application.Run(new EzEizo.Core.NativeWindow(AppRole.Manager));
+        try
+        {
+            Application.ThreadException += (_, eventArgs) => NativeStartup.Failure("Metis", eventArgs.Exception);
+            NativeStartup.Mark("Metis", "Opening native window");
+            Application.Run(new EzEizo.Core.NativeWindow(AppRole.Manager));
+            NativeStartup.Mark("Metis", "Window closed normally");
+        }
+        catch (Exception ex) { NativeStartup.Failure("Metis", ex); }
     }
 }
