@@ -22,13 +22,14 @@ public sealed partial class NativeWindow : Form
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
     private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, OnDark = true, Width = 105, Height = 37 };
     private string documentSection = "issues";
-    private NativeCard? activeCard;
+    private Panel? activeCard;
     private readonly List<NativeButton> navButtons = [];
     private Account? account;
     private string currentPage = "";
     private string readyPage = "";
     private string searchTerm = "";
     private string statusFilter = "הכל";
+    private string listSection = "";
     private int? lastListVersion;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 10000 };
 
@@ -43,11 +44,11 @@ public sealed partial class NativeWindow : Form
         Font = new Font("Segoe UI", 11);
         header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.5.3";
+        Text += " · 2.5.4";
         header.Manager = role == AppRole.Manager;
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
             Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
-        var version = new NativeBadge { Text = "v2.5.3", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.5.4", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
         header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
@@ -175,12 +176,12 @@ public sealed partial class NativeWindow : Form
     private void CenterCard()
     {
         if (activeCard is null || activeCard.IsDisposed) return;
-        var desired = currentPage == "login" ? 600 : 850;
+        var desired = currentPage == "login" ? 600 : 1100;
         activeCard.Width = Math.Min(desired, Math.Max(520, content.ClientSize.Width - 32));
         var desiredHeight = currentPage switch
         {
-            "login" => 455, "home" => 520, "management" => 470,
-            "issues" or "keys" or "queue" => 530, _ => content.ClientSize.Height - 32
+            "login" => 455, "home" => 580, "management" => 530,
+            "issues" or "keys" or "queue" => content.ClientSize.Height - 32, _ => content.ClientSize.Height - 32
         };
         activeCard.Height = Math.Min(Math.Max(200, desiredHeight), content.ClientSize.Height - 32);
         activeCard.Location = new Point((content.ClientSize.Width - activeCard.Width) / 2, 16);
@@ -190,10 +191,10 @@ public sealed partial class NativeWindow : Form
         var previousControls = content.Controls.Cast<Control>().ToArray();
         content.Controls.Clear();
         foreach (var previous in previousControls) previous.Dispose();
-        var card = new NativeCard { Padding = new Padding(3) };
+        var card = new Panel { BackColor = Pale };
         stack.Dock = DockStyle.Fill;
         var toolbar = stack.Controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.Name == "EditorToolbar");
-        if (toolbar is null) card.Controls.Add(stack);
+        if (toolbar is null) card.Controls.Add(BuildPage(stack));
         else
         {
             stack.Controls.Remove(toolbar);
@@ -203,7 +204,7 @@ public sealed partial class NativeWindow : Form
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             toolbar.Dock = DockStyle.Fill;
             layout.Controls.Add(toolbar, 0, 0);
-            layout.Controls.Add(stack, 0, 1);
+            layout.Controls.Add(BuildPage(stack), 0, 1);
             card.Controls.Add(layout);
         }
         activeCard = card;
@@ -228,6 +229,59 @@ public sealed partial class NativeWindow : Form
         }
         LayoutBottomNav();
         if (!loading) readyPage = currentPage;
+    }
+    private static Control BuildPage(FlowLayoutPanel stack)
+    {
+        if (!stack.Controls.Cast<Control>().Any(x => Equals(x.Tag, "section-heading")))
+        {
+            var plain = new NativeCard { Dock = DockStyle.Fill, Padding = new Padding(3) };
+            plain.Controls.Add(stack);
+            return plain;
+        }
+
+        // Each heading begins a separate card, as in the original page. The outer
+        // panel owns the only scrollbar; grids and signatures keep their own size.
+        var page = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true,
+            FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            Padding = new Padding(0, 0, 14, 12), BackColor = Pale };
+        FlowLayoutPanel? section = null;
+        var sections = new List<(NativeCard card, FlowLayoutPanel body)>();
+        foreach (var child in stack.Controls.Cast<Control>().ToArray())
+        {
+            stack.Controls.Remove(child);
+            if (section is null || Equals(child.Tag, "section-heading"))
+            {
+                var card = new NativeCard { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    Margin = new Padding(0, 0, 0, 16), Padding = new Padding(3) };
+                section = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    FlowDirection = FlowDirection.TopDown, WrapContents = false,
+                    BackColor = Color.White, Padding = new Padding(20, 16, 20, 20) };
+                card.Controls.Add(section);
+                page.Controls.Add(card);
+                sections.Add((card, section));
+            }
+            section.Controls.Add(child);
+        }
+        void Fit()
+        {
+            var width = Math.Max(500, page.ClientSize.Width - page.Padding.Horizontal - 22);
+            foreach (var (card, body) in sections)
+            {
+                card.Width = width;
+                body.Width = width - 6;
+                var inner = width - body.Padding.Horizontal - 12;
+                foreach (Control child in body.Controls)
+                {
+                    if (child is Label or DataGridView || Equals(child.Tag, "section-heading") ||
+                        child is FlowLayoutPanel || child is CheckBox || child is NativeSkeletonBlock)
+                        child.Width = inner;
+                    else if (child is TextBox input && input.Multiline) child.Width = inner;
+                }
+            }
+        }
+        page.Resize += (_, _) => Fit();
+        page.HandleCreated += (_, _) => Fit();
+        return page;
     }
     private static void StyleGrids(Control parent)
     {
@@ -364,39 +418,59 @@ public sealed partial class NativeWindow : Form
             var data = await Work(() => store.List(page == "issues" ? "issues" : "keyLoads", user));
             lastListVersion = version;
             if (account != user || silent && currentPage != page) return;
+            if (listSection != page) { listSection = page; statusFilter = "פתוח"; searchTerm = ""; }
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
             stack.Controls.Add(Label(role == AppRole.Manager ? "מעקב צוות" : "משימות שהתקבלו", 28));
-            stack.Controls.Add(Label(page == "issues" ? role == AppRole.Manager ? "תקלות" : "רשימת משימות" : "הטענות מפתחות", 56, true));
+            var heading = Label(statusFilter switch
+            {
+                "סגור" => page == "issues" ? "תקלות סגורות" : "הטענות סגורות",
+                "ממתין לסגירה" => "תקלות לסגירה",
+                _ => page == "issues" ? "תקלות פתוחות" : "הטענות פתוחות"
+            }, 56, true);
+            stack.Controls.Add(heading);
             if (role == AppRole.Manager)
             {
-                var tabs = new FlowLayoutPanel { Width = 785, Height = 64, WrapContents = false,
+                var tabs = new FlowLayoutPanel { Width = 1020, Height = 64, WrapContents = false,
                     FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 18) };
+                var tabButtons = new List<NativeButton>();
+                void AddTab(string caption, string filter)
+                {
+                    NativeButton? tab = null;
+                    tab = (NativeButton)Button(caption, (_, _) =>
+                    {
+                        statusFilter = filter;
+                        heading.Text = caption;
+                        foreach (var button in tabButtons) { button.Active = button == tab; button.Invalidate(); }
+                        Render();
+                    });
+                    tab.Secondary = true; tab.Width = page == "issues" ? 235 : 195;
+                    tab.Active = statusFilter == filter;
+                    tabButtons.Add(tab); tabs.Controls.Add(tab);
+                }
                 if (page == "issues")
+                {
                     tabs.Controls.Add(Button("פתיחת תקלה", async (_, _) => await ShowCreateFault()));
+                    AddTab("תקלות פתוחות", "פתוח");
+                    AddTab("תקלות לסגירה", "ממתין לסגירה");
+                    AddTab("תקלות סגורות", "סגור");
+                }
                 else
                 {
                     tabs.Controls.Add(Button("הטענה חדשה", async (_, _) => await ShowCreateKey()));
                     tabs.Controls.Add(Button("היסטוריית מפתחות", async (_, _) => await OpenKeyHistory()));
+                    AddTab("הטענות פתוחות", "פתוח");
+                    AddTab("הטענות סגורות", "סגור");
                 }
                 stack.Controls.Add(tabs);
             }
-            stack.Controls.Add(Label(page == "issues" ? "כל דפי התקלות ורשומות הטיפול" : "דפי הטענת המפתחות של הצוות", 38));
-            ComboBox? statuses = null;
-            if (role == AppRole.Manager)
-            {
-                statuses = new ComboBox { Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
-                statuses.Items.AddRange(page == "issues" ? new object[] { "הכל", "פתוח", "ממתין לסגירה", "סגור" } : new object[] { "הכל", "פתוח", "סגור" });
-                statuses.SelectedItem = statusFilter;
-                if (statuses.SelectedIndex < 0) { statuses.SelectedIndex = 0; statusFilter = "הכל"; }
-                stack.Controls.Add(Label("סטטוס", 32)); stack.Controls.Add(statuses);
-            }
+            stack.Controls.Add(Label(page == "issues" ? "דפי התקלות ורשומות הטיפול" : "דפי הטענת המפתחות של הצוות", 38));
             var search = Input("חפש מספר סידורי", 20);
             search.Text = searchTerm;
             stack.Controls.Add(Label(page == "issues" ? "חיפוש לפי מספר תקלה" : "חיפוש לפי מספר הטענה", 32));
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 780, Height = 530, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var cards = new FlowLayoutPanel { Width = 1020, Height = 450, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
             void Render()
             {
@@ -416,13 +490,12 @@ public sealed partial class NativeWindow : Form
                     var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial} · מטוס {aircraft}{Environment.NewLine}{(item["status"]?.ToString() == "open" ? "פתוח" : item["status"]?.ToString() == "closed" ? "סגור" : "ממתין לסגירה")}";
                     var card = (NativeButton)Button(title, async (_, _) => await OpenDocument(page, id));
                     card.Secondary = true;
-                    card.Width = 735;
+                    card.Width = 970;
                     card.Height = 77;
                     card.TextAlign = ContentAlignment.MiddleLeft;
                     cards.Controls.Add(card);
                 }
             }
-            if (statuses is not null) statuses.SelectedIndexChanged += (_, _) => { statusFilter = statuses.SelectedItem?.ToString() ?? "הכל"; Render(); };
             search.TextChanged += (_, _) => { searchTerm = search.Text; Render(); };
             Render();
             Present(stack);
