@@ -1,11 +1,15 @@
 using System.Drawing.Drawing2D;
+using System.ComponentModel;
 
 namespace EzEizo.Core;
 
 internal sealed class NativeButton : Button
 {
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Secondary { get; set; }
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Active { get; set; }
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Danger { get; set; }
     private bool hovering;
 
