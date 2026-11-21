@@ -17,5 +17,6 @@
     <Compile Include="NativeCatalog.cs" />
     <Compile Include="NativeSignature.cs" />
     <Compile Include="NativeCreate.cs" />
+    <Compile Include="NativeManagement.cs" />
   </ItemGroup>
 </Project>
