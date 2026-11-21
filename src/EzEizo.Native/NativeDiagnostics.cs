@@ -21,7 +21,7 @@ public static class NativeDiagnostics
         {
             try
             {
-                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(45))
+                if (DateTime.UtcNow - started > TimeSpan.FromSeconds(90))
                 { failure = "Native UI navigation timed out on " + window.DiagnosticPage; window.Close(); return; }
                 var controls = Descendants(window).ToArray();
                 if (stage == 0 && window.DiagnosticPage == "login")
@@ -43,19 +43,44 @@ public static class NativeDiagnostics
                 else if (stage == 2 && window.DiagnosticPage == "issues")
                 {
                     Capture(window, "native-issues.png");
-                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 3;
+                    controls.OfType<Button>().First(x => x.Text == "פתיחת תקלה").PerformClick(); stage = 3;
                 }
-                else if (stage == 3 && window.DiagnosticPage == "keys")
+                else if (stage == 3 && window.DiagnosticPage == "new-fault")
+                {
+                    Capture(window, "native-new-fault.png");
+                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick(); stage = 4;
+                }
+                else if (stage == 4 && window.DiagnosticPage == "keys")
                 {
                     Capture(window, "native-keys.png");
-                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 4;
+                    controls.OfType<Button>().First(x => x.Text == "הטענה חדשה").PerformClick(); stage = 5;
                 }
-                else if (stage == 4 && window.DiagnosticPage == "management")
+                else if (stage == 5 && window.DiagnosticPage == "new-key")
+                {
+                    Capture(window, "native-new-key.png");
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 6;
+                }
+                else if (stage == 6 && window.DiagnosticPage == "management")
                 {
                     Capture(window, "native-management.png");
-                    controls.OfType<Button>().First(x => x.Text.StartsWith("ניהול משתמשים")).PerformClick(); stage = 5;
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("ניהול משתמשים")).PerformClick(); stage = 7;
                 }
-                else if (stage == 5 && window.DiagnosticPage == "users") { Capture(window, "native-users.png"); stage = 6; window.Close(); }
+                else if (stage == 7 && window.DiagnosticPage == "users")
+                {
+                    Capture(window, "native-users.png");
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 8;
+                }
+                else if (stage == 8 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("הפקת דוחות")).PerformClick(); stage = 9; }
+                else if (stage == 9 && window.DiagnosticPage == "reports")
+                {
+                    Capture(window, "native-reports.png");
+                    controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 10;
+                }
+                else if (stage == 10 && window.DiagnosticPage == "management")
+                { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 11; }
+                else if (stage == 11 && window.DiagnosticPage == "constants")
+                { Capture(window, "native-constants.png"); stage = 12; window.Close(); }
             }
             catch (Exception ex)
             {
@@ -67,7 +92,7 @@ public static class NativeDiagnostics
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 6) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 12) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
     }
     private static void Capture(Form window, string file)
     {
