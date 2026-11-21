@@ -10,25 +10,26 @@ public sealed partial class NativeWindow
     }
     private static FlowLayoutPanel FieldGrid() => new()
     {
-        Width = 1010, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        Width = 950, Height = 350,
         FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(0, 0, 0, 12)
     };
     private static FlowLayoutPanel FieldCell() => new()
     {
-        Width = 485, Height = 104, FlowDirection = FlowDirection.TopDown,
+        Width = 450, Height = 104, FlowDirection = FlowDirection.TopDown,
         WrapContents = false, Margin = new Padding(0, 0, 12, 8), BackColor = Color.White
     };
     private static void AddField(FlowLayoutPanel cell, string title, Control input)
     {
-        cell.Controls.Add(Label(title, 34));
-        input.Width = 460;
+        var caption = Label(title, 34); caption.Width = 420; cell.Controls.Add(caption);
+        input.Width = 420;
         cell.Controls.Add(input);
     }
     private static ComboBox Choice(FlowLayoutPanel stack, string title, IEnumerable<string> values)
     {
         var caption = Label(title);
+        if (stack.Width <= 500) caption.Width = 420;
         stack.Controls.Add(caption);
-        var box = new ComboBox { Width = 440, Height = 40, DropDownStyle = ComboBoxStyle.DropDownList,
+        var box = new ComboBox { Width = stack.Width <= 500 ? 420 : 440, Height = 40, DropDownStyle = ComboBoxStyle.DropDownList,
             Margin = new Padding(0, 0, 0, 14), Tag = caption };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
@@ -44,9 +45,14 @@ public sealed partial class NativeWindow
     private static CheckedListBox Team(FlowLayoutPanel stack, IReadOnlyList<Account> technicians)
     {
         stack.Controls.Add(Label("צוות טכנאים", 42, true));
-        var list = new CheckedListBox { Width = 440, Height = 145, CheckOnClick = true };
+        stack.Controls.Add(Label("בחר טכנאים מרשימת המשתמשים הפעילים.", 34));
+        var list = new CheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
+            CheckOnClick = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254) };
         foreach (var tech in technicians) list.Items.Add(new PersonChoice(tech));
         stack.Controls.Add(list);
+        if (technicians.Count == 0)
+            stack.Controls.Add(new Label { Text = "אין טכנאים פעילים. צור טכנאי בניהול משתמשים לפני פתיחת משימה.",
+                Width = 745, Height = 44, ForeColor = Color.FromArgb(190, 26, 42), TextAlign = ContentAlignment.MiddleLeft });
         return list;
     }
     private static Account[] Checked(CheckedListBox list) => list.CheckedItems.Cast<PersonChoice>().Select(x => x.User).ToArray();
@@ -91,7 +97,8 @@ public sealed partial class NativeWindow
                 Options(shelter, NativeCatalog.Squadrons.TryGetValue(name, out var entry) ? entry.shelters : []);
                 Options(aircraft, NativeCatalog.Squadrons.TryGetValue(name, out entry) ? entry.aircraft : []);
             };
-            shelter.SelectedIndexChanged += (_, _) => workshopCell.Visible = Selected(shelter) == "מוסך";
+            shelter.SelectedIndexChanged += (_, _) =>
+            { workshopCell.Visible = Selected(shelter) == "מוסך"; fields.Height = workshopCell.Visible ? 465 : 350; };
             var systemCell = FieldCell(); fields.Controls.Add(systemCell);
             var system = Choice(systemCell, "שם מערכת", NativeCatalog.Systems);
             var code = Input("קוד מערכת · מתמלא אוטומטית"); code.ReadOnly = true;
@@ -190,7 +197,7 @@ public sealed partial class NativeWindow
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
             Section(stack, "הטענת מפתחות");
-            var fields = FieldGrid(); stack.Controls.Add(fields);
+            var fields = FieldGrid(); fields.Height = 285; stack.Controls.Add(fields);
             var date = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
             var dateCell = FieldCell(); fields.Controls.Add(dateCell); AddField(dateCell, "תאריך", date);
             var time = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
