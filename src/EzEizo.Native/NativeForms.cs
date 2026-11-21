@@ -201,8 +201,8 @@ public sealed partial class NativeWindow
         currentPage = "fault-editor";
         var id = V(doc, "id"); var sheet = Object(doc["sheet"]);
         var key = "fault-sheet-v2:" + id;
-        var drafts = await Work(() => store.Drafts(user));
-        var state = drafts.TryGetValue(key, out var saved) ? Object(JsonNode.Parse(saved)) :
+        var saved = await Work(() => store.ReadDraft(key, user));
+        var state = saved is not null ? Object(JsonNode.Parse(saved)) :
             Object(doc["closed"]?["state"]?.DeepClone());
         var controls = new Dictionary<string, NativeSignature>();
         Section(stack, "טופס טיפול בתקלה");
