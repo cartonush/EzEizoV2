@@ -8,6 +8,22 @@ public sealed partial class NativeWindow
     {
         public override string ToString() => $"{User.Name} · {User.PersonalNumber}";
     }
+    private static FlowLayoutPanel FieldGrid() => new()
+    {
+        Width = 1010, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(0, 0, 0, 12)
+    };
+    private static FlowLayoutPanel FieldCell() => new()
+    {
+        Width = 485, Height = 104, FlowDirection = FlowDirection.TopDown,
+        WrapContents = false, Margin = new Padding(0, 0, 12, 8), BackColor = Color.White
+    };
+    private static void AddField(FlowLayoutPanel cell, string title, Control input)
+    {
+        cell.Controls.Add(Label(title, 34));
+        input.Width = 460;
+        cell.Controls.Add(input);
+    }
     private static ComboBox Choice(FlowLayoutPanel stack, string title, IEnumerable<string> values)
     {
         var caption = Label(title);
@@ -59,25 +75,31 @@ public sealed partial class NativeWindow
             Section(stack, "יצירת תקלה");
             stack.Controls.Add(Label("מלא את פרטי האירוע ופתח תקלה חדשה. היא תקבל מספר סידורי ותופיע ברשימה.", 48));
             Section(stack, "נתוני התקלה");
-            var squadron = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
-            var shelter = Choice(stack, "דת״ק", []);
-            var workshop = Choice(stack, "מוסך", ["מוסך א", "מוסך ב", "כנפ״ת"]);
-            workshop.Visible = false;
-            ((Control)workshop.Tag!).Visible = false;
-            var aircraft = Choice(stack, "מספר מטוס", []);
+            var fields = FieldGrid(); stack.Controls.Add(fields);
+            var squadCell = FieldCell(); fields.Controls.Add(squadCell);
+            var squadron = Choice(squadCell, "טייסת", NativeCatalog.Squadrons.Keys);
+            var shelterCell = FieldCell(); fields.Controls.Add(shelterCell);
+            var shelter = Choice(shelterCell, "דת״ק", []);
+            var workshopCell = FieldCell(); fields.Controls.Add(workshopCell);
+            var workshop = Choice(workshopCell, "מוסך", ["מוסך א", "מוסך ב", "כנפ״ת"]);
+            workshopCell.Visible = false;
+            var aircraftCell = FieldCell(); fields.Controls.Add(aircraftCell);
+            var aircraft = Choice(aircraftCell, "מספר מטוס", []);
             squadron.SelectedIndexChanged += (_, _) =>
             {
                 var name = Selected(squadron);
                 Options(shelter, NativeCatalog.Squadrons.TryGetValue(name, out var entry) ? entry.shelters : []);
                 Options(aircraft, NativeCatalog.Squadrons.TryGetValue(name, out entry) ? entry.aircraft : []);
             };
-            shelter.SelectedIndexChanged += (_, _) => workshop.Visible = ((Control)workshop.Tag!).Visible = Selected(shelter) == "מוסך";
-            var system = Choice(stack, "שם מערכת", NativeCatalog.Systems);
+            shelter.SelectedIndexChanged += (_, _) => workshopCell.Visible = Selected(shelter) == "מוסך";
+            var systemCell = FieldCell(); fields.Controls.Add(systemCell);
+            var system = Choice(systemCell, "שם מערכת", NativeCatalog.Systems);
             var code = Input("קוד מערכת · מתמלא אוטומטית"); code.ReadOnly = true;
-            stack.Controls.Add(Label("קוד מערכת")); stack.Controls.Add(code);
+            var codeCell = FieldCell(); fields.Controls.Add(codeCell); AddField(codeCell, "קוד מערכת", code);
             system.SelectedIndexChanged += (_, _) =>
             { var index = Array.IndexOf(NativeCatalog.Systems, Selected(system)); code.Text = index >= 0 ? NativeCatalog.Codes[index] : ""; };
-            var ew = Choice(stack, "חליפת ל״א", NativeCatalog.Ew);
+            var ewCell = FieldCell(); fields.Controls.Add(ewCell);
+            var ew = Choice(ewCell, "חליפת ל״א", NativeCatalog.Ew);
             ew.Enabled = false;
             aircraft.SelectedIndexChanged += (_, _) => { ew.Enabled = Selected(aircraft).Length > 0; if (ew.Enabled) ew.SelectedIndex = 1; };
             Section(stack, "תיאור תקלה");
@@ -168,13 +190,16 @@ public sealed partial class NativeWindow
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
             Section(stack, "הטענת מפתחות");
-            var date = new DateTimePicker { Width = 200, Format = DateTimePickerFormat.Short, Value = DateTime.Today };
-            stack.Controls.Add(Label("תאריך")); stack.Controls.Add(date);
-            var time = new DateTimePicker { Width = 200, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
-            stack.Controls.Add(Label("שעה")); stack.Controls.Add(time);
-            stack.Controls.Add(Button("השעה עכשיו", (_, _) => time.Value = DateTime.Now));
-            var squadron = Choice(stack, "טייסת", ["101", "105", "109"]);
-            var shelter = Choice(stack, "דת״ק", []);
+            var fields = FieldGrid(); stack.Controls.Add(fields);
+            var date = new DateTimePicker { Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+            var dateCell = FieldCell(); fields.Controls.Add(dateCell); AddField(dateCell, "תאריך", date);
+            var time = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };
+            var timeCell = FieldCell(); fields.Controls.Add(timeCell); AddField(timeCell, "שעה", time);
+            timeCell.Controls.Add(Button("השעה עכשיו", (_, _) => time.Value = DateTime.Now)); timeCell.Height = 154;
+            var squadCell = FieldCell(); fields.Controls.Add(squadCell);
+            var squadron = Choice(squadCell, "טייסת", ["101", "105", "109"]);
+            var shelterCell = FieldCell(); fields.Controls.Add(shelterCell);
+            var shelter = Choice(shelterCell, "דת״ק", []);
             var team = Team(stack, technicians);
             Section(stack, "רשימת הטענה");
             stack.Controls.Add(Label("חפש ובחר מטוס מהטייסת וסמן לפחות סוג מפתח אחד. שורה נוספת נפתחת אוטומטית.", 46));
