@@ -169,7 +169,13 @@ public sealed partial class NativeWindow
                 AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
             results.Columns.Add("type", "סוג"); results.Columns.Add("serial", "מספר טופס"); results.Columns.Add("squad", "טייסת");
             results.Columns.Add("aircraft", "מטוס"); results.Columns.Add("status", "סטטוס"); results.Columns.Add("date", "תאריך");
+            results.Visible = false; // The result cards below follow the original report layout.
             stack.Controls.Add(results);
+            var summary = new FlowLayoutPanel { Width = 745, Height = 82, WrapContents = false, Visible = false };
+            stack.Controls.Add(summary);
+            var resultCards = new FlowLayoutPanel { Width = 745, Height = 120, WrapContents = true,
+                AutoScroll = true, Visible = false };
+            stack.Controls.Add(resultCards);
             JsonNode[] found = [];
             stack.Controls.Add(Button("הצג דוח", (_, _) =>
             {
@@ -216,6 +222,46 @@ public sealed partial class NativeWindow
                             V(item, "status") switch { "open" => "פתוח", "pendingReview" => "ממתין לסגירה", "closed" => "סגור", var state => state },
                             DisplayDate(V(item, "createdAt")));
                     }
+                    summary.Controls.Clear();
+                    foreach (var (label, count) in new[]
+                    {
+                        ("תקלות", found.Count(x => x["sheet"] is not null)),
+                        ("מפתחות", found.Count(x => x["sheet"] is null)),
+                        ("פתוח", found.Count(x => V(x, "status") == "open")),
+                        ("ממתין לסגירה", found.Count(x => V(x, "status") == "pendingReview")),
+                        ("סגור", found.Count(x => V(x, "status") == "closed"))
+                    }) summary.Controls.Add(DetailTile(label, count.ToString(), 135));
+                    summary.Visible = true;
+                    resultCards.Controls.Clear();
+                    foreach (var item in found)
+                    {
+                        var sheet = item["sheet"] ?? item;
+                        var serial = V(item, "serial");
+                        var name = item["sheet"] is null ? "הטענת מפתחות" : "תקלה";
+                        var aircraft = V(sheet, "aircraft");
+                        if (aircraft.Length == 0)
+                            aircraft = string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(row => V(row, "aircraft")));
+                        var card = new NativeCard { Width = 361, Height = 148, Margin = new Padding(0, 0, 10, 10) };
+                        card.Controls.Add(new Label { Text = $"{name} {serial}", Location = new Point(12, 12), Width = 335, Height = 33,
+                            TextAlign = ContentAlignment.MiddleLeft, Font = NativeFonts.Create(12, FontStyle.Bold), ForeColor = Navy });
+                        card.Controls.Add(new Label { Text = $"טייסת {V(sheet, "squadron")} · מטוס {aircraft} · {V(item, "status") switch { "open" => "פתוח", "closed" => "סגור", _ => "ממתין לסגירה" }}\n{DisplayDate(V(item, "createdAt"))}",
+                            Location = new Point(12, 46), Width = 335, Height = 48, TextAlign = ContentAlignment.MiddleLeft,
+                            Font = NativeFonts.Create(9.75f), ForeColor = Muted });
+                        var download = Button("הורד טופס PDF", async (_, _) =>
+                        {
+                            try
+                            {
+                                status.Text = "מפיק את הטופס ל־PDF…";
+                                var path = await Work(() => NativePdf.SaveForm(item, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)));
+                                status.Text = $"הטופס נשמר: {path}";
+                            }
+                            catch (Exception ex) { Error(ex); }
+                        });
+                        download.Secondary = true; download.Location = new Point(12, 101);
+                        card.Controls.Add(download); resultCards.Controls.Add(card);
+                    }
+                    resultCards.Height = Math.Min(400, Math.Max(110, (int)Math.Ceiling(found.Length / 2.0) * 158 + 10));
+                    resultCards.Visible = true;
                     status.Text = $"נמצאו {found.Length} טפסים.";
                 }
                 catch (Exception ex) { Error(ex); }
@@ -243,19 +289,6 @@ public sealed partial class NativeWindow
                         records.Add(string.Join(",", row.Cells.Cast<DataGridViewCell>().Select(cell => "\"" + (cell.Value?.ToString() ?? "").Replace("\"", "\"\"") + "\"")));
                     File.WriteAllLines(file, records, new System.Text.UTF8Encoding(true));
                     status.Text = $"הקובץ נשמר: {file}";
-                }
-                catch (Exception ex) { Error(ex); }
-            }));
-            stack.Controls.Add(Button("הורד טופס שנבחר PDF", async (_, _) =>
-            {
-                try
-                {
-                    var index = results.CurrentRow?.Index ?? -1;
-                    if (index < 0 || index >= found.Length) throw new ArgumentException("בחר שורה מתוך תוצאות החיפוש.");
-                    status.Text = "מפיק את הטופס ל־PDF…";
-                    var item = found[index]; var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                    var path = await Work(() => NativePdf.SaveForm(item, desktop));
-                    status.Text = $"הטופס נשמר: {path}";
                 }
                 catch (Exception ex) { Error(ex); }
             }));
