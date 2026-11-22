@@ -437,18 +437,16 @@ public sealed partial class NativeWindow : Form
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
-            stack.Controls.Add(Label(role == AppRole.Manager ? "מעקב צוות" : "משימות שהתקבלו", 28));
-            var heading = Label(statusFilter switch
+            var heading = Section(stack, statusFilter switch
             {
                 "סגור" => page == "issues" ? "תקלות סגורות" : "הטענות סגורות",
                 "ממתין לסגירה" => "תקלות לסגירה",
                 _ => page == "issues" ? "תקלות פתוחות" : "הטענות פתוחות"
-            }, 56, true);
-            stack.Controls.Add(heading);
+            }, "מעקב צוות");
             Action render = () => { };
             if (role == AppRole.Manager)
             {
-                var tabs = new FlowLayoutPanel { Width = 785, Height = 116, WrapContents = true,
+                var tabs = new FlowLayoutPanel { Width = 785, Height = 64, WrapContents = true,
                     FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 18) };
                 var tabButtons = new List<NativeButton>();
                 void AddTab(string caption, string filter)
@@ -535,8 +533,7 @@ public sealed partial class NativeWindow : Form
             if (account != user || silent && currentPage != "queue") return;
             currentPage = "queue"; lastListVersion = version; refreshTimer.Start();
             var stack = Stack();
-            stack.Controls.Add(Label("משימות שהתקבלו", 30));
-            stack.Controls.Add(Label("רשימת משימות", 58, true));
+            Section(stack, "רשימת משימות", "משימות שהתקבלו");
             stack.Controls.Add(Label("בחר תקלה או הטענת מפתחות פתוחה מהרשימה כדי למלא את הטופס שלה.", 52));
             var search = Input("חפש מספר טופס", 20);
             stack.Controls.Add(search);

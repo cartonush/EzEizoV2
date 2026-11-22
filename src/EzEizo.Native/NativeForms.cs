@@ -82,16 +82,18 @@ public sealed partial class NativeWindow
         if (editable) stack.Controls.Add(Button("נקה חתימה", (_, _) => { pad.Clear(); state[key] = ""; }));
         return pad;
     }
-    private static void Section(FlowLayoutPanel stack, string title)
+    private static Label Section(FlowLayoutPanel stack, string title, string kicker = "פרטי טופס")
     {
         var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White,
             Tag = "section-heading", Margin = new Padding(0, 0, 0, 8) };
-        heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
+        heading.Controls.Add(new Label { Text = kicker, Location = new Point(0, 4), Width = 740, Height = 22,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = NativeFonts.Create(8.25f, FontStyle.Bold) });
-        heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
+        var titleLabel = new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) });
+        heading.Controls.Add(titleLabel);
         heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
         stack.Controls.Add(heading);
+        return titleLabel;
     }
     private static FlowLayoutPanel EditorBar(FlowLayoutPanel stack)
     {
