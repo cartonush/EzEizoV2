@@ -32,16 +32,19 @@ public sealed partial class NativeWindow
         var box = new ComboBox { Width = stack.Width <= 500 ? 365 : 440, Height = 40,
             DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend,
             AutoCompleteSource = AutoCompleteSource.ListItems,
-            Margin = new Padding(0, 0, 0, 14), Tag = caption };
+            Margin = new Padding(0, 0, 0, 14), Tag = caption,
+            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(251, 253, 254) };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
         box.SelectedIndex = 0;
+        box.SelectionStart = box.Text.Length; box.SelectionLength = 0;
         stack.Controls.Add(box);
         return box;
     }
     private static void Options(ComboBox box, IEnumerable<string> values)
     {
         box.Items.Clear(); box.Items.Add("בחר"); box.Items.AddRange(values.Cast<object>().ToArray()); box.SelectedIndex = 0;
+        box.SelectionStart = box.Text.Length; box.SelectionLength = 0;
     }
     private static string Selected(ComboBox box) => box.SelectedIndex > 0 ? box.SelectedItem?.ToString() ?? "" : "";
     private static CheckedListBox Team(FlowLayoutPanel stack, IReadOnlyList<Account> technicians)

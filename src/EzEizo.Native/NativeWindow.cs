@@ -496,6 +496,7 @@ public sealed partial class NativeWindow : Form
                     (statusFilter == "הכל" || statusFilter == "פתוח" && item["status"]?.ToString() == "open" ||
                      statusFilter == "סגור" && item["status"]?.ToString() == "closed" ||
                      statusFilter == "ממתין לסגירה" && item["status"]?.ToString() == "pendingReview")).ToArray();
+                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 88 + 12));
                 if (matching.Length == 0) cards.Controls.Add(Label("אין טפסים להצגה."));
                 foreach (var item in matching)
                 {
@@ -550,6 +551,7 @@ public sealed partial class NativeWindow : Form
                     .Concat(keys.Where(x => x["status"]?.ToString() == "open").Select(x => (page: "keys", doc: x)))
                     .Where(x => (x.doc["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase))
                     .ToArray();
+                cards.Height = Math.Min(520, Math.Max(88, tasks.Length * 91 + 12));
                 if (tasks.Length == 0) cards.Controls.Add(Label("אין משימות פתוחות במכשיר הזה.", 58));
                 foreach (var (page, doc) in tasks)
                 {
