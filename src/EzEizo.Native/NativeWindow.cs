@@ -229,15 +229,15 @@ public sealed partial class NativeWindow : Form
             if (actions.Length > 0)
             {
                 layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-                var footer = new FlowLayoutPanel { Name = "PageActions", Dock = DockStyle.Fill,
-                    FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(14, 10, 14, 5),
-                    BackColor = Color.White };
-                foreach (var action in actions)
+                var footer = new Panel { Name = "PageActions", Dock = DockStyle.Fill, BackColor = Color.White };
+                foreach (var action in actions) footer.Controls.Add(action);
+                void ArrangeActions()
                 {
-                    action.Width = Math.Max(175, Math.Min(250, (Math.Max(540, card.Width) - 40) / actions.Length - 8));
-                    action.Margin = new Padding(0, 0, 9, 0);
-                    footer.Controls.Add(action);
+                    var each = Math.Min(240, Math.Max(145, (footer.ClientSize.Width - 40 - 10 * (actions.Length - 1)) / actions.Length));
+                    for (var i = 0; i < actions.Length; i++)
+                        actions[i].SetBounds(footer.ClientSize.Width - 24 - each - i * (each + 10), 11, each, 44);
                 }
+                footer.Resize += (_, _) => ArrangeActions();
                 layout.Controls.Add(footer, 0, layout.RowCount - 1);
             }
             card.Controls.Add(layout);
@@ -649,7 +649,7 @@ public sealed partial class NativeWindow : Form
             var name = Input("שם מלא", 100); stack.Controls.Add(name);
             var number = Input("מספר אישי · 7 ספרות", 7); stack.Controls.Add(number);
             var password = Input("סיסמה · 6 ספרות", 6, true); stack.Controls.Add(password);
-            stack.Controls.Add(Button("צור טכנאי", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("צור טכנאי", async (_, _) =>
             {
                 try
                 {

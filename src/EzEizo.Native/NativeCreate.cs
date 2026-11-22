@@ -371,7 +371,7 @@ public sealed partial class NativeWindow
                 foreach (var row in sheet["rows"] as JsonArray ?? new()) rows.Rows.Add(V(row, "aircraft"), B(row, "blue"), B(row, "shach"), V(row, "notes"));
                 stack.Controls.Add(rows);
             }
-            stack.Controls.Add(Button("שמור שינויים", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("שמור שינויים", async (_, _) =>
             {
                 try
                 {

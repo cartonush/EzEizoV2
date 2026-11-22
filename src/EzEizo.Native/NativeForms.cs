@@ -123,7 +123,7 @@ public sealed partial class NativeWindow
             if (page == "issues" && statusValue == "pendingReview")
             {
                 var reviewer = Signature(stack, "חתימת בודק הדף", new JsonObject(), "reviewerSignature", true);
-                stack.Controls.Add(Button("בדוק וסגור", async (_, _) =>
+                stack.Controls.Add(PrimaryAction("בדוק וסגור", async (_, _) =>
                 {
                     if (!reviewer.HasSignature) { status.Text = "חתימת בודק הדף חסרה."; return; }
                     try
@@ -148,7 +148,7 @@ public sealed partial class NativeWindow
             if (statusValue == "open")
             {
                 var note = Field(stack, "הוסף הערת מנהל", new JsonObject(), "note", true);
-                stack.Controls.Add(Button("שמור הערה", async (_, _) =>
+                stack.Controls.Add(PrimaryAction("שמור הערה", async (_, _) =>
                 {
                     try
                     {
@@ -346,12 +346,10 @@ public sealed partial class NativeWindow
             }
             else if (i == 10)
             {
-                stack.Controls.Add(Label($"11. {NativeCatalog.Actions[i]}"));
-                var choice = new ComboBox { Width = 240, DropDownStyle = ComboBoxStyle.DropDownList };
-                choice.Items.AddRange(["בחר תוצאה", "✓ בוצע", "X לא נדרש"]);
+                var choice = Choice(stack, $"11. {NativeCatalog.Actions[i]}", ["✓ בוצע", "X לא נדרש"]);
+                choice.DropDownStyle = ComboBoxStyle.DropDownList;
                 choice.SelectedIndex = V(state, "action11Result") == "done" ? 1 : V(state, "action11Result") == "notRequired" ? 2 : 0;
                 choice.SelectedIndexChanged += (_, _) => { state["action11Result"] = choice.SelectedIndex == 1 ? "done" : choice.SelectedIndex == 2 ? "notRequired" : ""; actionValues[index] = choice.SelectedIndex > 0; };
-                stack.Controls.Add(choice);
             }
             else
             {

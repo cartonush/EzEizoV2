@@ -32,7 +32,7 @@ public sealed partial class NativeWindow
                     foreach (var row in entries as JsonArray ?? new JsonArray())
                         grid.Rows.Add(group, row?[0]?.ToString(), row?[1]?.ToString());
             };
-            stack.Controls.Add(Button("שמור קבועים", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("שמור קבועים", async (_, _) =>
             {
                 if (Selected(plane).Length == 0) { status.Text = "בחר טייסת ומטוס מהרשימות."; return; }
                 try
