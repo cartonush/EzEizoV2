@@ -333,7 +333,7 @@ public sealed partial class NativeWindow : Form
         stack.Controls.Add(Label("דף בית", 29));
         stack.Controls.Add(Label("שלום " + account.Name, 58, true));
         stack.Controls.Add(Label("בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.", 45));
-        var tiles = new FlowLayoutPanel { Width = 970, Height = 370, WrapContents = true };
+        var tiles = new FlowLayoutPanel { Width = 780, Height = 370, WrapContents = true };
         foreach (var (title, detail, action) in new (string, string, Func<Task>)[]
         {
             ("פתיחת תקלה", "יצירת דף טיפול חדש לטכנאים", ShowCreateFault),
@@ -345,7 +345,7 @@ public sealed partial class NativeWindow : Form
         })
         {
             var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 465; tile.Height = 105;
+            tile.Secondary = true; tile.Width = 378; tile.Height = 105;
             tile.TileTitle = title; tile.TileDescription = detail;
             tiles.Controls.Add(tile);
         }
@@ -585,7 +585,7 @@ public sealed partial class NativeWindow : Form
             Section(stack, "ניהול משתמשים");
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 950, Height = Math.Min(350, Math.Max(75, users.Count * 58 + 12)),
+            var list = new FlowLayoutPanel { Width = 780, Height = Math.Min(480, Math.Max(105, users.Count * 108 + 12)),
                 AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
@@ -593,20 +593,23 @@ public sealed partial class NativeWindow : Form
                 list.Controls.Clear();
                 foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
                 {
-                    var row = new FlowLayoutPanel { Width = 850, Height = 54, WrapContents = false };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 280, Height = 45, TextAlign = ContentAlignment.MiddleLeft });
-                    row.Controls.Add(Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)));
-                    row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
+                    var row = new FlowLayoutPanel { Width = 750, Height = 101, WrapContents = true };
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = 740, Height = 38, TextAlign = ContentAlignment.MiddleLeft });
+                    var history = Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 175; row.Controls.Add(history);
+                    var active = Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                    }));
-                    if (!person.Active) row.Controls.Add(Button("מחק לצמיתות", async (_, _) =>
+                    }); active.Width = 175; row.Controls.Add(active);
+                    if (!person.Active)
                     {
+                        var delete = Button("מחק לצמיתות", async (_, _) =>
+                        {
                         if (MessageBox.Show(this, $"למחוק לצמיתות את {person.Name}?", "מחיקה סופית", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                         try { await Work(() => { database.DeleteTechnician(person.Id); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                    }));
+                        }); delete.Width = 175; row.Controls.Add(delete);
+                    }
                     list.Controls.Add(row);
                 }
             }

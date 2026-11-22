@@ -191,7 +191,7 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 2 && window.DiagnosticPage == "fault-editor")
                 {
-                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות אחזקה", "יחידות שפורקו והורכבו", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
+                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות לביצוע", "יחידות שפורקו והורכבו", "קבועים", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
                         if (!controls.OfType<Label>().Any(x => x.Text == title))
                             throw new InvalidOperationException("Fault editor is missing: " + title);
                     Capture(window, "native-technician-fault.png");
