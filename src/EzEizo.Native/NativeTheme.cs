@@ -83,6 +83,135 @@ internal sealed class NativeButton : Button
     }
 }
 
+
+internal sealed class NativeCheckBox : CheckBox
+{
+    private static readonly Color Teal = Color.FromArgb(22, 139, 121);
+    private static readonly Color Ink = Color.FromArgb(21, 43, 64);
+    private bool hovering;
+
+    public NativeCheckBox()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        UseVisualStyleBackColor = false;
+        Cursor = Cursors.Hand;
+        BackColor = Color.FromArgb(249, 251, 252);
+        ForeColor = Ink;
+        Padding = new Padding(12, 0, 12, 0);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Parent?.BackColor ?? Color.White);
+
+        var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
+        if (bounds.Width < 2 || bounds.Height < 2) return;
+        var surface = !Enabled ? Color.FromArgb(240, 244, 246) :
+            hovering ? Color.FromArgb(243, 249, 250) : BackColor;
+        var borderColor = Checked ? Color.FromArgb(173, 216, 205) : Color.FromArgb(223, 233, 238);
+        using (var path = NativeButton.Rounded(bounds, 12))
+        using (var brush = new SolidBrush(surface))
+        using (var pen = new Pen(borderColor))
+        {
+            g.FillPath(brush, path);
+            g.DrawPath(pen, path);
+            if (Focused && ShowFocusCues)
+            {
+                using var focusPen = new Pen(Color.FromArgb(79, 158, 194), 2);
+                g.DrawPath(focusPen, path);
+            }
+        }
+
+        const int size = 23;
+        var markX = RightToLeft == RightToLeft.Yes ? Width - Padding.Right - size - 6 : Padding.Left + 6;
+        var mark = new Rectangle(markX, Math.Max(4, (Height - size) / 2), size, size);
+        using (var markPath = NativeButton.Rounded(mark, 6))
+        using (var markFill = new SolidBrush(Checked ? Teal : Color.White))
+        using (var markBorder = new Pen(Checked ? Teal : Color.FromArgb(174, 191, 201), 1.5f))
+        {
+            g.FillPath(markFill, markPath);
+            g.DrawPath(markBorder, markPath);
+        }
+        if (Checked)
+        {
+            using var checkPen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawLines(checkPen, [new Point(mark.Left + 6, mark.Top + 12),
+                new Point(mark.Left + 10, mark.Top + 16), new Point(mark.Left + 18, mark.Top + 7)]);
+        }
+
+        var textLeft = RightToLeft == RightToLeft.Yes ? Padding.Left + 4 : mark.Right + 10;
+        var textRight = RightToLeft == RightToLeft.Yes ? mark.Left - 10 : Width - Padding.Right - 4;
+        var textBounds = new Rectangle(textLeft, 3, Math.Max(0, textRight - textLeft), Height - 6);
+        var flags = TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis |
+            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left);
+        TextRenderer.DrawText(g, Text, Font, textBounds, Enabled ? ForeColor : Color.FromArgb(126, 143, 153), flags);
+    }
+}
+
+internal sealed class NativeCheckedListBox : CheckedListBox
+{
+    private static readonly Color Teal = Color.FromArgb(22, 139, 121);
+    public NativeCheckedListBox()
+    {
+        DrawMode = DrawMode.OwnerDrawFixed;
+        ItemHeight = 36;
+        IntegralHeight = false;
+        CheckOnClick = true;
+        BorderStyle = BorderStyle.None;
+        BackColor = Color.White;
+    }
+
+    protected override void OnDrawItem(DrawItemEventArgs e)
+    {
+        if (e.Index < 0 || e.Index >= Items.Count) return;
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var row = Rectangle.Inflate(e.Bounds, -2, -2);
+        var selected = (e.State & DrawItemState.Selected) != 0;
+        using (var path = NativeButton.Rounded(row, 8))
+        using (var fill = new SolidBrush(selected ? Color.FromArgb(235, 246, 249) : Color.FromArgb(249, 251, 252)))
+        using (var border = new Pen(selected ? Color.FromArgb(139, 190, 207) : Color.FromArgb(225, 233, 238)))
+        {
+            g.FillPath(fill, path);
+            g.DrawPath(border, path);
+        }
+
+        var size = 20;
+        var mark = new Rectangle(RightToLeft == RightToLeft.Yes ? row.Right - 32 : row.Left + 10,
+            row.Top + (row.Height - size) / 2, size, size);
+        using (var markPath = NativeButton.Rounded(mark, 5))
+        using (var markFill = new SolidBrush(GetItemChecked(e.Index) ? Teal : Color.White))
+        using (var markBorder = new Pen(GetItemChecked(e.Index) ? Teal : Color.FromArgb(174, 191, 201), 1.4f))
+        {
+            g.FillPath(markFill, markPath);
+            g.DrawPath(markBorder, markPath);
+        }
+        if (GetItemChecked(e.Index))
+        {
+            using var pen = new Pen(Color.White, 2) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawLines(pen, [new Point(mark.Left + 5, mark.Top + 10),
+                new Point(mark.Left + 9, mark.Top + 14), new Point(mark.Left + 16, mark.Top + 6)]);
+        }
+        var textLeft = RightToLeft == RightToLeft.Yes ? row.Left + 10 : mark.Right + 10;
+        var textRight = RightToLeft == RightToLeft.Yes ? mark.Left - 10 : row.Right - 10;
+        var textBounds = new Rectangle(textLeft, row.Top, Math.Max(0, textRight - textLeft), row.Height);
+        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left);
+        TextRenderer.DrawText(g, GetItemText(Items[e.Index]), Font, textBounds,
+            Enabled ? Color.FromArgb(21, 43, 64) : Color.FromArgb(126, 143, 153), flags);
+        if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
+    }
+}
+
 internal sealed class NativeCard : Panel
 {
     public NativeCard()
