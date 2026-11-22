@@ -89,7 +89,7 @@ public sealed partial class NativeWindow
         heading.Controls.Add(new Label { Text = kicker, Location = new Point(0, 4), Width = 740, Height = 22,
             TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = NativeFonts.Create(8.25f, FontStyle.Bold) });
         var titleLabel = new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) });
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) };
         heading.Controls.Add(titleLabel);
         heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
         stack.Controls.Add(heading);
