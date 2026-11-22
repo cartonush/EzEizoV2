@@ -174,10 +174,10 @@ internal static class NativePdf
         document.PrintPage += (_, e) =>
         {
             if (e.Graphics is null) return;
-            using var textFont = new Font("Arial", 10);
-            using var titleFont = new Font("Arial", 13, FontStyle.Bold);
-            using var tableFont = new Font("Arial", 8.5f);
-            using var tableHeaderFont = new Font("Arial", 8.5f, FontStyle.Bold);
+            using var textFont = NativeFonts.Create(10);
+            using var titleFont = NativeFonts.Create(13, FontStyle.Bold);
+            using var tableFont = NativeFonts.Create(8.5f);
+            using var tableHeaderFont = NativeFonts.Create(8.5f, FontStyle.Bold);
             using var format = new StringFormat(StringFormatFlags.DirectionRightToLeft) { Alignment = StringAlignment.Near };
             var x = e.MarginBounds.Left; var y = e.MarginBounds.Top;
             while (index < parts.Count)

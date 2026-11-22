@@ -15,21 +15,21 @@ public sealed partial class NativeWindow
     };
     private static FlowLayoutPanel FieldCell() => new()
     {
-        Width = 410, Height = 104, FlowDirection = FlowDirection.TopDown,
+        Width = 378, Height = 104, FlowDirection = FlowDirection.TopDown,
         WrapContents = false, Margin = new Padding(0, 0, 8, 8), BackColor = Color.White
     };
     private static void AddField(FlowLayoutPanel cell, string title, Control input)
     {
-        var caption = Label(title, 34); caption.Width = 380; cell.Controls.Add(caption);
-        input.Width = 380;
+        var caption = Label(title, 34); caption.Width = 365; cell.Controls.Add(caption);
+        input.Width = 365;
         cell.Controls.Add(input);
     }
     private static ComboBox Choice(FlowLayoutPanel stack, string title, IEnumerable<string> values)
     {
         var caption = Label(title);
-        if (stack.Width <= 500) caption.Width = 380;
+        if (stack.Width <= 500) caption.Width = 365;
         stack.Controls.Add(caption);
-        var box = new ComboBox { Width = stack.Width <= 500 ? 380 : 440, Height = 40,
+        var box = new ComboBox { Width = stack.Width <= 500 ? 365 : 440, Height = 40,
             DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend,
             AutoCompleteSource = AutoCompleteSource.ListItems,
             Margin = new Padding(0, 0, 0, 14), Tag = caption };

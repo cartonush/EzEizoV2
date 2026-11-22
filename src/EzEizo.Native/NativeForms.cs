@@ -56,7 +56,7 @@ public sealed partial class NativeWindow
     private static TextBox Field(FlowLayoutPanel stack, string label, JsonObject state, string key, bool multi = false)
     {
         var caption = Label(label, label.Length > 80 ? 100 : 32);
-        caption.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        caption.Font = NativeFonts.Create(9.75f, FontStyle.Bold);
         stack.Controls.Add(caption);
         var input = Input(label, 2000);
         if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; input.Width = 735; }
@@ -69,7 +69,7 @@ public sealed partial class NativeWindow
     {
         var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 49,
             ForeColor = Navy, BackColor = Color.FromArgb(249, 251, 252), Padding = new Padding(12, 0, 12, 0),
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
+            Font = NativeFonts.Create(9.75f, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
         box.CheckedChanged += (_, _) => state[key] = box.Checked;
         stack.Controls.Add(box);
         return box;
@@ -87,9 +87,9 @@ public sealed partial class NativeWindow
         var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White,
             Tag = "section-heading", Margin = new Padding(0, 0, 0, 8) };
         heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = NativeFonts.Create(8.25f, FontStyle.Bold) });
         heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = new Font("Segoe UI", 16, FontStyle.Bold) });
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) });
         heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
         stack.Controls.Add(heading);
     }
@@ -105,7 +105,7 @@ public sealed partial class NativeWindow
     {
         Text = "הנתונים נשמרים במסד המקומי לאחר לחיצה על שמירה",
         Width = 335, Height = 44, TextAlign = ContentAlignment.MiddleCenter,
-        ForeColor = Navy, Font = new Font("Segoe UI", 9)
+        ForeColor = Navy, Font = NativeFonts.Create(8.25f)
     };
 
     private async Task AddDocumentActions(FlowLayoutPanel stack, string page, JsonNode doc)

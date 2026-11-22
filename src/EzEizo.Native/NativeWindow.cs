@@ -42,10 +42,10 @@ public sealed partial class NativeWindow : Form
         Size = new Size(1120, 820);
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
-        Font = new Font("Segoe UI", 11);
+        Font = NativeFonts.Create(10);
         header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.5.4";
+        Text += " · 2.6.0";
         header.Manager = role == AppRole.Manager;
         status.TextChanged += (_, _) =>
         {
@@ -54,8 +54,8 @@ public sealed partial class NativeWindow : Form
             status.ForeColor = warning ? Color.FromArgb(205, 22, 43) : Navy;
         };
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
-            Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
-        var version = new NativeBadge { Text = "v2.5.4", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            Size = new Size(44, 44), Font = NativeFonts.Create(18, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.6.0", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
         header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
@@ -84,7 +84,7 @@ public sealed partial class NativeWindow : Form
                 ("מפתחות", () => OpenList("keys")), ("ניהול", OpenManagementHome)
             })
             {
-                var button = new NativeButton { Text = title, Secondary = true, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+                var button = new NativeButton { Text = title, Secondary = true, Font = NativeFonts.Create(9, FontStyle.Bold) };
                 button.Click += async (_, _) => await action();
                 bottomNav.Controls.Add(button);
                 navButtons.Add(button);
@@ -155,14 +155,14 @@ public sealed partial class NativeWindow : Form
     private static Label Label(string text, int height = 34, bool bold = false) => new()
     {
         Text = text, Width = 750, Height = height, TextAlign = ContentAlignment.MiddleLeft,
-        ForeColor = Navy, Font = new Font("Segoe UI", bold ? 17 : 11, bold ? FontStyle.Bold : FontStyle.Regular)
+        ForeColor = Navy, Font = NativeFonts.Create(bold ? 14.25f : 10, bold ? FontStyle.Bold : FontStyle.Regular)
     };
     private static Button Button(string label, EventHandler click)
     {
-        using var measuredFont = new Font("Segoe UI", 10, FontStyle.Bold);
+        using var measuredFont = NativeFonts.Create(9.75f, FontStyle.Bold);
         var measuredWidth = TextRenderer.MeasureText(label.Replace(Environment.NewLine, " "), measuredFont).Width;
         var button = new NativeButton { Text = label, Width = Math.Clamp(measuredWidth + 42, 175, 350), Height = 44,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 7, 12) };
+            Font = NativeFonts.Create(9.75f, FontStyle.Bold), Margin = new Padding(0, 0, 7, 12) };
         button.Click += click;
         return button;
     }
@@ -180,16 +180,16 @@ public sealed partial class NativeWindow : Form
         var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
             Margin = new Padding(0, 0, 10, 10), Padding = new Padding(10) };
         tile.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 25,
-            ForeColor = Muted, Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.MiddleLeft });
+            ForeColor = Muted, Font = NativeFonts.Create(8.25f), TextAlign = ContentAlignment.MiddleLeft });
         tile.Controls.Add(new Label { Text = value, Dock = DockStyle.Bottom, Height = 31,
-            ForeColor = Navy, Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = Navy, Font = NativeFonts.Create(11.25f, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true });
         return tile;
     }
     private void CenterCard()
     {
         if (activeCard is null || activeCard.IsDisposed) return;
-        var desired = currentPage == "login" ? 600 : 1100;
+        var desired = currentPage == "login" ? 600 : 880;
         activeCard.Width = Math.Min(desired, Math.Max(520, content.ClientSize.Width - 32));
         var desiredHeight = currentPage switch
         {

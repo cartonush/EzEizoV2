@@ -56,8 +56,8 @@ internal sealed class NativeButton : Button
         {
             var textFlags = TextFormatFlags.RightToLeft | TextFormatFlags.Right |
                 TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis;
-            using var titleFont = new Font("Segoe UI", 13, FontStyle.Bold);
-            using var descriptionFont = new Font("Segoe UI", 10);
+            using var titleFont = NativeFonts.Create(13.5f, FontStyle.Bold);
+            using var descriptionFont = NativeFonts.Create(9.75f);
             TextRenderer.DrawText(e.Graphics, TileTitle, titleFont,
                 new Rectangle(bounds.Left + 17, bounds.Top + 19, bounds.Width - 34, 29),
                 Color.FromArgb(23, 59, 93), textFlags);
@@ -131,9 +131,9 @@ internal sealed class NativeHeader : Panel
         var left = Width - 595;
         const TextFormatFlags flags = TextFormatFlags.RightToLeft | TextFormatFlags.Right |
             TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-        using var eyebrowFont = new Font("Segoe UI", 9, FontStyle.Bold);
-        using var headingFont = new Font("Segoe UI", 17, FontStyle.Bold);
-        using var subtitleFont = new Font("Segoe UI", 10);
+        using var eyebrowFont = NativeFonts.Create(8.25f, FontStyle.Bold);
+        using var headingFont = NativeFonts.Create(14.25f, FontStyle.Bold);
+        using var subtitleFont = NativeFonts.Create(9);
         TextRenderer.DrawText(e.Graphics, "כנף 1 - טייסת תחזוקה", eyebrowFont,
             new Rectangle(left, 5, 500, 17), Color.FromArgb(176, 203, 221), flags);
         TextRenderer.DrawText(e.Graphics, Heading, headingFont,
