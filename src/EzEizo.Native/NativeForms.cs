@@ -67,7 +67,7 @@ public sealed partial class NativeWindow
     }
     private static CheckBox Check(FlowLayoutPanel stack, string label, JsonObject state, string key)
     {
-        var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 49,
+        var box = new NativeCheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 49,
             ForeColor = Navy, BackColor = Color.FromArgb(249, 251, 252), Padding = new Padding(12, 0, 12, 0),
             Font = NativeFonts.Create(9.75f, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
         box.CheckedChanged += (_, _) => state[key] = box.Checked;
@@ -355,7 +355,7 @@ public sealed partial class NativeWindow
             }
             else
             {
-                var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.Actions[i]}", Width = 750, Height = 45,
+                var box = new NativeCheckBox { Text = $"{i + 1:D2}. {NativeCatalog.Actions[i]}", Width = 750, Height = 45,
                     Checked = bool.TryParse(actionValues[i]?.ToString(), out var checkedValue) && checkedValue };
                 box.CheckedChanged += (_, _) => actionValues[index] = box.Checked;
                 stack.Controls.Add(box);
@@ -617,7 +617,7 @@ public sealed partial class NativeWindow
         for (var i = 0; i < 12; i++)
         {
             var index = i;
-            var box = new CheckBox { Text = $"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", Width = 745, Height = 48,
+            var box = new NativeCheckBox { Text = $"{i + 1:D2}. {NativeCatalog.KeyActions[i]}", Width = 745, Height = 48,
                 Checked = i == 0 || bool.TryParse(actions[i]?.ToString(), out var b) && b, Enabled = i != 0 };
             box.CheckedChanged += (_, _) => actions[index] = box.Checked;
             taskGroup.Controls.Add(box);
