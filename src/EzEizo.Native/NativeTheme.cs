@@ -107,6 +107,26 @@ internal sealed class NativeCheckBox : CheckBox
     protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
 
+    internal static void DrawMark(Graphics g, Rectangle mark, bool isChecked, bool enabled = true)
+    {
+        var fillColor = isChecked ? Color.FromArgb(22, 139, 121) : Color.White;
+        var borderColor = isChecked ? Color.FromArgb(22, 139, 121) : Color.FromArgb(174, 191, 201);
+        using (var markPath = NativeButton.Rounded(mark, 6))
+        using (var markFill = new SolidBrush(enabled ? fillColor : Color.FromArgb(240, 244, 246)))
+        using (var markBorder = new Pen(enabled ? borderColor : Color.FromArgb(205, 215, 221), 1.5f))
+        {
+            g.FillPath(markFill, markPath);
+            g.DrawPath(markBorder, markPath);
+        }
+        if (isChecked)
+        {
+            using var checkPen = new Pen(enabled ? Color.White : Color.FromArgb(126, 143, 153), 2.2f)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawLines(checkPen, [new Point(mark.Left + 6, mark.Top + 12),
+                new Point(mark.Left + 10, mark.Top + 16), new Point(mark.Left + 18, mark.Top + 7)]);
+        }
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -134,19 +154,7 @@ internal sealed class NativeCheckBox : CheckBox
         const int size = 23;
         var markX = RightToLeft == RightToLeft.Yes ? Width - Padding.Right - size - 6 : Padding.Left + 6;
         var mark = new Rectangle(markX, Math.Max(4, (Height - size) / 2), size, size);
-        using (var markPath = NativeButton.Rounded(mark, 6))
-        using (var markFill = new SolidBrush(Checked ? Teal : Color.White))
-        using (var markBorder = new Pen(Checked ? Teal : Color.FromArgb(174, 191, 201), 1.5f))
-        {
-            g.FillPath(markFill, markPath);
-            g.DrawPath(markBorder, markPath);
-        }
-        if (Checked)
-        {
-            using var checkPen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawLines(checkPen, [new Point(mark.Left + 6, mark.Top + 12),
-                new Point(mark.Left + 10, mark.Top + 16), new Point(mark.Left + 18, mark.Top + 7)]);
-        }
+        DrawMark(g, mark, Checked, Enabled);
 
         var textLeft = RightToLeft == RightToLeft.Yes ? Padding.Left + 4 : mark.Right + 10;
         var textRight = RightToLeft == RightToLeft.Yes ? mark.Left - 10 : Width - Padding.Right - 4;
