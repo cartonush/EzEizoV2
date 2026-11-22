@@ -13,11 +13,13 @@ internal static class NativeFonts
         if (!File.Exists(path))
             throw new FileNotFoundException("גופן הממשק Heebo חסר מחבילת ההתקנה.", path);
         Collection.AddFontFile(path);
-        return Collection.Families.Single();
+        // Variable TTF files can expose several named instances to GDI+.
+        return Collection.Families.FirstOrDefault(f => f.Name.Contains("Heebo", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("גופן Heebo לא נטען.");
     }
 
     internal static Font Create(float points, FontStyle style = FontStyle.Regular)
     {
-        return new Font(Family, points, style, GraphicsUnit.Point);
+        return new Font(Family, points, Family.IsStyleAvailable(style) ? style : FontStyle.Regular, GraphicsUnit.Point);
     }
 }
