@@ -356,6 +356,8 @@ public sealed partial class NativeWindow : Form
     {
         var labels = currentPage switch
         {
+            "issues" => new HashSet<string>(["פתיחת תקלה"]),
+            "keys" => new HashSet<string>(["הטענה חדשה"]),
             "new-fault" => new HashSet<string>(["פתח תקלה"]),
             "new-key" => new HashSet<string>(["פתח הטענה"]),
             "fault-editor" => new HashSet<string>(["שמירה וסגירה"]),
