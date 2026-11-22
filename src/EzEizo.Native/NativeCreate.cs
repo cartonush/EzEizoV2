@@ -29,11 +29,14 @@ public sealed partial class NativeWindow
         var caption = Label(title);
         if (stack.Width <= 500) caption.Width = 365;
         stack.Controls.Add(caption);
-        var box = new ComboBox { Width = stack.Width <= 500 ? 365 : 440, Height = 40,
+        var fieldWidth = stack.Width <= 500 ? 365 : 440;
+        var frame = new NativeSelectFrame { Width = fieldWidth, Margin = new Padding(0, 0, 0, 14) };
+        var box = new ComboBox { Width = fieldWidth - 18, Height = 32,
             DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend,
             AutoCompleteSource = AutoCompleteSource.ListItems,
-            Margin = new Padding(0, 0, 0, 14), Tag = caption,
-            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(251, 253, 254) };
+            Location = new Point(9, 6), Margin = Padding.Empty, Tag = caption,
+            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(251, 253, 254),
+            Font = NativeFonts.Create(9.75f) };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
         box.SelectedIndex = 0;
@@ -44,7 +47,8 @@ public sealed partial class NativeWindow
             box.SelectionStart = box.Text.Length;
             box.SelectionLength = 0;
         }));
-        stack.Controls.Add(box);
+        frame.Controls.Add(box);
+        stack.Controls.Add(frame);
         return box;
     }
     private static void Options(ComboBox box, IEnumerable<string> values)
@@ -57,8 +61,7 @@ public sealed partial class NativeWindow
     {
         stack.Controls.Add(Label("צוות טכנאים", 42, true));
         stack.Controls.Add(Label("בחר טכנאים מרשימת המשתמשים הפעילים.", 34));
-        var list = new CheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
-            CheckOnClick = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254) };
+        var list = new NativeCheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 34 + 12)) };
         foreach (var tech in technicians) list.Items.Add(new PersonChoice(tech));
         stack.Controls.Add(list);
         if (technicians.Count == 0)
@@ -151,13 +154,13 @@ public sealed partial class NativeWindow
             stack.Controls.Add(Button("הצג / הסתר משימות", (_, _) => actionList.Visible = !actionList.Visible));
             stack.Controls.Add(actionList);
             Section(stack, "פתיחת התקלה");
-            var briefing = new CheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
+            var briefing = new NativeCheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
             stack.Controls.Add(briefing);
             var signature = new NativeSignature();
             stack.Controls.Add(Label("חתימת משלח המשימה")); stack.Controls.Add(signature);
             stack.Controls.Add(Button("נקה חתימה", (_, _) => signature.Clear()));
             var team = Team(stack, technicians);
-            stack.Controls.Add(Button("פתח תקלה", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("פתח תקלה", async (_, _) =>
             {
                 try
                 {
@@ -260,7 +263,7 @@ public sealed partial class NativeWindow
             stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים נדרשים: מ.כ 2020 + חרב אש", 48));
             Section(stack, "משימות לביצוע");
             stack.Controls.Add(Label("המשימה הראשונה תאושר ותיחתם בידי משלח המשימה בעת פתיחת הדף.", 44));
-            var briefing = new CheckBox { Width = 745, Height = 60, Text = "תדריך בטיחות וניהול סיכונים הועבר ונחתם ע״י משלח המשימה." };
+            var briefing = new NativeCheckBox { Width = 745, Height = 60, Text = "תדריך בטיחות וניהול סיכונים הועבר ונחתם ע״י משלח המשימה." };
             stack.Controls.Add(briefing);
             stack.Controls.Add(Label("חתימת משלח המשימה"));
             var signature = new NativeSignature(); stack.Controls.Add(signature);
@@ -276,7 +279,7 @@ public sealed partial class NativeWindow
                 ((Button)sender!).Text = taskList.Visible ? "הסתר את 12 המשימות" : "הצג את 12 המשימות לביצוע";
             }));
             stack.Controls.Add(taskList);
-            stack.Controls.Add(Button("פתח הטענה", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("פתח הטענה", async (_, _) =>
             {
                 try
                 {

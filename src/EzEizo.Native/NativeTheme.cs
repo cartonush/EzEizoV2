@@ -83,6 +83,94 @@ internal sealed class NativeButton : Button
     }
 }
 
+internal static class NativeCheckPainter
+{
+    public static void Draw(Graphics graphics, Rectangle bounds, bool isChecked, bool enabled = true)
+    {
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var shape = NativeButton.Rounded(bounds, 6);
+        using var fill = new SolidBrush(!enabled ? Color.FromArgb(238, 243, 245) :
+            isChecked ? Color.FromArgb(22, 139, 121) : Color.White);
+        using var edge = new Pen(isChecked ? Color.FromArgb(22, 139, 121) : Color.FromArgb(189, 207, 217), 1.5f);
+        graphics.FillPath(fill, shape);
+        graphics.DrawPath(edge, shape);
+        if (!isChecked) return;
+        using var tick = new Pen(Color.White, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        graphics.DrawLines(tick, [new Point(bounds.Left + 5, bounds.Top + 11),
+            new Point(bounds.Left + 9, bounds.Top + 15), new Point(bounds.Left + 17, bounds.Top + 6)]);
+    }
+}
+
+internal sealed class NativeCheckBox : CheckBox
+{
+    public NativeCheckBox()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        Cursor = Cursors.Hand;
+        BackColor = Color.White;
+        Font = NativeFonts.Create(9.75f);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(BackColor);
+        var square = new Rectangle(Width - 30, (Height - 23) / 2, 22, 22);
+        NativeCheckPainter.Draw(e.Graphics, square, Checked, Enabled);
+        var bounds = new Rectangle(8, 3, Math.Max(1, Width - 48), Height - 6);
+        TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
+            Enabled ? Color.FromArgb(21, 43, 64) : Color.Gray,
+            TextFormatFlags.RightToLeft | TextFormatFlags.Right | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+        if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle);
+    }
+}
+
+internal sealed class NativeCheckedListBox : CheckedListBox
+{
+    public NativeCheckedListBox()
+    {
+        DrawMode = DrawMode.OwnerDrawFixed;
+        ItemHeight = 34;
+        CheckOnClick = true;
+        BorderStyle = BorderStyle.FixedSingle;
+        BackColor = Color.FromArgb(251, 253, 254);
+        Font = NativeFonts.Create(9.5f);
+    }
+    protected override void OnDrawItem(DrawItemEventArgs e)
+    {
+        if (e.Index < 0) return;
+        using var background = new SolidBrush((e.State & DrawItemState.Selected) != 0
+            ? Color.FromArgb(229, 244, 249) : BackColor);
+        e.Graphics.FillRectangle(background, e.Bounds);
+        NativeCheckPainter.Draw(e.Graphics,
+            new Rectangle(e.Bounds.Right - 31, e.Bounds.Y + (e.Bounds.Height - 22) / 2, 21, 21), GetItemChecked(e.Index), Enabled);
+        TextRenderer.DrawText(e.Graphics, Items[e.Index]?.ToString() ?? "", Font,
+            new Rectangle(e.Bounds.X + 8, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 48), e.Bounds.Height),
+            Color.FromArgb(21, 43, 64), TextFormatFlags.RightToLeft | TextFormatFlags.Right |
+            TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        e.DrawFocusRectangle();
+    }
+}
+
+internal sealed class NativeSelectFrame : Panel
+{
+    public NativeSelectFrame()
+    {
+        Height = 43;
+        BackColor = Color.White;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var shape = NativeButton.Rounded(new Rectangle(1, 1, Width - 3, Height - 3), 9);
+        using var fill = new SolidBrush(Color.FromArgb(251, 253, 254));
+        using var edge = new Pen(Color.FromArgb(207, 222, 230), 1.3f);
+        e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(edge, shape);
+    }
+}
+
 internal sealed class NativeCard : Panel
 {
     public NativeCard()

@@ -3,7 +3,7 @@ name: Build native UI preview
 on:
   workflow_dispatch:
   push:
-    branches: [pwa-parity-2-6-0]
+    branches: [native-ui-2-6-1]
     paths:
       - 'src/EzEizo.Native/**'
       - 'src/EzEizo.Core/**'

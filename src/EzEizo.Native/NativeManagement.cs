@@ -116,10 +116,10 @@ public sealed partial class NativeWindow
             Section(stack, "הפקת דוחות");
             var report = Choice(stack, "סוג הדוח", ["יומן פעילות", "יומן טייסת", "היסטוריית מטוס", "היסטוריית תקלות טכנאי", "תקלות פתוחות", "דפים ממתינים לסגירה", "תקלות סגורות"]);
             Section(stack, "סינון הדוח");
-            var squadrons = new CheckedListBox { Width = 440, Height = 100, CheckOnClick = true };
+            var squadrons = new NativeCheckedListBox { Width = 440, Height = 100, CheckOnClick = true };
             squadrons.Items.AddRange(NativeCatalog.Squadrons.Keys.Cast<object>().ToArray());
             var squadCaption = Label("טייסות"); stack.Controls.Add(squadCaption); stack.Controls.Add(squadrons);
-            var planes = new CheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
+            var planes = new NativeCheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
             var planeCaption = Label("מטוסים"); stack.Controls.Add(planeCaption); stack.Controls.Add(planes);
             void RefreshPlanes()
             {
@@ -135,10 +135,10 @@ public sealed partial class NativeWindow
             });
             var clearAll = Button("נקה בחירה", (_, _) => { for (var i = 0; i < planes.Items.Count; i++) planes.SetItemChecked(i, false); });
             stack.Controls.Add(selectAll); stack.Controls.Add(clearAll);
-            var people = new CheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
+            var people = new NativeCheckedListBox { Width = 440, Height = 130, CheckOnClick = true };
             foreach (var tech in technicians) people.Items.Add(new PersonChoice(new Account(tech.Id, tech.Name, tech.PersonalNumber, "mechanic")));
             var peopleCaption = Label("טכנאים"); stack.Controls.Add(peopleCaption); stack.Controls.Add(people);
-            var allDates = new CheckBox { Width = 440, Height = 40, Text = "כל התקופות" }; stack.Controls.Add(allDates);
+            var allDates = new NativeCheckBox { Width = 440, Height = 40, Text = "כל התקופות" }; stack.Controls.Add(allDates);
             var dates = FieldGrid(); dates.Height = 112;
             var from = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", Value = DateTime.Now.AddDays(-1) };
             var fromCell = FieldCell(); AddField(fromCell, "מתאריך ושעה", from); dates.Controls.Add(fromCell);
@@ -177,7 +177,7 @@ public sealed partial class NativeWindow
                 AutoScroll = true, Visible = false };
             stack.Controls.Add(resultCards);
             JsonNode[] found = [];
-            stack.Controls.Add(Button("הצג דוח", (_, _) =>
+            stack.Controls.Add(PrimaryAction("הצג דוח", (_, _) =>
             {
                 try
                 {
@@ -266,7 +266,7 @@ public sealed partial class NativeWindow
                 }
                 catch (Exception ex) { Error(ex); }
             }));
-            stack.Controls.Add(Button("הורד PDF של הדוח", async (_, _) =>
+            stack.Controls.Add(PrimaryAction("הורד PDF של הדוח", async (_, _) =>
             {
                 try
                 {

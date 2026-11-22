@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>EzEizo-Native-Mechanic</AssemblyName>
-    <Version>2.6.0</Version>
+    <Version>2.6.1</Version>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../EzEizo.Native/EzEizo.Native.csproj" /></ItemGroup>
 </Project>

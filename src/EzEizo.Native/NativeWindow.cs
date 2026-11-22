@@ -18,7 +18,7 @@ public sealed partial class NativeWindow : Form
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
     private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
-    private readonly Panel bottomNav = new() { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
+    private readonly Panel bottomNav = new() { Dock = DockStyle.Top, Height = 64, BackColor = Color.FromArgb(249, 252, 253) };
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
     private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, OnDark = true, Width = 105, Height = 37 };
     private string documentSection = "issues";
@@ -45,7 +45,7 @@ public sealed partial class NativeWindow : Form
         Font = NativeFonts.Create(10);
         header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.6.0";
+        Text += " · 2.6.1";
         header.Manager = role == AppRole.Manager;
         status.TextChanged += (_, _) =>
         {
@@ -55,7 +55,7 @@ public sealed partial class NativeWindow : Form
         };
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
             Size = new Size(44, 44), Font = NativeFonts.Create(18, FontStyle.Bold) };
-        var version = new NativeBadge { Text = "v2.6.0", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.6.1", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
         header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
@@ -74,7 +74,7 @@ public sealed partial class NativeWindow : Form
             else await OpenList("issues");
         };
         logoutButton.Click += async (_, _) => { await ReleaseForm(); account = null; Login(); };
-        bottomNav.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Color.FromArgb(213, 226, 233) });
+        bottomNav.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(213, 226, 233) });
         bottomNav.Resize += (_, _) => LayoutBottomNav();
         if (role == AppRole.Manager)
         {
@@ -166,6 +166,13 @@ public sealed partial class NativeWindow : Form
         button.Click += click;
         return button;
     }
+    private static Button PrimaryAction(string label, EventHandler click)
+    {
+        var button = Button(label, click);
+        button.Tag = "page-action";
+        button.Width = 210;
+        return button;
+    }
     private static TextBox Input(string placeholder, int max = 200, bool password = false) => new()
     {
         PlaceholderText = placeholder, Width = 440, Height = 42, AutoSize = false, MaxLength = max,
@@ -207,17 +214,32 @@ public sealed partial class NativeWindow : Form
         var card = new Panel { BackColor = Pale };
         stack.Dock = DockStyle.Fill;
         var toolbar = stack.Controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.Name == "EditorToolbar");
-        if (toolbar is null) card.Controls.Add(BuildPage(stack));
+        if (toolbar is not null) stack.Controls.Remove(toolbar);
+        var actions = stack.Controls.OfType<Button>().Where(x => Equals(x.Tag, "page-action")).ToArray();
+        foreach (var action in actions) stack.Controls.Remove(action);
+        if (toolbar is null && actions.Length == 0) card.Controls.Add(BuildPage(stack));
         else
         {
-            stack.Controls.Remove(toolbar);
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1 + (toolbar is null ? 0 : 1) + (actions.Length == 0 ? 0 : 1) };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+            if (toolbar is not null) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            toolbar.Dock = DockStyle.Fill;
-            layout.Controls.Add(toolbar, 0, 0);
-            layout.Controls.Add(BuildPage(stack), 0, 1);
+            if (toolbar is not null) { toolbar.Dock = DockStyle.Fill; layout.Controls.Add(toolbar, 0, 0); }
+            layout.Controls.Add(BuildPage(stack), 0, toolbar is null ? 0 : 1);
+            if (actions.Length > 0)
+            {
+                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+                var footer = new FlowLayoutPanel { Name = "PageActions", Dock = DockStyle.Fill,
+                    FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(14, 10, 14, 5),
+                    BackColor = Color.White };
+                foreach (var action in actions)
+                {
+                    action.Width = Math.Max(175, Math.Min(250, (Math.Max(540, card.Width) - 40) / actions.Length - 8));
+                    action.Margin = new Padding(0, 0, 9, 0);
+                    footer.Controls.Add(action);
+                }
+                layout.Controls.Add(footer, 0, layout.RowCount - 1);
+            }
             card.Controls.Add(layout);
         }
         activeCard = card;
@@ -312,6 +334,15 @@ public sealed partial class NativeWindow : Form
                 grid.DefaultCellStyle.ForeColor = Navy;
                 grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(222, 239, 247);
                 grid.DefaultCellStyle.SelectionForeColor = Navy;
+                grid.CellPainting += (_, e) =>
+                {
+                    if (e.RowIndex < 0 || e.ColumnIndex < 0 || grid.Columns[e.ColumnIndex] is not DataGridViewCheckBoxColumn) return;
+                    e.Paint(e.CellBounds, DataGridViewPaintParts.Background | DataGridViewPaintParts.Border);
+                    var value = e.Value is bool checkedValue && checkedValue;
+                    NativeCheckPainter.Draw(e.Graphics, new Rectangle(e.CellBounds.X + (e.CellBounds.Width - 22) / 2,
+                        e.CellBounds.Y + (e.CellBounds.Height - 22) / 2, 21, 21), value);
+                    e.Handled = true;
+                };
             }
             StyleGrids(child);
         }
@@ -323,7 +354,7 @@ public sealed partial class NativeWindow : Form
         var left = (bottomNav.ClientSize.Width - width) / 2;
         var each = (width - 24) / 4;
         for (var i = 0; i < navButtons.Count; i++)
-            navButtons[i].SetBounds(left + (3 - i) * (each + 8), 10, each, 53);
+            navButtons[i].SetBounds(left + (3 - i) * (each + 8), 8, each, 47);
     }
     private async Task OpenHome()
     {
