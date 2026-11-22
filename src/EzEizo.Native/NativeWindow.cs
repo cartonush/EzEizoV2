@@ -325,6 +325,20 @@ public sealed partial class NativeWindow : Form
                 grid.DefaultCellStyle.ForeColor = Navy;
                 grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(222, 239, 247);
                 grid.DefaultCellStyle.SelectionForeColor = Navy;
+                foreach (var column in grid.Columns.OfType<DataGridViewCheckBoxColumn>())
+                    column.FlatStyle = FlatStyle.Flat;
+                grid.CellPainting += (_, e) =>
+                {
+                    if (e.RowIndex < 0 || e.ColumnIndex < 0 || grid.Columns[e.ColumnIndex] is not DataGridViewCheckBoxColumn) return;
+                    e.PaintBackground(e.CellBounds, true);
+                    var isChecked = e.Value is true || e.FormattedValue is true;
+                    var size = 19;
+                    var mark = new Rectangle(e.CellBounds.Left + (e.CellBounds.Width - size) / 2,
+                        e.CellBounds.Top + (e.CellBounds.Height - size) / 2, size, size);
+                    NativeCheckBox.DrawMark(e.Graphics, mark, isChecked, grid.Enabled);
+                    e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
+                    e.Handled = true;
+                };
             }
             StyleGrids(child);
         }
@@ -358,7 +372,7 @@ public sealed partial class NativeWindow : Form
             button.Height = 48;
             actionButtons.Controls.Add(button);
         }
-        actionDock.Visible = matches.Length > 0 && !string.IsNullOrWhiteSpace(readyPage);
+        actionDock.Visible = matches.Length > 0;
         LayoutPinnedActions();
     }
 
