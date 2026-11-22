@@ -247,7 +247,7 @@ public sealed partial class NativeWindow
                         card.Controls.Add(new Label { Text = $"טייסת {V(sheet, "squadron")} · מטוס {aircraft} · {V(item, "status") switch { "open" => "פתוח", "closed" => "סגור", _ => "ממתין לסגירה" }}\n{DisplayDate(V(item, "createdAt"))}",
                             Location = new Point(12, 46), Width = 335, Height = 48, TextAlign = ContentAlignment.MiddleLeft,
                             Font = NativeFonts.Create(9.75f), ForeColor = Muted });
-                        var download = Button("הורד טופס PDF", async (_, _) =>
+                        var download = (NativeButton)Button("הורד טופס PDF", async (_, _) =>
                         {
                             try
                             {
