@@ -47,7 +47,7 @@ public sealed partial class NativeWindow : Form
         Font = NativeFonts.Create(10);
         header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.6.0";
+        Text += " · 2.6.1";
         header.Manager = role == AppRole.Manager;
         status.TextChanged += (_, _) =>
         {
@@ -57,7 +57,7 @@ public sealed partial class NativeWindow : Form
         };
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
             Size = new Size(44, 44), Font = NativeFonts.Create(18, FontStyle.Bold) };
-        var version = new NativeBadge { Text = "v2.6.0", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.6.1", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
         header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
