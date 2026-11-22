@@ -241,12 +241,9 @@ public static class NativeDiagnostics
     }
     public static void VerifyPdf()
     {
-        var db = new Database();
-        var password = TestPassword();
-        var managerNumber = TestNumber();
-        db.CreateAccount("מנהל בדיקת PDF", managerNumber, "manager", password);
-        var manager = db.Authenticate(managerNumber, password, AppRole.Manager)
-            ?? throw new InvalidOperationException("מנהל הבדיקה לא נמצא.");
+        // Export is read-only; use a synthetic manager role without changing the
+        // primary manager record created by the offline workflow test.
+        var manager = new Account(Guid.NewGuid().ToString(), "מנהל בדיקת PDF", TestNumber(), "manager");
         var form = new OfflineStore().List("issues", manager).First();
         var key = new OfflineStore().List("keyLoads", manager).First();
         var folder = Path.Combine(Path.GetTempPath(), "EzEizo-pdf-check-" + Guid.NewGuid().ToString("N"));
