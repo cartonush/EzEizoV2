@@ -18,7 +18,9 @@ public sealed partial class NativeWindow : Form
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
     private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
-    private readonly Panel bottomNav = new() { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
+    private readonly Panel bottomNav = new() { Dock = DockStyle.Top, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
+    private readonly Panel actionDock = new() { Dock = DockStyle.Bottom, Height = 68, BackColor = Color.White, Visible = false };
+    private readonly FlowLayoutPanel actionButtons = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(12, 8, 12, 8), BackColor = Color.White };
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
     private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, OnDark = true, Width = 105, Height = 37 };
     private string documentSection = "issues";
@@ -74,8 +76,11 @@ public sealed partial class NativeWindow : Form
             else await OpenList("issues");
         };
         logoutButton.Click += async (_, _) => { await ReleaseForm(); account = null; Login(); };
-        bottomNav.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Color.FromArgb(213, 226, 233) });
+        bottomNav.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(213, 226, 233) });
         bottomNav.Resize += (_, _) => LayoutBottomNav();
+        actionDock.Controls.Add(actionButtons);
+        actionDock.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Color.FromArgb(213, 226, 233) });
+        actionDock.Resize += (_, _) => LayoutPinnedActions();
         if (role == AppRole.Manager)
         {
             foreach (var (title, action) in new (string, Func<Task>)[]
@@ -93,6 +98,7 @@ public sealed partial class NativeWindow : Form
         content.Resize += (_, _) => CenterCard();
         Controls.Add(content);
         Controls.Add(status);
+        Controls.Add(actionDock);
         Controls.Add(bottomNav);
         Controls.Add(header);
         var worker = new Thread(() =>
@@ -204,10 +210,15 @@ public sealed partial class NativeWindow : Form
         var previousControls = content.Controls.Cast<Control>().ToArray();
         content.Controls.Clear();
         foreach (var previous in previousControls) previous.Dispose();
+        var previousActions = actionButtons.Controls.Cast<Control>().ToArray();
+        actionButtons.Controls.Clear();
+        foreach (var previousAction in previousActions) previousAction.Dispose();
+        actionDock.Visible = false;
         var card = new Panel { BackColor = Pale };
         stack.Dock = DockStyle.Fill;
         var toolbar = stack.Controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.Name == "EditorToolbar");
-        if (toolbar is null) card.Controls.Add(BuildPage(stack));
+        Control page;
+        if (toolbar is null) page = BuildPage(stack);
         else
         {
             stack.Controls.Remove(toolbar);
@@ -219,7 +230,9 @@ public sealed partial class NativeWindow : Form
             layout.Controls.Add(toolbar, 0, 0);
             layout.Controls.Add(BuildPage(stack), 0, 1);
             card.Controls.Add(layout);
+            page = layout;
         }
+        PinImportantActions(page);
         activeCard = card;
         content.Controls.Add(card);
         StyleGrids(card);
@@ -316,6 +329,49 @@ public sealed partial class NativeWindow : Form
             StyleGrids(child);
         }
     }
+    private static IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child)) yield return descendant;
+        }
+    }
+
+    private void PinImportantActions(Control page)
+    {
+        var labels = currentPage switch
+        {
+            "new-fault" => new HashSet<string>(["פתח תקלה"]),
+            "new-key" => new HashSet<string>(["פתח הטענה"]),
+            "fault-editor" => new HashSet<string>(["שמירה וסגירה"]),
+            "key-editor" => new HashSet<string>(["סיים הטענה"]),
+            "document" => new HashSet<string>(["בדוק וסגור"]),
+            "reports" => new HashSet<string>(["הצג דוח", "הורד PDF של הדוח", "הפק CSV", "הורד את תוצאות החיפוש"]),
+            _ => new HashSet<string>()
+        };
+        var matches = Descendants(page).OfType<NativeButton>().Where(button => labels.Contains(button.Text)).ToArray();
+        foreach (var button in matches)
+        {
+            button.Parent?.Controls.Remove(button);
+            button.Margin = new Padding(4);
+            button.Height = 48;
+            actionButtons.Controls.Add(button);
+        }
+        actionDock.Visible = matches.Length > 0 && !string.IsNullOrWhiteSpace(readyPage);
+        LayoutPinnedActions();
+    }
+
+    private void LayoutPinnedActions()
+    {
+        var buttons = actionButtons.Controls.OfType<NativeButton>().ToArray();
+        if (buttons.Length == 0) return;
+        var gap = 8;
+        var width = Math.Max(150, (actionButtons.ClientSize.Width - actionButtons.Padding.Horizontal - gap * (buttons.Length - 1)) / buttons.Length - 8);
+        width = Math.Min(260, width);
+        foreach (var button in buttons) button.Width = width;
+    }
+
     private void LayoutBottomNav()
     {
         if (navButtons.Count == 0) return;
