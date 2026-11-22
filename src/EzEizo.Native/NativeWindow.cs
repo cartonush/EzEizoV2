@@ -42,10 +42,10 @@ public sealed partial class NativeWindow : Form
         Size = new Size(1120, 820);
         RightToLeft = RightToLeft.Yes;
         RightToLeftLayout = true;
-        Font = new Font("Segoe UI", 11);
+        Font = NativeFonts.Create(10);
         header.Heading = role == AppRole.Manager ? "Metis · דף מנהל" : "גף אוויוניקה קרב · טכנאי";
         header.Subtitle = role == AppRole.Manager ? "יצירת דפי תקלה לטכנאים" : "דף טיפול בתקלה";
-        Text += " · 2.5.4";
+        Text += " · 2.6.0";
         header.Manager = role == AppRole.Manager;
         status.TextChanged += (_, _) =>
         {
@@ -54,8 +54,8 @@ public sealed partial class NativeWindow : Form
             status.ForeColor = warning ? Color.FromArgb(205, 22, 43) : Navy;
         };
         var brand = new NativeBrandMark { Text = role == AppRole.Manager ? "מ" : "ט", Manager = role == AppRole.Manager,
-            Size = new Size(44, 44), Font = new Font("Segoe UI", 21, FontStyle.Bold) };
-        var version = new NativeBadge { Text = "v2.5.4", Size = new Size(79, 35), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            Size = new Size(44, 44), Font = NativeFonts.Create(18, FontStyle.Bold) };
+        var version = new NativeBadge { Text = "v2.6.0", Size = new Size(79, 35), Font = NativeFonts.Create(8, FontStyle.Bold) };
         header.Controls.AddRange([brand, version, backButton, logoutButton]);
         header.Resize += (_, _) =>
         {
@@ -84,7 +84,7 @@ public sealed partial class NativeWindow : Form
                 ("מפתחות", () => OpenList("keys")), ("ניהול", OpenManagementHome)
             })
             {
-                var button = new NativeButton { Text = title, Secondary = true, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+                var button = new NativeButton { Text = title, Secondary = true, Font = NativeFonts.Create(9, FontStyle.Bold) };
                 button.Click += async (_, _) => await action();
                 bottomNav.Controls.Add(button);
                 navButtons.Add(button);
@@ -155,14 +155,14 @@ public sealed partial class NativeWindow : Form
     private static Label Label(string text, int height = 34, bool bold = false) => new()
     {
         Text = text, Width = 750, Height = height, TextAlign = ContentAlignment.MiddleLeft,
-        ForeColor = Navy, Font = new Font("Segoe UI", bold ? 17 : 11, bold ? FontStyle.Bold : FontStyle.Regular)
+        ForeColor = Navy, Font = NativeFonts.Create(bold ? 14.25f : 10, bold ? FontStyle.Bold : FontStyle.Regular)
     };
     private static Button Button(string label, EventHandler click)
     {
-        using var measuredFont = new Font("Segoe UI", 10, FontStyle.Bold);
+        using var measuredFont = NativeFonts.Create(9.75f, FontStyle.Bold);
         var measuredWidth = TextRenderer.MeasureText(label.Replace(Environment.NewLine, " "), measuredFont).Width;
         var button = new NativeButton { Text = label, Width = Math.Clamp(measuredWidth + 42, 175, 350), Height = 44,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 7, 12) };
+            Font = NativeFonts.Create(9.75f, FontStyle.Bold), Margin = new Padding(0, 0, 7, 12) };
         button.Click += click;
         return button;
     }
@@ -180,16 +180,16 @@ public sealed partial class NativeWindow : Form
         var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
             Margin = new Padding(0, 0, 10, 10), Padding = new Padding(10) };
         tile.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 25,
-            ForeColor = Muted, Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.MiddleLeft });
+            ForeColor = Muted, Font = NativeFonts.Create(8.25f), TextAlign = ContentAlignment.MiddleLeft });
         tile.Controls.Add(new Label { Text = value, Dock = DockStyle.Bottom, Height = 31,
-            ForeColor = Navy, Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = Navy, Font = NativeFonts.Create(11.25f, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true });
         return tile;
     }
     private void CenterCard()
     {
         if (activeCard is null || activeCard.IsDisposed) return;
-        var desired = currentPage == "login" ? 600 : 1100;
+        var desired = currentPage == "login" ? 600 : 880;
         activeCard.Width = Math.Min(desired, Math.Max(520, content.ClientSize.Width - 32));
         var desiredHeight = currentPage switch
         {
@@ -333,7 +333,7 @@ public sealed partial class NativeWindow : Form
         stack.Controls.Add(Label("דף בית", 29));
         stack.Controls.Add(Label("שלום " + account.Name, 58, true));
         stack.Controls.Add(Label("בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.", 45));
-        var tiles = new FlowLayoutPanel { Width = 970, Height = 370, WrapContents = true };
+        var tiles = new FlowLayoutPanel { Width = 780, Height = 370, WrapContents = true };
         foreach (var (title, detail, action) in new (string, string, Func<Task>)[]
         {
             ("פתיחת תקלה", "יצירת דף טיפול חדש לטכנאים", ShowCreateFault),
@@ -345,7 +345,7 @@ public sealed partial class NativeWindow : Form
         })
         {
             var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 465; tile.Height = 105;
+            tile.Secondary = true; tile.Width = 378; tile.Height = 105;
             tile.TileTitle = title; tile.TileDescription = detail;
             tiles.Controls.Add(tile);
         }
@@ -437,18 +437,16 @@ public sealed partial class NativeWindow : Form
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
-            stack.Controls.Add(Label(role == AppRole.Manager ? "מעקב צוות" : "משימות שהתקבלו", 28));
-            var heading = Label(statusFilter switch
+            var heading = Section(stack, statusFilter switch
             {
                 "סגור" => page == "issues" ? "תקלות סגורות" : "הטענות סגורות",
                 "ממתין לסגירה" => "תקלות לסגירה",
                 _ => page == "issues" ? "תקלות פתוחות" : "הטענות פתוחות"
-            }, 56, true);
-            stack.Controls.Add(heading);
+            }, "מעקב צוות");
             Action render = () => { };
             if (role == AppRole.Manager)
             {
-                var tabs = new FlowLayoutPanel { Width = 1020, Height = 64, WrapContents = false,
+                var tabs = new FlowLayoutPanel { Width = 785, Height = 64, WrapContents = true,
                     FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 18) };
                 var tabButtons = new List<NativeButton>();
                 void AddTab(string caption, string filter)
@@ -461,21 +459,21 @@ public sealed partial class NativeWindow : Form
                         foreach (var button in tabButtons) { button.Active = button == tab; button.Invalidate(); }
                         render();
                     });
-                    tab.Secondary = true; tab.Width = page == "issues" ? 235 : 195;
+                    tab.Secondary = true; tab.Width = 185;
                     tab.Active = statusFilter == filter;
                     tabButtons.Add(tab); tabs.Controls.Add(tab);
                 }
                 if (page == "issues")
                 {
-                    tabs.Controls.Add(Button("פתיחת תקלה", async (_, _) => await ShowCreateFault()));
+                    var create = Button("פתיחת תקלה", async (_, _) => await ShowCreateFault()); create.Width = 185; tabs.Controls.Add(create);
                     AddTab("תקלות פתוחות", "פתוח");
                     AddTab("תקלות לסגירה", "ממתין לסגירה");
                     AddTab("תקלות סגורות", "סגור");
                 }
                 else
                 {
-                    tabs.Controls.Add(Button("הטענה חדשה", async (_, _) => await ShowCreateKey()));
-                    tabs.Controls.Add(Button("היסטוריית מפתחות", async (_, _) => await OpenKeyHistory()));
+                    var create = Button("הטענה חדשה", async (_, _) => await ShowCreateKey()); create.Width = 185; tabs.Controls.Add(create);
+                    var history = Button("היסטוריית מפתחות", async (_, _) => await OpenKeyHistory()); history.Width = 185; tabs.Controls.Add(history);
                     AddTab("הטענות פתוחות", "פתוח");
                     AddTab("הטענות סגורות", "סגור");
                 }
@@ -486,7 +484,7 @@ public sealed partial class NativeWindow : Form
             search.Text = searchTerm;
             stack.Controls.Add(Label(page == "issues" ? "חיפוש לפי מספר תקלה" : "חיפוש לפי מספר הטענה", 32));
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 1020, Height = 450, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var cards = new FlowLayoutPanel { Width = 780, Height = 450, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
             void Render()
             {
@@ -496,6 +494,7 @@ public sealed partial class NativeWindow : Form
                     (statusFilter == "הכל" || statusFilter == "פתוח" && item["status"]?.ToString() == "open" ||
                      statusFilter == "סגור" && item["status"]?.ToString() == "closed" ||
                      statusFilter == "ממתין לסגירה" && item["status"]?.ToString() == "pendingReview")).ToArray();
+                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 88 + 12));
                 if (matching.Length == 0) cards.Controls.Add(Label("אין טפסים להצגה."));
                 foreach (var item in matching)
                 {
@@ -506,7 +505,7 @@ public sealed partial class NativeWindow : Form
                     var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial} · מטוס {aircraft}{Environment.NewLine}{(item["status"]?.ToString() == "open" ? "פתוח" : item["status"]?.ToString() == "closed" ? "סגור" : "ממתין לסגירה")}";
                     var card = (NativeButton)Button(title, async (_, _) => await OpenDocument(page, id));
                     card.Secondary = true;
-                    card.Width = 970;
+                    card.Width = 750;
                     card.Height = 77;
                     card.TextAlign = ContentAlignment.MiddleLeft;
                     cards.Controls.Add(card);
@@ -534,12 +533,11 @@ public sealed partial class NativeWindow : Form
             if (account != user || silent && currentPage != "queue") return;
             currentPage = "queue"; lastListVersion = version; refreshTimer.Start();
             var stack = Stack();
-            stack.Controls.Add(Label("משימות שהתקבלו", 30));
-            stack.Controls.Add(Label("רשימת משימות", 58, true));
+            Section(stack, "רשימת משימות", "משימות שהתקבלו");
             stack.Controls.Add(Label("בחר תקלה או הטענת מפתחות פתוחה מהרשימה כדי למלא את הטופס שלה.", 52));
             var search = Input("חפש מספר טופס", 20);
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 1010, Height = 520, AutoScroll = true,
+            var cards = new FlowLayoutPanel { Width = 780, Height = 520, AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
             void Render()
@@ -550,6 +548,7 @@ public sealed partial class NativeWindow : Form
                     .Concat(keys.Where(x => x["status"]?.ToString() == "open").Select(x => (page: "keys", doc: x)))
                     .Where(x => (x.doc["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase))
                     .ToArray();
+                cards.Height = Math.Min(520, Math.Max(88, tasks.Length * 91 + 12));
                 if (tasks.Length == 0) cards.Controls.Add(Label("אין משימות פתוחות במכשיר הזה.", 58));
                 foreach (var (page, doc) in tasks)
                 {
@@ -561,7 +560,7 @@ public sealed partial class NativeWindow : Form
                     var card = (NativeButton)Button(
                         $"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · מטוס {aircraft}{Environment.NewLine}{sheet["squadron"]} · משימה פתוחה",
                         async (_, _) => await OpenDocument(page, id));
-                    card.Secondary = true; card.Width = 970; card.Height = 80;
+                    card.Secondary = true; card.Width = 750; card.Height = 80;
                     cards.Controls.Add(card);
                 }
             }
@@ -585,7 +584,7 @@ public sealed partial class NativeWindow : Form
             Section(stack, "ניהול משתמשים");
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 950, Height = Math.Min(350, Math.Max(75, users.Count * 58 + 12)),
+            var list = new FlowLayoutPanel { Width = 780, Height = Math.Min(480, Math.Max(105, users.Count * 108 + 12)),
                 AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
@@ -593,20 +592,23 @@ public sealed partial class NativeWindow : Form
                 list.Controls.Clear();
                 foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
                 {
-                    var row = new FlowLayoutPanel { Width = 850, Height = 54, WrapContents = false };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = person.Active ? 450 : 280, Height = 45, TextAlign = ContentAlignment.MiddleLeft });
-                    row.Controls.Add(Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)));
-                    row.Controls.Add(Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
+                    var row = new FlowLayoutPanel { Width = 750, Height = 101, WrapContents = true };
+                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = 740, Height = 38, TextAlign = ContentAlignment.MiddleLeft });
+                    var history = Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 175; row.Controls.Add(history);
+                    var active = Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                    }));
-                    if (!person.Active) row.Controls.Add(Button("מחק לצמיתות", async (_, _) =>
+                    }); active.Width = 175; row.Controls.Add(active);
+                    if (!person.Active)
                     {
+                        var delete = Button("מחק לצמיתות", async (_, _) =>
+                        {
                         if (MessageBox.Show(this, $"למחוק לצמיתות את {person.Name}?", "מחיקה סופית", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                         try { await Work(() => { database.DeleteTechnician(person.Id); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                    }));
+                        }); delete.Width = 175; row.Controls.Add(delete);
+                    }
                     list.Controls.Add(row);
                 }
             }

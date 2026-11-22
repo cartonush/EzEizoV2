@@ -56,7 +56,7 @@ public sealed partial class NativeWindow
     private static TextBox Field(FlowLayoutPanel stack, string label, JsonObject state, string key, bool multi = false)
     {
         var caption = Label(label, label.Length > 80 ? 100 : 32);
-        caption.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        caption.Font = NativeFonts.Create(9.75f, FontStyle.Bold);
         stack.Controls.Add(caption);
         var input = Input(label, 2000);
         if (multi) { input.Multiline = true; input.Height = 88; input.ScrollBars = ScrollBars.Vertical; input.Width = 735; }
@@ -69,7 +69,7 @@ public sealed partial class NativeWindow
     {
         var box = new CheckBox { Text = label, Checked = B(state, key), AutoSize = false, Width = 745, Height = 49,
             ForeColor = Navy, BackColor = Color.FromArgb(249, 251, 252), Padding = new Padding(12, 0, 12, 0),
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
+            Font = NativeFonts.Create(9.75f, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10) };
         box.CheckedChanged += (_, _) => state[key] = box.Checked;
         stack.Controls.Add(box);
         return box;
@@ -82,16 +82,18 @@ public sealed partial class NativeWindow
         if (editable) stack.Controls.Add(Button("נקה חתימה", (_, _) => { pad.Clear(); state[key] = ""; }));
         return pad;
     }
-    private static void Section(FlowLayoutPanel stack, string title)
+    private static Label Section(FlowLayoutPanel stack, string title, string kicker = "פרטי טופס")
     {
         var heading = new Panel { Width = 745, Height = 78, BackColor = Color.White,
             Tag = "section-heading", Margin = new Padding(0, 0, 0, 8) };
-        heading.Controls.Add(new Label { Text = "פרטי טופס", Location = new Point(0, 4), Width = 740, Height = 22,
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = new Font("Segoe UI", 9, FontStyle.Bold) });
-        heading.Controls.Add(new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
-            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = new Font("Segoe UI", 16, FontStyle.Bold) });
+        heading.Controls.Add(new Label { Text = kicker, Location = new Point(0, 4), Width = 740, Height = 22,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue, Font = NativeFonts.Create(8.25f, FontStyle.Bold) });
+        var titleLabel = new Label { Text = title, Location = new Point(0, 27), Width = 740, Height = 39,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) };
+        heading.Controls.Add(titleLabel);
         heading.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(232, 239, 243) });
         stack.Controls.Add(heading);
+        return titleLabel;
     }
     private static FlowLayoutPanel EditorBar(FlowLayoutPanel stack)
     {
@@ -105,7 +107,7 @@ public sealed partial class NativeWindow
     {
         Text = "הנתונים נשמרים במסד המקומי לאחר לחיצה על שמירה",
         Width = 335, Height = 44, TextAlign = ContentAlignment.MiddleCenter,
-        ForeColor = Navy, Font = new Font("Segoe UI", 9)
+        ForeColor = Navy, Font = NativeFonts.Create(8.25f)
     };
 
     private async Task AddDocumentActions(FlowLayoutPanel stack, string page, JsonNode doc)
@@ -178,6 +180,13 @@ public sealed partial class NativeWindow
         if (page == "issues")
         {
             var sheet = doc["sheet"] ?? doc;
+            if (V(sheet, "dispatcherSignature").StartsWith("data:image/png;base64,", StringComparison.Ordinal))
+            {
+                Section(stack, "תדריך בטיחות וניהול סיכונים");
+                stack.Controls.Add(Label("יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו.", 42));
+                stack.Controls.Add(Label("חתימת משלח המשימה"));
+                stack.Controls.Add(new NativeSignature(V(sheet, "dispatcherSignature")) { Enabled = false });
+            }
             stack.Controls.Add(Label("תיאור התקלה: " + V(sheet, "fault"), 75));
             stack.Controls.Add(Label("תיאור תיקון: " + V(state, "repair"), 85));
             stack.Controls.Add(Label("הערות: " + V(sheet, "managerNotes") + " " + V(state, "technicianNote"), 75));
@@ -185,7 +194,7 @@ public sealed partial class NativeWindow
             var constants = Object(sheet["constants"]);
             if (constants.Count > 0)
             {
-                Section(stack, "קבועים לפי מטוס");
+                Section(stack, "קבועים");
                 foreach (var (group, entries) in constants)
                 {
                     stack.Controls.Add(Label(group, 38, true));
@@ -285,23 +294,40 @@ public sealed partial class NativeWindow
         var state = saved is not null ? Object(JsonNode.Parse(saved)) :
             Object(doc["closed"]?["state"]?.DeepClone());
         var controls = new Dictionary<string, NativeSignature>();
+        if (!string.IsNullOrWhiteSpace(V(sheet, "dispatcherSignature")))
+        {
+            Section(stack, "תדריך בטיחות וניהול סיכונים");
+            stack.Controls.Add(Label("יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו.", 42));
+            stack.Controls.Add(Label("חתימת משלח המשימה"));
+            stack.Controls.Add(new NativeSignature(V(sheet, "dispatcherSignature")) { Enabled = false });
+        }
         Section(stack, "בדיקת בטיחות המטוס");
         var faultBar = EditorBar(stack);
         controls["safetyTechnicianSignature"] = Signature(stack, "בדיקת המטוס בטוח לאחזקה טרם התהליך: אין קסטות מוץ / נורים וכפט״ים מורכבים על המטוס. חתימת הטכנאי", state, "safetyTechnicianSignature", true);
         Section(stack, "תקלה ותיקון");
         stack.Controls.Add(Label("תיאור תקלה", 34, true));
         stack.Controls.Add(Label(V(sheet, "fault"), 76));
-        Field(stack, "תיאור תיקון", state, "repair", true);
-        stack.Controls.Add(Label("הערות מנהל: " + V(sheet, "managerNotes"), 60));
-        Field(stack, "הערת טכנאי", state, "technicianNote", true);
-        Section(stack, "קבועים לפי מטוס");
-        foreach (var (group, entries) in Object(sheet["constants"]))
+        var managerNotes = V(sheet, "managerNotes").TrimEnd();
+        var protectedPrefix = managerNotes.Length == 0 ? "" : managerNotes + Environment.NewLine;
+        stack.Controls.Add(Label("הערות מנהל וטכנאי · הערות המנהל מוגנות", 34, true));
+        var combinedNotes = Input("הוסף הערות לטופס…", 2000);
+        combinedNotes.Multiline = true; combinedNotes.Height = 110; combinedNotes.Width = 735;
+        combinedNotes.ScrollBars = ScrollBars.Vertical;
+        combinedNotes.Text = protectedPrefix + V(state, "technicianNote");
+        combinedNotes.TextChanged += (_, _) =>
         {
-            stack.Controls.Add(Label(group, 38, true));
-            foreach (var row in entries as JsonArray ?? new())
-                stack.Controls.Add(Label($"{row?[0]}: {row?[1]}", 28));
-        }
-        Section(stack, "פעולות אחזקה");
+            if (!combinedNotes.Text.StartsWith(protectedPrefix, StringComparison.Ordinal))
+            {
+                var oldText = V(state, "technicianNote");
+                combinedNotes.Text = protectedPrefix + oldText;
+                combinedNotes.SelectionStart = combinedNotes.TextLength;
+                return;
+            }
+            state["technicianNote"] = combinedNotes.Text[protectedPrefix.Length..];
+        };
+        stack.Controls.Add(combinedNotes);
+        Field(stack, "תיאור תיקון", state, "repair", true);
+        Section(stack, "פעולות לביצוע");
         var actionValues = state["actions"] as JsonArray ?? new JsonArray();
         while (actionValues.Count < 12) actionValues.Add(false);
         if (state["actions"] is null) state["actions"] = actionValues;
@@ -338,6 +364,22 @@ public sealed partial class NativeWindow
         Section(stack, "יחידות שפורקו והורכבו");
         foreach (var kind in NativeCatalog.Tables.Keys)
         {
+            if (kind == "tools")
+            {
+                Section(stack, "קבועים");
+                var showConstants = Check(stack, "הצג קבועים · הערכים מוצגים לקריאה בלבד", new JsonObject(), "expanded");
+                var constantRows = new FlowLayoutPanel { Width = 745, AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false, Visible = false };
+                foreach (var (group, entries) in Object(sheet["constants"]))
+                {
+                    constantRows.Controls.Add(Label(group, 38, true));
+                    foreach (var row in entries as JsonArray ?? new())
+                        constantRows.Controls.Add(Label($"{row?[0]}: {row?[1]}", 28));
+                }
+                showConstants.CheckedChanged += (_, _) => constantRows.Visible = showConstants.Checked;
+                stack.Controls.Add(constantRows);
+            }
             if (kind == "tools") Section(stack, "כלים");
             if (kind == "taken") Section(stack, "קשיחים שנלקחו");
             if (kind == "rejected") Section(stack, "קשיחים שנפסלו");

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace EzEizo.Core;
 
@@ -16,7 +17,7 @@ public static class NativeDiagnostics
     {
         // The packaged template has only a manager. Add a throwaway technician to
         // exercise the user list and history page without changing the ZIP template.
-        new Database().CreateAccount("טכנאי תצוגה", "7412589", "mechanic", "123456");
+        new Database().CreateAccount("טכנאי תצוגה", TestNumber(), "mechanic", TestPassword());
         using var window = new NativeWindow(AppRole.Manager);
         var stage = 0;
         var started = DateTime.UtcNow;
@@ -35,7 +36,8 @@ public static class NativeDiagnostics
                     if (!File.Exists(file)) return;
                     Capture(window, "native-login.png");
                     var password = File.ReadAllLines(file).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
-                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = "9862436";
+                    var number = File.ReadAllLines(file).Single(x => x.StartsWith("מספר אישי:")).Split(':')[1].Trim();
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = number;
                     controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = password;
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
@@ -106,6 +108,12 @@ public static class NativeDiagnostics
                 else if (stage == 11 && window.DiagnosticPage == "reports")
                 {
                     Capture(window, "native-reports.png");
+                    controls.OfType<ComboBox>().First().SelectedIndex = 1;
+                    controls.OfType<Button>().First(x => x.Text == "הצג דוח").PerformClick();
+                    if (!Descendants(window).OfType<FlowLayoutPanel>().Any(x => x.Visible &&
+                            x.Controls.OfType<Panel>().Count() == 5))
+                        throw new InvalidOperationException("Report summary cards did not render.");
+                    Capture(window, "native-report-results.png");
                     controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 12;
                 }
                 else if (stage == 12 && window.DiagnosticPage == "management")
@@ -146,11 +154,13 @@ public static class NativeDiagnostics
     public static void VerifyTechnicianUi()
     {
         var db = new Database();
-        var technician = db.CreateAccount("טכנאי בדיקה", "7654321", "mechanic", "123456");
-        var second = db.CreateAccount("טכנאי בדיקה נוסף", "7654322", "mechanic", "123456");
+        var password = TestPassword();
+        var technician = db.CreateAccount("טכנאי בדיקה", TestNumber(), "mechanic", password);
+        var second = db.CreateAccount("טכנאי בדיקה נוסף", TestNumber(), "mechanic", password);
         var initial = Path.Combine(Database.DataDirectory, "initial-manager.txt");
         var secret = File.ReadAllLines(initial).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
-        var manager = db.Authenticate("9862436", secret, AppRole.Manager)
+        var managerNumber = File.ReadAllLines(initial).Single(x => x.StartsWith("מספר אישי:")).Split(':')[1].Trim();
+        var manager = db.Authenticate(managerNumber, secret, AppRole.Manager)
             ?? throw new InvalidOperationException("The manager template is missing.");
         var store = new OfflineStore();
         using var issue = JsonDocument.Parse("""{"fault":"בדיקת ממשק תקלה","squadron":"105","shelter":"14","aircraft":"603","systemName":"מכם | FCR","systemCode":"74A","constants":{},"actions":[]}""");
@@ -179,8 +189,8 @@ public static class NativeDiagnostics
                 if (stage == 0 && window.DiagnosticPage == "login")
                 {
                     Capture(window, "native-technician-login.png");
-                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = "7654321";
-                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = "123456";
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = technician.PersonalNumber;
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = password;
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
                 }
@@ -191,7 +201,7 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 2 && window.DiagnosticPage == "fault-editor")
                 {
-                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות אחזקה", "יחידות שפורקו והורכבו", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
+                    foreach (var title in new[] { "בדיקת בטיחות המטוס", "תקלה ותיקון", "פעולות לביצוע", "יחידות שפורקו והורכבו", "קבועים", "כלים", "קשיחים שנלקחו", "קשיחים שנפסלו", "הצהרת הטכנאי" })
                         if (!controls.OfType<Label>().Any(x => x.Text == title))
                             throw new InvalidOperationException("Fault editor is missing: " + title);
                     Capture(window, "native-technician-fault.png");
@@ -231,9 +241,9 @@ public static class NativeDiagnostics
     }
     public static void VerifyPdf()
     {
-        var db = new Database();
-        var manager = db.Authenticate("1234567", "654321", AppRole.Manager)
-            ?? throw new InvalidOperationException("מנהל הבדיקה לא נמצא.");
+        // Export is read-only; use a synthetic manager role without changing the
+        // primary manager record created by the offline workflow test.
+        var manager = new Account(Guid.NewGuid().ToString(), "מנהל בדיקת PDF", TestNumber(), "manager");
         var form = new OfflineStore().List("issues", manager).First();
         var key = new OfflineStore().List("keyLoads", manager).First();
         var folder = Path.Combine(Path.GetTempPath(), "EzEizo-pdf-check-" + Guid.NewGuid().ToString("N"));
@@ -249,4 +259,6 @@ public static class NativeDiagnostics
         }
         finally { Directory.Delete(folder, true); }
     }
+    private static string TestNumber() => RandomNumberGenerator.GetInt32(1_000_000, 10_000_000).ToString();
+    private static string TestPassword() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }
