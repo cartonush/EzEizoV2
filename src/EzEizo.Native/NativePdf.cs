@@ -89,6 +89,8 @@ internal static class NativePdf
             new($"טייסת: {V(source, "squadron")}     דת״ק: {V(source, "shelter")}     סטטוס: {StatusText(item)}"),
             new($"שעת פתיחה: {DateText(V(item, "createdAt"))}     שעת סגירה: {DateText(closedAt)}")
         };
+        if (V(source, "dispatcherSignature").StartsWith("data:image/png;base64,", StringComparison.Ordinal))
+            lines.Add(new("תדריך בטיחות וניהול סיכונים · חתימת משלח המשימה", V(source, "dispatcherSignature")));
         if (key)
         {
             lines.Add(new($"תאריך: {V(item, "date")}     שעה: {V(item, "time")}     צוות: {string.Join(" · ", (item["teamNames"] as JsonArray ?? new()).Select(x => x?.ToString()))}"));
@@ -115,7 +117,12 @@ internal static class NativePdf
         var tasks = key ? NativeCatalog.KeyActions : NativeCatalog.Actions;
         var actions = state?["actions"] as JsonArray ?? new();
         for (var i = 0; i < tasks.Length; i++)
-            lines.Add(new($"{i + 1:D2}. {(i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□")} {tasks[i]}"));
+        {
+            var mark = i < actions.Count && actions[i]?.ToString() == "true" ? "✓" : "□";
+            if (!key && i == 10 && V(state, "action11Result") == "notRequired") mark = "X";
+            var time = !key && (i is 1 or 11) ? " · " + V(state, i == 1 ? "arrivalTime" : "completionTime") : "";
+            lines.Add(new($"{i + 1:D2}. {mark} {tasks[i]}{time}"));
+        }
         foreach (var (name, spec) in NativeCatalog.Tables)
         {
             var rows = state?[name] as JsonArray;
