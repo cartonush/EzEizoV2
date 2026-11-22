@@ -1,8 +1,8 @@
 # EzEizoV2
 
-גרסת Windows ‏2.6.0 של EzEizo: שתי תוכנות מקומיות, מנהל וטכנאי, עם ממשק Windows מקורי (WinForms) ומסד Access משותף. אין WebView2, דפדפן, Firebase או דרישה לאינטרנט במהלך השימוש. קוד המקור נמצא ב־`src/EzEizo.Native*` ודרישות ההתקנה ב־[INSTALL-WINDOWS.md](INSTALL-WINDOWS.md).
+גרסת Windows ‏2.6.1 של EzEizo: שתי תוכנות מקומיות, מנהל וטכנאי, עם ממשק Windows מקורי (WinForms) ומסד Access משותף. אין WebView2, דפדפן, Firebase או דרישה לאינטרנט במהלך השימוש. קוד המקור נמצא ב־`src/EzEizo.Native*` ודרישות ההתקנה ב־[INSTALL-WINDOWS.md](INSTALL-WINDOWS.md).
 
-הורד את `EzEizo-Windows-2.6.0.zip` מ־[Releases](https://github.com/cartonush/EzEizoV2/releases). חלץ את תיקיית `EzEizo` לשולחן העבודה, התקן Microsoft Access Database Engine/Runtime x64 אם הוא חסר, והפעל ישירות את `Metis.exe` או `Mechanic.exe` בשורש התיקייה. רכיבי התוכנה נמצאים ב־`program`; שני היישומים משתמשים בקובץ `Desktop/EzEizo/data/EzEizo.accdb`.
+הורד את `EzEizo-Windows-2.6.1.zip` מ־[Releases](https://github.com/cartonush/EzEizoV2/releases). חלץ את תיקיית `EzEizo` לשולחן העבודה, התקן Microsoft Access Database Engine/Runtime x64 אם הוא חסר, והפעל ישירות את `Metis.exe` או `Mechanic.exe` בשורש התיקייה. רכיבי התוכנה נמצאים ב־`program`; שני היישומים משתמשים בקובץ `Desktop/EzEizo/data/EzEizo.accdb`.
 
 המסד המצורף הוא תבנית הדגמה עם חשבון מנהל ראשי. פרטי הכניסה נמסרים בנפרד. בעת עדכון, שמור את תיקיית `data` הישנה במקום התבנית המצורפת; אחרת תאבד את המשתמשים והטפסים שלך. אין להשתמש בפרטי ההדגמה בסביבת עבודה אמיתית.
 
