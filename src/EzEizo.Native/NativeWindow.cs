@@ -218,7 +218,11 @@ public sealed partial class NativeWindow : Form
         stack.Dock = DockStyle.Fill;
         var toolbar = stack.Controls.OfType<FlowLayoutPanel>().FirstOrDefault(x => x.Name == "EditorToolbar");
         Control page;
-        if (toolbar is null) page = BuildPage(stack);
+        if (toolbar is null)
+        {
+            page = BuildPage(stack);
+            card.Controls.Add(page);
+        }
         else
         {
             stack.Controls.Remove(toolbar);
