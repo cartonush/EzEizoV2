@@ -57,7 +57,7 @@ public sealed partial class NativeWindow
     {
         stack.Controls.Add(Label("צוות טכנאים", 42, true));
         stack.Controls.Add(Label("בחר טכנאים מרשימת המשתמשים הפעילים.", 34));
-        var list = new CheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
+        var list = new NativeCheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
             CheckOnClick = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254) };
         foreach (var tech in technicians) list.Items.Add(new PersonChoice(tech));
         stack.Controls.Add(list);
@@ -151,7 +151,7 @@ public sealed partial class NativeWindow
             stack.Controls.Add(Button("הצג / הסתר משימות", (_, _) => actionList.Visible = !actionList.Visible));
             stack.Controls.Add(actionList);
             Section(stack, "פתיחת התקלה");
-            var briefing = new CheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
+            var briefing = new NativeCheckBox { Width = 745, Height = 65, Text = "תדריך בטיחות וניהול סיכונים יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו." };
             stack.Controls.Add(briefing);
             var signature = new NativeSignature();
             stack.Controls.Add(Label("חתימת משלח המשימה")); stack.Controls.Add(signature);
@@ -260,7 +260,7 @@ public sealed partial class NativeWindow
             stack.Controls.Add(Label("כלי עבודה / צב״ד צת״ת / חלפים נדרשים: מ.כ 2020 + חרב אש", 48));
             Section(stack, "משימות לביצוע");
             stack.Controls.Add(Label("המשימה הראשונה תאושר ותיחתם בידי משלח המשימה בעת פתיחת הדף.", 44));
-            var briefing = new CheckBox { Width = 745, Height = 60, Text = "תדריך בטיחות וניהול סיכונים הועבר ונחתם ע״י משלח המשימה." };
+            var briefing = new NativeCheckBox { Width = 745, Height = 60, Text = "תדריך בטיחות וניהול סיכונים הועבר ונחתם ע״י משלח המשימה." };
             stack.Controls.Add(briefing);
             stack.Controls.Add(Label("חתימת משלח המשימה"));
             var signature = new NativeSignature(); stack.Controls.Add(signature);
