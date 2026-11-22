@@ -38,6 +38,12 @@ public sealed partial class NativeWindow
         box.Items.AddRange(values.Cast<object>().ToArray());
         box.SelectedIndex = 0;
         box.SelectionStart = box.Text.Length; box.SelectionLength = 0;
+        box.HandleCreated += (_, _) => box.BeginInvoke(new Action(() =>
+        {
+            if (box.IsDisposed) return;
+            box.SelectionStart = box.Text.Length;
+            box.SelectionLength = 0;
+        }));
         stack.Controls.Add(box);
         return box;
     }
