@@ -178,6 +178,13 @@ public sealed partial class NativeWindow
         if (page == "issues")
         {
             var sheet = doc["sheet"] ?? doc;
+            if (V(sheet, "dispatcherSignature").StartsWith("data:image/png;base64,", StringComparison.Ordinal))
+            {
+                Section(stack, "תדריך בטיחות וניהול סיכונים");
+                stack.Controls.Add(Label("יועבר ע״י מ״ע התקלה / משלח המשימה וייחתם על ידו.", 42));
+                stack.Controls.Add(Label("חתימת משלח המשימה"));
+                stack.Controls.Add(new NativeSignature(V(sheet, "dispatcherSignature")) { Enabled = false });
+            }
             stack.Controls.Add(Label("תיאור התקלה: " + V(sheet, "fault"), 75));
             stack.Controls.Add(Label("תיאור תיקון: " + V(state, "repair"), 85));
             stack.Controls.Add(Label("הערות: " + V(sheet, "managerNotes") + " " + V(state, "technicianNote"), 75));
@@ -185,7 +192,7 @@ public sealed partial class NativeWindow
             var constants = Object(sheet["constants"]);
             if (constants.Count > 0)
             {
-                Section(stack, "קבועים לפי מטוס");
+                Section(stack, "קבועים");
                 foreach (var (group, entries) in constants)
                 {
                     stack.Controls.Add(Label(group, 38, true));
