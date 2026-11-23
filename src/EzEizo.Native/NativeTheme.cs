@@ -240,6 +240,29 @@ internal sealed class NativeCard : Panel
     }
 }
 
+internal sealed class NativeInputFrame : Panel
+{
+    public NativeInputFrame()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = Color.White;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(Parent?.BackColor ?? Color.White);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
+        if (bounds.Width < 2 || bounds.Height < 2) return;
+        using var path = NativeButton.Rounded(bounds, 7);
+        using var surface = new SolidBrush(Color.White);
+        using var border = new Pen(ContainsFocus ? Color.FromArgb(93, 168, 197) : Color.FromArgb(219, 230, 236));
+        e.Graphics.FillPath(surface, path);
+        e.Graphics.DrawPath(border, path);
+        base.OnPaint(e);
+    }
+}
+
 internal sealed class NativeHeader : Panel
 {
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
