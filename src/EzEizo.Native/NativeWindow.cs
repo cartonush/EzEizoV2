@@ -749,9 +749,9 @@ public sealed partial class NativeWindow : Form
                     row.Controls.Add(new Label { Text = $"מספר אישי {person.PersonalNumber}  ·  {(person.Active ? "פעיל" : "הוסר")}",
                         Location = new Point(350, 40), Width = 350, Height = 23, TextAlign = ContentAlignment.MiddleLeft,
                         Font = NativeFonts.Create(9), ForeColor = person.Active ? Color.FromArgb(22, 139, 121) : Muted });
-                    var history = Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 160;
+                    var history = (NativeButton)Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 160;
                     history.Height = 38; history.Location = new Point(12, 48); history.Secondary = true; row.Controls.Add(history);
-                    var active = Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
+                    var active = (NativeButton)Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
@@ -759,7 +759,7 @@ public sealed partial class NativeWindow : Form
                     active.Secondary = true; row.Controls.Add(active);
                     if (!person.Active)
                     {
-                        var delete = Button("מחק לצמיתות", async (_, _) =>
+                        var delete = (NativeButton)Button("מחק לצמיתות", async (_, _) =>
                         {
                         if (MessageBox.Show(this, $"למחוק לצמיתות את {person.Name}?", "מחיקה סופית", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                         try { await Work(() => { database.DeleteTechnician(person.Id); return true; }); await OpenUsers(); }
