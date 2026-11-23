@@ -12,46 +12,142 @@ public sealed partial class NativeWindow
         try
         {
             var records = await Work(() => store.Constants(user));
-            currentPage = "constants"; refreshTimer.Stop();
-            var stack = Stack();
-            Section(stack, "עדכון קבועים לפי מטוס");
-            var squad = Choice(stack, "טייסת", NativeCatalog.Squadrons.Keys);
-            var plane = Choice(stack, "מטוס", []);
-            var grid = new DataGridView { Width = 740, Height = 380, RowHeadersVisible = false, AllowUserToAddRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-            grid.Columns.Add("group", "קבוצה"); grid.Columns.Add("key", "קבוע"); grid.Columns.Add("value", "ערך");
-            grid.Columns["group"].ReadOnly = true; grid.Columns["key"].ReadOnly = true;
-            stack.Controls.Add(grid);
-            squad.SelectedIndexChanged += (_, _) => Options(plane, NativeCatalog.Squadrons.TryGetValue(Selected(squad), out var entry) ? entry.aircraft : []);
-            plane.SelectedIndexChanged += (_, _) =>
+            refreshTimer.Stop();
+            var selectedSquadron = "101";
+
+            void ShowEditor(string squadron, string aircraft)
             {
-                grid.Rows.Clear();
-                if (Selected(plane).Length == 0) return;
-                var constants = Object(records.FirstOrDefault(x => V(x, "squadron") == Selected(squad) && V(x, "aircraft") == Selected(plane))?["constants"] ?? SampleConstants());
-                foreach (var (group, entries) in constants)
-                    foreach (var row in entries as JsonArray ?? new JsonArray())
-                        grid.Rows.Add(group, row?[0]?.ToString(), row?[1]?.ToString());
-            };
-            stack.Controls.Add(Button("שמור קבועים", async (_, _) =>
-            {
-                if (Selected(plane).Length == 0) { status.Text = "בחר טייסת ומטוס מהרשימות."; return; }
-                try
+                currentPage = "constants-editor";
+                var stack = Stack();
+                Section(stack, $"טייסת {squadron} · מטוס {aircraft}", "קבועים למטוס");
+                var back = Button("→ חזרה לרשימת המטוסים", (_, _) => ShowPicker());
+                back.Secondary = true;
+                stack.Controls.Add(back);
+                stack.Controls.Add(Label("עדכן את ערכי הקבועים של המטוס. השינויים יחולו על תקלות חדשות.", 44));
+                var record = records.FirstOrDefault(x => V(x, "squadron") == squadron && V(x, "aircraft") == aircraft);
+                var constants = Object(record?["constants"] ?? SampleConstants());
+                var fields = new List<(string group, string key, TextBox input)>();
+                var groups = new FlowLayoutPanel
                 {
-                    grid.EndEdit();
-                    var constants = new JsonObject();
-                    foreach (DataGridViewRow row in grid.Rows)
+                    Width = 745, Height = 402, FlowDirection = FlowDirection.LeftToRight,
+                    WrapContents = true, BackColor = Color.White, Margin = new Padding(0, 0, 0, 12)
+                };
+                foreach (var (groupName, entries) in constants)
+                {
+                    var values = entries as JsonArray ?? new JsonArray();
+                    var rows = Math.Max(1, (values.Count + 2) / 3);
+                    var card = new NativeCard { Width = 234, Height = 58 + rows * 62,
+                        Margin = new Padding(0, 0, 10, 12), BackColor = Color.FromArgb(251, 253, 254) };
+                    card.Controls.Add(new Label
                     {
-                        var group = row.Cells["group"].Value?.ToString() ?? "";
-                        if (constants[group] is null) constants[group] = new JsonArray();
-                        ((JsonArray)constants[group]!).Add(Strings([row.Cells["key"].Value?.ToString() ?? "", row.Cells["value"].Value?.ToString() ?? ""]));
+                        Text = groupName, Location = new Point(12, 10), Size = new Size(210, 27),
+                        TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue,
+                        Font = NativeFonts.Create(10, FontStyle.Bold)
+                    });
+                    for (var i = 0; i < values.Count; i++)
+                    {
+                        var key = values[i]?[0]?.ToString() ?? "";
+                        var value = values[i]?[1]?.ToString() ?? "";
+                        var x = 234 - 14 - 64 - i % 3 * 72;
+                        var y = 47 + i / 3 * 62;
+                        card.Controls.Add(new Label
+                        {
+                            Text = key, Location = new Point(x, y), Size = new Size(64, 18),
+                            ForeColor = Muted, TextAlign = ContentAlignment.MiddleCenter,
+                            Font = NativeFonts.Create(8.25f, FontStyle.Bold)
+                        });
+                        var input = new TextBox
+                        {
+                            Text = value, Location = new Point(x, y + 20), Size = new Size(64, 32),
+                            AutoSize = false, MaxLength = 80, TextAlign = HorizontalAlignment.Center,
+                            BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White,
+                            ForeColor = Navy, Font = NativeFonts.Create(10)
+                        };
+                        card.Controls.Add(input);
+                        fields.Add((groupName, key, input));
                     }
-                    await Work(() => { store.SaveConstants(Json(new JsonObject { ["squadron"] = Selected(squad), ["aircraft"] = Selected(plane), ["constants"] = constants }), user); return true; });
-                    status.Text = $"קבועי מטוס {Selected(plane)} נשמרו במסד.";
+                    groups.Controls.Add(card);
                 }
-                catch (Exception ex) { Error(ex); }
-            }));
-            Present(stack);
-            status.Text = "בחר מטוס כדי לראות ולערוך את הקבועים שלו.";
+                stack.Controls.Add(groups);
+                var message = record is null ? "ערכי הפתיחה זהים לקבועים שנמסרו לכל המטוסים."
+                    : "ערכי המטוס נטענו מהרשומה השמורה.";
+                stack.Controls.Add(Label(message, 38));
+                stack.Controls.Add(Button("שמור קבועים למטוס", async (_, _) =>
+                {
+                    var updated = new JsonObject();
+                    foreach (var (group, key, input) in fields)
+                    {
+                        var value = input.Text.Trim();
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^-?\d{1,18}$"))
+                        {
+                            status.Text = $"יש להזין מספר תקין עבור {group} {key}.";
+                            input.Focus();
+                            return;
+                        }
+                        if (updated[group] is null) updated[group] = new JsonArray();
+                        ((JsonArray)updated[group]!).Add(Strings([key, value]));
+                    }
+                    try
+                    {
+                        await Work(() =>
+                        {
+                            store.SaveConstants(Json(new JsonObject
+                            {
+                                ["squadron"] = squadron, ["aircraft"] = aircraft, ["constants"] = updated
+                            }), user);
+                            return true;
+                        });
+                        records = await Work(() => store.Constants(user));
+                        status.Text = $"קבועי מטוס {aircraft} נשמרו. תקלות חדשות ישתמשו בערכים המעודכנים.";
+                    }
+                    catch (Exception ex) { Error(ex); }
+                }));
+                Present(stack);
+                status.Text = $"עריכת קבועים · טייסת {squadron} · מטוס {aircraft}";
+            }
+
+            void ShowPicker()
+            {
+                currentPage = "constants";
+                var stack = Stack();
+                Section(stack, "עדכון קבועים לפי מטוס", "ניהול");
+                stack.Controls.Add(Label("בחר טייסת ומטוס כדי לראות ולערוך את הקבועים שלו. לכל מטוס נשמרת רשומה משלו.", 48));
+                var tabs = new FlowLayoutPanel { Width = 745, Height = 62, WrapContents = false,
+                    FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
+                var buttons = new List<NativeButton>();
+                var aircraft = new FlowLayoutPanel { Width = 745, Height = 320,
+                    FlowDirection = FlowDirection.RightToLeft, WrapContents = true, BackColor = Color.White };
+                void SelectSquadron(string name)
+                {
+                    selectedSquadron = name;
+                    foreach (var button in buttons) { button.Active = button.Text == "טייסת " + name; button.Invalidate(); }
+                    aircraft.Controls.Clear();
+                    if (!NativeCatalog.Squadrons.TryGetValue(name, out var catalog)) return;
+                    foreach (var plane in catalog.aircraft)
+                    {
+                        var updated = records.Any(x => V(x, "squadron") == name && V(x, "aircraft") == plane);
+                        var chip = Button("מטוס " + plane + (updated ? " · עודכן" : ""), (_, _) => ShowEditor(name, plane));
+                        chip.Secondary = true;
+                        chip.Width = 135; chip.Height = 42; chip.Margin = new Padding(0, 0, 9, 9);
+                        aircraft.Controls.Add(chip);
+                    }
+                    aircraft.Height = ((catalog.aircraft.Length + 4) / 5) * 51 + 8;
+                }
+                foreach (var squadron in NativeCatalog.Squadrons.Keys)
+                {
+                    var tab = (NativeButton)Button("טייסת " + squadron, (_, _) => SelectSquadron(squadron));
+                    tab.Secondary = true; tab.Width = 176; tab.Height = 45;
+                    tab.Margin = new Padding(0, 0, 8, 8);
+                    buttons.Add(tab); tabs.Controls.Add(tab);
+                }
+                stack.Controls.Add(tabs);
+                stack.Controls.Add(Label("בחר מטוס מהרשימה", 38, true));
+                stack.Controls.Add(aircraft);
+                SelectSquadron(selectedSquadron);
+                Present(stack);
+                status.Text = "בחר מטוס כדי לראות ולערוך את הקבועים שלו.";
+            }
+            ShowPicker();
         }
         catch (Exception ex) { Error(ex); }
     }
@@ -66,22 +162,47 @@ public sealed partial class NativeWindow
             var loads = await Work(() => store.List("keyLoads", user));
             currentPage = "key-history"; refreshTimer.Stop();
             var stack = Stack();
-            Section(stack, "היסטוריית מפתחות");
-            var squad = Choice(stack, "טייסת", ["101", "105", "109"]);
-            var grid = new DataGridView { Width = 745, Height = 500, ReadOnly = true, RowHeadersVisible = false,
-                AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-            foreach (var (name, heading) in new[] { ("aircraft", "מספר מטוס"), ("blueDate", "תאריך ארז כחול"), ("bluePeriod", "חודשים ארז כחול"), ("shachDate", "תאריך שחק"), ("shachPeriod", "חודשים שחק") })
-                grid.Columns.Add(name, heading);
-            stack.Controls.Add(grid);
-            squad.SelectedIndexChanged += (_, _) =>
+            Section(stack, "היסטוריית מפתחות", "שלוש טייסות");
+            stack.Controls.Add(Label("ארז כחול ושחק מתעדכנים בנפרד לאחר הטענה שהושלמה. סוג מפתח שלא נטען מסומן ״טרם הוטען״.", 48));
+            var tabs = new FlowLayoutPanel { Width = 745, Height = 62, WrapContents = false,
+                FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
+            stack.Controls.Add(tabs);
+            var grid = new DataGridView
             {
+                Width = 745, Height = 650, ReadOnly = true, RowHeadersVisible = false,
+                AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false, MultiSelect = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                ColumnHeadersHeight = 64, RowTemplate = { Height = 46 },
+                Tag = "key-history"
+            };
+            foreach (var (name, heading) in new[]
+            {
+                ("aircraft", "מספר מטוס"), ("blueDate", "תאריך הטענת מפתחות ארז כחול"),
+                ("bluePeriod", "חודשים ארז כחול"), ("shachDate", "תאריך הטענת שחק"),
+                ("shachPeriod", "חודשים שחק")
+            }) grid.Columns.Add(name, heading);
+            grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            grid.ColumnHeadersDefaultCellStyle.Font = NativeFonts.Create(9, FontStyle.Bold);
+            grid.Font = NativeFonts.Create(9.5f);
+            stack.Controls.Add(grid);
+            var buttons = new List<NativeButton>();
+            void SelectSquadron(string name)
+            {
+                foreach (var button in buttons) { button.Active = button.Text == "טייסת " + name; button.Invalidate(); }
                 grid.Rows.Clear();
-                var name = Selected(squad);
                 if (!NativeCatalog.Squadrons.TryGetValue(name, out var catalog)) return;
+                var completed = loads.Where(x => V(x, "status") == "closed" && V(x, "squadron") == name)
+                    .OrderByDescending(x => V(x, "completedAt")).ToArray();
                 foreach (var plane in catalog.aircraft)
                 {
                     JsonNode? blue = null, shach = null;
-                    foreach (var load in loads.Where(x => V(x, "status") == "closed" && V(x, "squadron") == name).OrderByDescending(x => V(x, "completedAt")))
+                    foreach (var load in completed)
                     {
                         var rows = load["rows"] as JsonArray ?? new();
                         var work = load["work"]?["aircraft"] as JsonArray ?? new();
@@ -92,10 +213,38 @@ public sealed partial class NativeWindow
                             if (shach is null && B(rows[i], "shach") && B(work[i], "shachDone")) shach = load;
                         }
                     }
-                    grid.Rows.Add(plane, Date(blue), V(blue, "period"), Date(shach), V(shach, "period"));
+                    var latest = blue is null ? shach : shach is null ? blue :
+                        string.CompareOrdinal(V(blue, "completedAt"), V(shach, "completedAt")) >= 0 ? blue : shach;
+                    var bluePeriod = blue is null ? "—" : V(blue, "period");
+                    var shachPeriod = shach is null ? "—" : V(shach, "period");
+                    if (blue is not null && latest is not null && V(latest, "period") != bluePeriod)
+                        bluePeriod += Environment.NewLine + "נדרש להשלים";
+                    if (shach is not null && latest is not null && V(latest, "period") != shachPeriod)
+                        shachPeriod += Environment.NewLine + "נדרש להשלים";
+                    var index = grid.Rows.Add(plane, blue is null ? "טרם הוטען" : Date(blue), bluePeriod,
+                        shach is null ? "טרם הוטען" : Date(shach), shachPeriod);
+                    var row = grid.Rows[index];
+                    foreach (var cellIndex in blue is null ? new[] { 1, 2 } : Array.Empty<int>())
+                    { row.Cells[cellIndex].Style.BackColor = Color.FromArgb(255, 248, 237); row.Cells[cellIndex].Style.ForeColor = Color.FromArgb(164, 84, 25); }
+                    foreach (var cellIndex in shach is null ? new[] { 3, 4 } : Array.Empty<int>())
+                    { row.Cells[cellIndex].Style.BackColor = Color.FromArgb(255, 248, 237); row.Cells[cellIndex].Style.ForeColor = Color.FromArgb(164, 84, 25); }
+                    if (bluePeriod.Contains("נדרש להשלים")) row.Cells[2].Style.ForeColor = Color.FromArgb(164, 84, 25);
+                    if (shachPeriod.Contains("נדרש להשלים")) row.Cells[4].Style.ForeColor = Color.FromArgb(164, 84, 25);
                 }
-            };
+                grid.Height = 66 + grid.RowCount * 46;
+                grid.ClearSelection();
+                status.Text = $"היסטוריית מפתחות · טייסת {name} · {grid.RowCount} מטוסים";
+            }
+            foreach (var name in new[] { "101", "105", "109" })
+            {
+                var tab = (NativeButton)Button("טייסת " + name, (_, _) => SelectSquadron(name));
+                tab.Secondary = true; tab.Width = 230; tab.Height = 44;
+                tab.Margin = new Padding(0, 0, 9, 8);
+                buttons.Add(tab); tabs.Controls.Add(tab);
+            }
+            SelectSquadron("101");
             Present(stack);
+            grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(234, 243, 248);
             status.Text = "כל סוג מפתח מחושב לפי ההטענה האחרונה שהושלמה עבורו.";
         }
         catch (Exception ex) { Error(ex); }
