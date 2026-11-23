@@ -347,7 +347,7 @@ public sealed partial class NativeWindow
             else if (i == 10)
             {
                 stack.Controls.Add(Label($"11. {NativeCatalog.Actions[i]}"));
-                var choice = new ComboBox { Width = 240, DropDownStyle = ComboBoxStyle.DropDownList };
+                var choice = new NativeChoice { Width = 240, Height = 42 };
                 choice.Items.AddRange(["בחר תוצאה", "✓ בוצע", "X לא נדרש"]);
                 choice.SelectedIndex = V(state, "action11Result") == "done" ? 1 : V(state, "action11Result") == "notRequired" ? 2 : 0;
                 choice.SelectedIndexChanged += (_, _) => { state["action11Result"] = choice.SelectedIndex == 1 ? "done" : choice.SelectedIndex == 2 ? "notRequired" : ""; actionValues[index] = choice.SelectedIndex > 0; };

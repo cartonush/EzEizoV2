@@ -66,9 +66,14 @@ internal sealed class NativeButton : Button
                 Color.FromArgb(96, 118, 134), textFlags);
         }
         else
-            TextRenderer.DrawText(e.Graphics, Text, Font, bounds, foreground,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-                TextFormatFlags.EndEllipsis | TextFormatFlags.RightToLeft);
+        {
+            var content = TextAlign == ContentAlignment.MiddleRight
+                ? new Rectangle(bounds.Left + 18, bounds.Top, bounds.Width - 36, bounds.Height)
+                : bounds;
+            TextRenderer.DrawText(e.Graphics, Text, Font, content, foreground,
+                (TextAlign == ContentAlignment.MiddleRight ? TextFormatFlags.Right : TextFormatFlags.HorizontalCenter) |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.RightToLeft);
+        }
     }
     internal static GraphicsPath Rounded(Rectangle bounds, int radius)
     {
@@ -216,6 +221,35 @@ internal sealed class NativeCheckedListBox : CheckedListBox
             (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left);
         TextRenderer.DrawText(g, GetItemText(Items[e.Index]), Font, textBounds,
             Enabled ? Color.FromArgb(21, 43, 64) : Color.FromArgb(126, 143, 153), flags);
+        if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
+    }
+}
+
+internal sealed class NativeChoice : ComboBox
+{
+    public NativeChoice()
+    {
+        DropDownStyle = ComboBoxStyle.DropDownList;
+        DrawMode = DrawMode.OwnerDrawFixed;
+        ItemHeight = 34;
+        FlatStyle = FlatStyle.Popup;
+        BackColor = Color.FromArgb(251, 253, 254);
+        ForeColor = Color.FromArgb(21, 43, 64);
+        RightToLeft = RightToLeft.Yes;
+        Font = NativeFonts.Create(10);
+    }
+
+    protected override void OnDrawItem(DrawItemEventArgs e)
+    {
+        if (e.Index < 0 || e.Index >= Items.Count) return;
+        var selected = (e.State & DrawItemState.Selected) != 0;
+        using var fill = new SolidBrush(selected ? Color.FromArgb(229, 244, 249) : Color.White);
+        e.Graphics.FillRectangle(fill, e.Bounds);
+        var bounds = Rectangle.Inflate(e.Bounds, -12, 0);
+        TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, bounds,
+            e.Index == 0 ? Color.FromArgb(111, 132, 145) : ForeColor,
+            TextFormatFlags.RightToLeft | TextFormatFlags.Right | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis);
         if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
     }
 }

@@ -10,18 +10,18 @@ public sealed partial class NativeWindow
     }
     private static FlowLayoutPanel FieldGrid() => new()
     {
-        Width = 950, Height = 350,
+        Width = 745, Height = 350,
         FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Margin = new Padding(0, 0, 0, 12)
     };
     private static FlowLayoutPanel FieldCell() => new()
     {
-        Width = 378, Height = 104, FlowDirection = FlowDirection.TopDown,
+        Width = 358, Height = 87, FlowDirection = FlowDirection.TopDown,
         WrapContents = false, Margin = new Padding(0, 0, 8, 8), BackColor = Color.White
     };
     private static void AddField(FlowLayoutPanel cell, string title, Control input)
     {
-        var caption = Label(title, 34); caption.Width = 365; cell.Controls.Add(caption);
-        input.Width = 365;
+        var caption = Label(title, 30); caption.Width = 350; cell.Controls.Add(caption);
+        input.Width = 350;
         cell.Controls.Add(input);
     }
     private static ComboBox Choice(FlowLayoutPanel stack, string title, IEnumerable<string> values)
@@ -29,28 +29,17 @@ public sealed partial class NativeWindow
         var caption = Label(title);
         if (stack.Width <= 500) caption.Width = 365;
         stack.Controls.Add(caption);
-        var box = new ComboBox { Width = stack.Width <= 500 ? 365 : 440, Height = 40,
-            DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend,
-            AutoCompleteSource = AutoCompleteSource.ListItems,
-            Margin = new Padding(0, 0, 0, 14), Tag = caption,
-            FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(251, 253, 254) };
+        var box = new NativeChoice { Width = stack.Width <= 500 ? 350 : 440, Height = 42,
+            Margin = new Padding(0, 0, 0, 12), Tag = caption };
         box.Items.Add("בחר");
         box.Items.AddRange(values.Cast<object>().ToArray());
         box.SelectedIndex = 0;
-        box.SelectionStart = box.Text.Length; box.SelectionLength = 0;
-        box.HandleCreated += (_, _) => box.BeginInvoke(new Action(() =>
-        {
-            if (box.IsDisposed) return;
-            box.SelectionStart = box.Text.Length;
-            box.SelectionLength = 0;
-        }));
         stack.Controls.Add(box);
         return box;
     }
     private static void Options(ComboBox box, IEnumerable<string> values)
     {
         box.Items.Clear(); box.Items.Add("בחר"); box.Items.AddRange(values.Cast<object>().ToArray()); box.SelectedIndex = 0;
-        box.SelectionStart = box.Text.Length; box.SelectionLength = 0;
     }
     private static string Selected(ComboBox box) => box.SelectedIndex > 0 ? box.SelectedItem?.ToString() ?? "" : "";
     private static CheckedListBox Team(FlowLayoutPanel stack, IReadOnlyList<Account> technicians)
@@ -92,7 +81,7 @@ public sealed partial class NativeWindow
             Section(stack, "יצירת תקלה");
             stack.Controls.Add(Label("מלא את פרטי האירוע ופתח תקלה חדשה. היא תקבל מספר סידורי ותופיע ברשימה.", 48));
             Section(stack, "נתוני התקלה");
-            var fields = FieldGrid(); stack.Controls.Add(fields);
+            var fields = FieldGrid(); fields.Height = 296; stack.Controls.Add(fields);
             var squadCell = FieldCell(); fields.Controls.Add(squadCell);
             var squadron = Choice(squadCell, "טייסת", NativeCatalog.Squadrons.Keys);
             var shelterCell = FieldCell(); fields.Controls.Add(shelterCell);
@@ -109,7 +98,7 @@ public sealed partial class NativeWindow
                 Options(aircraft, NativeCatalog.Squadrons.TryGetValue(name, out entry) ? entry.aircraft : []);
             };
             shelter.SelectedIndexChanged += (_, _) =>
-            { workshopCell.Visible = Selected(shelter) == "מוסך"; fields.Height = workshopCell.Visible ? 465 : 350; };
+            { workshopCell.Visible = Selected(shelter) == "מוסך"; fields.Height = workshopCell.Visible ? 385 : 296; };
             var systemCell = FieldCell(); fields.Controls.Add(systemCell);
             var system = Choice(systemCell, "שם מערכת", NativeCatalog.Systems);
             var code = Input("קוד מערכת · מתמלא אוטומטית"); code.ReadOnly = true;
@@ -208,7 +197,7 @@ public sealed partial class NativeWindow
             currentPage = "new-key"; refreshTimer.Stop();
             var stack = Stack();
             Section(stack, "הטענת מפתחות");
-            var fields = FieldGrid(); fields.Height = 248; stack.Controls.Add(fields);
+            var fields = FieldGrid(); fields.Height = 240; stack.Controls.Add(fields);
             var date = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Value = DateTime.Today };
             var dateCell = FieldCell(); fields.Controls.Add(dateCell); AddField(dateCell, "תאריך", date);
             var time = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Now };

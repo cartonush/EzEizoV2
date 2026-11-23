@@ -626,7 +626,8 @@ public sealed partial class NativeWindow : Form
             search.Text = searchTerm;
             stack.Controls.Add(Label(page == "issues" ? "חיפוש לפי מספר תקלה" : "חיפוש לפי מספר הטענה", 32));
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 780, Height = 450, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var cards = new FlowLayoutPanel { Width = 745, Height = 450, AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White };
             stack.Controls.Add(cards);
             void Render()
             {
@@ -636,20 +637,24 @@ public sealed partial class NativeWindow : Form
                     (statusFilter == "הכל" || statusFilter == "פתוח" && item["status"]?.ToString() == "open" ||
                      statusFilter == "סגור" && item["status"]?.ToString() == "closed" ||
                      statusFilter == "ממתין לסגירה" && item["status"]?.ToString() == "pendingReview")).ToArray();
-                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 88 + 12));
-                if (matching.Length == 0) cards.Controls.Add(Label("אין טפסים להצגה."));
+                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 96 + 12));
+                if (matching.Length == 0)
+                    cards.Controls.Add(Label(search.TextLength > 0 ? "לא נמצאו טפסים למספר שחיפשת." :
+                        statusFilter == "ממתין לסגירה" ? "אין תקלות שממתינות לסגירה." : "אין טפסים להצגה במצב זה.", 66));
                 foreach (var item in matching)
                 {
                     var id = item["id"]?.ToString() ?? "";
                     var sheet = item["sheet"] ?? item;
                     var serial = item["serial"]?.ToString() ?? sheet["serial"]?.ToString() ?? "";
                     var aircraft = sheet["aircraft"]?.ToString() ?? string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => x?["aircraft"]?.ToString()));
-                    var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial} · מטוס {aircraft}{Environment.NewLine}{(item["status"]?.ToString() == "open" ? "פתוח" : item["status"]?.ToString() == "closed" ? "סגור" : "ממתין לסגירה")}";
+                    var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial} · מטוס {aircraft}{Environment.NewLine}" +
+                        $"{(item["status"]?.ToString() == "open" ? "פתוח" : item["status"]?.ToString() == "closed" ? "סגור" : "ממתין לסגירה")}  ·  {DisplayDate(V(item, "createdAt"))}";
                     var card = (NativeButton)Button(title, async (_, _) => await OpenDocument(page, id));
                     card.Secondary = true;
-                    card.Width = 750;
-                    card.Height = 77;
-                    card.TextAlign = ContentAlignment.MiddleLeft;
+                    card.Width = 715;
+                    card.Height = 84;
+                    card.TextAlign = ContentAlignment.MiddleRight;
+                    card.Margin = new Padding(0, 0, 0, 8);
                     cards.Controls.Add(card);
                 }
             }
@@ -724,24 +729,34 @@ public sealed partial class NativeWindow : Form
             currentPage = "users";
             var stack = Stack();
             Section(stack, "ניהול משתמשים");
+            stack.Controls.Add(Label($"{users.Count(x => x.Active)} טכנאים פעילים · {users.Count(x => !x.Active)} משתמשים שהוסרו", 40));
+            stack.Controls.Add(Label("חיפוש לפי שם או מספר אישי", 30));
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 780, Height = Math.Min(480, Math.Max(105, users.Count * 108 + 12)),
+            var list = new FlowLayoutPanel { Width = 745, Height = Math.Min(480, Math.Max(110, users.Count * 112 + 12)),
                 AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
             {
                 list.Controls.Clear();
-                foreach (var person in users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)))
+                var matching = users.Where(x => x.Name.Contains(search.Text, StringComparison.CurrentCultureIgnoreCase) || x.PersonalNumber.Contains(search.Text)).ToArray();
+                if (matching.Length == 0) list.Controls.Add(Label("לא נמצאו משתמשים מתאימים.", 55));
+                foreach (var person in matching)
                 {
-                    var row = new FlowLayoutPanel { Width = 750, Height = 101, WrapContents = true };
-                    row.Controls.Add(new Label { Text = $"{person.Name} · {person.PersonalNumber} · {(person.Active ? "פעיל" : "הוסר")}", Width = 740, Height = 38, TextAlign = ContentAlignment.MiddleLeft });
-                    var history = Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 175; row.Controls.Add(history);
+                    var row = new NativeCard { Width = 720, Height = 104, Margin = new Padding(0, 0, 0, 9) };
+                    row.Controls.Add(new Label { Text = person.Name, Location = new Point(350, 9), Width = 350, Height = 30,
+                        TextAlign = ContentAlignment.MiddleLeft, Font = NativeFonts.Create(11, FontStyle.Bold), ForeColor = Navy });
+                    row.Controls.Add(new Label { Text = $"מספר אישי {person.PersonalNumber}  ·  {(person.Active ? "פעיל" : "הוסר")}",
+                        Location = new Point(350, 40), Width = 350, Height = 23, TextAlign = ContentAlignment.MiddleLeft,
+                        Font = NativeFonts.Create(9), ForeColor = person.Active ? Color.FromArgb(22, 139, 121) : Muted });
+                    var history = Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 160;
+                    history.Height = 38; history.Location = new Point(12, 48); history.Secondary = true; row.Controls.Add(history);
                     var active = Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                    }); active.Width = 175; row.Controls.Add(active);
+                    }); active.Width = 145; active.Height = 38; active.Location = new Point(180, 48);
+                    active.Secondary = true; row.Controls.Add(active);
                     if (!person.Active)
                     {
                         var delete = Button("מחק לצמיתות", async (_, _) =>
@@ -749,7 +764,8 @@ public sealed partial class NativeWindow : Form
                         if (MessageBox.Show(this, $"למחוק לצמיתות את {person.Name}?", "מחיקה סופית", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                         try { await Work(() => { database.DeleteTechnician(person.Id); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
-                        }); delete.Width = 175; row.Controls.Add(delete);
+                        }); delete.Width = 145; delete.Height = 38; delete.Location = new Point(180, 7);
+                        delete.Secondary = true; delete.Danger = true; row.Controls.Add(delete);
                     }
                     list.Controls.Add(row);
                 }
@@ -757,9 +773,12 @@ public sealed partial class NativeWindow : Form
             search.TextChanged += (_, _) => Render();
             Render();
             Section(stack, "יצירת טכנאי");
+            stack.Controls.Add(Label("שם מלא", 30));
             var name = Input("שם מלא", 100); stack.Controls.Add(name);
-            var number = Input("מספר אישי · 7 ספרות", 7); stack.Controls.Add(number);
-            var password = Input("סיסמה · 6 ספרות", 6, true); stack.Controls.Add(password);
+            stack.Controls.Add(Label("מספר אישי", 30));
+            var number = Input("7 ספרות", 7); stack.Controls.Add(number);
+            stack.Controls.Add(Label("סיסמה ראשונית", 30));
+            var password = Input("6 ספרות", 6, true); stack.Controls.Add(password);
             stack.Controls.Add(Button("צור טכנאי", async (_, _) =>
             {
                 try
