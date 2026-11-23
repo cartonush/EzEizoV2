@@ -58,8 +58,9 @@ public sealed partial class NativeWindow
                         });
                         var input = new TextBox
                         {
-                            Text = value, Location = new Point(x, y + 20), Size = new Size(64, 32),
-                            AutoSize = false, MaxLength = 80, TextAlign = HorizontalAlignment.Center,
+                            Text = value, Tag = key, Location = new Point(x, y + 20), Size = new Size(64, 32),
+                            AutoSize = false, MaxLength = 80, RightToLeft = RightToLeft.No,
+                            TextAlign = HorizontalAlignment.Center,
                             BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White,
                             ForeColor = Navy, Font = NativeFonts.Create(10)
                         };
@@ -189,6 +190,8 @@ public sealed partial class NativeWindow
             grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             grid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
             grid.ColumnHeadersDefaultCellStyle.Font = NativeFonts.Create(9, FontStyle.Bold);
+            grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(234, 243, 248);
+            grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Navy;
             grid.Font = NativeFonts.Create(9.5f);
             stack.Controls.Add(grid);
             var buttons = new List<NativeButton>();
@@ -233,6 +236,7 @@ public sealed partial class NativeWindow
                 }
                 grid.Height = 66 + grid.RowCount * 46;
                 grid.ClearSelection();
+                grid.CurrentCell = null;
                 status.Text = $"היסטוריית מפתחות · טייסת {name} · {grid.RowCount} מטוסים";
             }
             foreach (var name in new[] { "101", "105", "109" })
@@ -243,6 +247,7 @@ public sealed partial class NativeWindow
                 buttons.Add(tab); tabs.Controls.Add(tab);
             }
             SelectSquadron("101");
+            grid.HandleCreated += (_, _) => grid.BeginInvoke(new Action(() => { grid.ClearSelection(); grid.CurrentCell = null; }));
             Present(stack);
             grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(234, 243, 248);
             status.Text = "כל סוג מפתח מחושב לפי ההטענה האחרונה שהושלמה עבורו.";
