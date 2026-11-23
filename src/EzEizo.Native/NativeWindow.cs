@@ -184,7 +184,7 @@ public sealed partial class NativeWindow : Form
         ? date.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : value;
     private static Panel DetailTile(string title, string value, int width = 176)
     {
-        var tile = new Panel { Width = width, Height = 70, BackColor = Color.FromArgb(247, 250, 251),
+        var tile = new NativeStatTile { Width = width, Height = 70,
             Margin = new Padding(0, 0, 10, 10), Padding = new Padding(10) };
         tile.Controls.Add(new Label { Text = title, Dock = DockStyle.Top, Height = 25,
             ForeColor = Muted, Font = NativeFonts.Create(8.25f), TextAlign = ContentAlignment.MiddleLeft });
@@ -327,12 +327,16 @@ public sealed partial class NativeWindow : Form
                 grid.GridColor = Color.FromArgb(213, 226, 233);
                 grid.BorderStyle = BorderStyle.None;
                 grid.EnableHeadersVisualStyles = false;
+                if (grid.RowTemplate.Height < 36) grid.RowTemplate.Height = 36;
+                if (grid.ColumnHeadersHeight < 40) grid.ColumnHeadersHeight = 40;
                 grid.ColumnHeadersDefaultCellStyle.BackColor = Pale;
                 grid.ColumnHeadersDefaultCellStyle.ForeColor = Navy;
+                grid.ColumnHeadersDefaultCellStyle.Padding = new Padding(8, 0, 8, 0);
                 grid.DefaultCellStyle.BackColor = Color.White;
                 grid.DefaultCellStyle.ForeColor = Navy;
                 grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(222, 239, 247);
                 grid.DefaultCellStyle.SelectionForeColor = Navy;
+                grid.DefaultCellStyle.Padding = new Padding(8, 2, 8, 2);
                 foreach (var column in grid.Columns.OfType<DataGridViewCheckBoxColumn>())
                     column.FlatStyle = FlatStyle.Flat;
                 grid.CellPainting += (_, e) =>
