@@ -461,7 +461,7 @@ public sealed partial class NativeWindow : Form
             ("תקלות לסגירה וסגורות", "סקירה וחתימת בודק הדף", async () =>
             { listSection = "issues"; statusFilter = "ממתין לסגירה"; await OpenList("issues"); }),
             ("מפתחות", "פתיחת הטענה, מעקב והיסטוריה", () => OpenList("keys")),
-            ("ניהול", "משתמשים, דוחות וקבועים", OpenManagementHome)
+            ("ניהול", "משתמשים, הפקת דוחות ועדכון קבועים לפי מטוס", OpenManagementHome)
         };
         var buttons = entries.Select(entry => DashboardTile(entry.title, entry.detail, entry.action)).ToArray();
         tiles.Controls.AddRange(buttons);
@@ -493,8 +493,8 @@ public sealed partial class NativeWindow : Form
         var card = DashboardCard("דף ראשי", "ניהול", null, 372);
         var entries = new (string title, string detail, Func<Task> action)[]
         {
-            ("ניהול משתמשים", "יצירה, חיפוש והסרה של משתמשים", OpenUsers),
-            ("הפקת דוחות", "סינון וייצוא טפסים", OpenReports),
+            ("ניהול משתמשים", "יצירה, הסרה וצפייה בתקלות לפי טכנאי", OpenUsers),
+            ("הפקת דוחות", "סינון, תצוגה מקדימה והפקת PDF או CSV", OpenReports),
             ("עדכון קבועים לפי מטוס", "עריכת ערכי המערכות למטוסים", OpenConstants)
         };
         var buttons = entries.Select(entry => DashboardTile(entry.title, entry.detail, entry.action)).ToArray();
