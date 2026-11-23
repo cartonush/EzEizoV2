@@ -30,6 +30,7 @@ public sealed partial class NativeWindow : Form
     private string currentPage = "";
     private string readyPage = "";
     private string searchTerm = "";
+    private string closedOwnerId = "";
     private string statusFilter = "הכל";
     private string listSection = "";
     private Database.TechnicianRecord? historyPerson;
@@ -192,6 +193,27 @@ public sealed partial class NativeWindow : Form
             ForeColor = Navy, Font = NativeFonts.Create(11.25f, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true });
         return tile;
+    }
+    private static NativeCard FormListCard(string title, string details, string date,
+        string state, EventHandler open)
+    {
+        var card = new NativeCard { Width = 715, Height = 118, Margin = new Padding(0, 0, 0, 10) };
+        card.Controls.Add(new Label { Text = title, Location = new Point(235, 10), Size = new Size(460, 29),
+            TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true,
+            ForeColor = Navy, Font = NativeFonts.Create(11.25f, FontStyle.Bold) });
+        card.Controls.Add(new Label { Text = details, Location = new Point(150, 41), Size = new Size(545, 25),
+            TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true,
+            ForeColor = Muted, Font = NativeFonts.Create(9) });
+        card.Controls.Add(new Label { Text = date, Location = new Point(275, 70), Size = new Size(420, 22),
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Muted, Font = NativeFonts.Create(8.5f) });
+        card.Controls.Add(new NativeStatusBadge { State = state,
+            Text = state switch { "closed" => "סגור", "pendingReview" => "לסגירה", _ => "פתוח" },
+            Location = new Point(17, 13), Size = new Size(100, 30) });
+        var action = (NativeButton)Button("פתיחת טופס", open);
+        action.Secondary = true; action.Width = 145; action.Height = 39;
+        action.Location = new Point(17, 62);
+        card.Controls.Add(action);
+        return card;
     }
     private void CenterCard()
     {
@@ -604,9 +626,10 @@ public sealed partial class NativeWindow : Form
         {
             var version = await Work(() => store.Version(page == "issues" ? "issues" : "keyLoads"));
             var data = await Work(() => store.List(page == "issues" ? "issues" : "keyLoads", user));
+            var technicians = page == "issues" ? await Work(() => database.AllTechnicians()) : new List<Database.TechnicianRecord>();
             lastListVersion = version;
             if (account != user || silent && currentPage != page) return;
-            if (listSection != page) { listSection = page; statusFilter = "פתוח"; searchTerm = ""; }
+            if (listSection != page) { listSection = page; statusFilter = "פתוח"; searchTerm = ""; closedOwnerId = ""; }
             currentPage = page;
             refreshTimer.Start();
             var stack = Stack();
@@ -657,18 +680,33 @@ public sealed partial class NativeWindow : Form
             search.Text = searchTerm;
             stack.Controls.Add(Label(page == "issues" ? "חיפוש לפי מספר תקלה" : "חיפוש לפי מספר הטענה", 32));
             stack.Controls.Add(search);
+            var ownerCaption = Label("סינון תקלות סגורות לפי טכנאי", 30);
+            var ownerFilter = new NativeChoice { Width = 440, Height = 42, Margin = new Padding(0, 0, 0, 13) };
+            ownerFilter.Items.Add("כל הטכנאים");
+            foreach (var technician in technicians) ownerFilter.Items.Add(new PersonChoice(new Account(
+                technician.Id, technician.Name, technician.PersonalNumber, "mechanic")));
+            ownerFilter.SelectedIndex = Math.Max(0, technicians.FindIndex(x => x.Id == closedOwnerId) + 1);
+            ownerFilter.SelectedIndexChanged += (_, _) =>
+            {
+                closedOwnerId = ownerFilter.SelectedItem is PersonChoice person ? person.User.Id : "";
+                render();
+            };
+            stack.Controls.Add(ownerCaption); stack.Controls.Add(ownerFilter);
             var cards = new FlowLayoutPanel { Width = 745, Height = 450, AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White };
             stack.Controls.Add(cards);
             void Render()
             {
+                ownerCaption.Visible = ownerFilter.Visible = page == "issues" && statusFilter == "סגור";
                 cards.Controls.Clear();
                 var matching = data.Where(item =>
                     (item["serial"]?.ToString() ?? item["sheet"]?["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                    (closedOwnerId.Length == 0 || statusFilter != "סגור" ||
+                        (item["assigneeUids"] as JsonArray ?? new()).Any(x => x?.ToString() == closedOwnerId)) &&
                     (statusFilter == "הכל" || statusFilter == "פתוח" && item["status"]?.ToString() == "open" ||
                      statusFilter == "סגור" && item["status"]?.ToString() == "closed" ||
                      statusFilter == "ממתין לסגירה" && item["status"]?.ToString() == "pendingReview")).ToArray();
-                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 96 + 12));
+                cards.Height = Math.Min(450, Math.Max(88, matching.Length * 128 + 12));
                 if (matching.Length == 0)
                     cards.Controls.Add(Label(search.TextLength > 0 ? "לא נמצאו טפסים למספר שחיפשת." :
                         statusFilter == "ממתין לסגירה" ? "אין תקלות שממתינות לסגירה." : "אין טפסים להצגה במצב זה.", 66));
@@ -678,15 +716,12 @@ public sealed partial class NativeWindow : Form
                     var sheet = item["sheet"] ?? item;
                     var serial = item["serial"]?.ToString() ?? sheet["serial"]?.ToString() ?? "";
                     var aircraft = sheet["aircraft"]?.ToString() ?? string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => x?["aircraft"]?.ToString()));
-                    var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial} · מטוס {aircraft}{Environment.NewLine}" +
-                        $"{(item["status"]?.ToString() == "open" ? "פתוח" : item["status"]?.ToString() == "closed" ? "סגור" : "ממתין לסגירה")}  ·  {DisplayDate(V(item, "createdAt"))}";
-                    var card = (NativeButton)Button(title, async (_, _) => await OpenDocument(page, id));
-                    card.Secondary = true;
-                    card.Width = 715;
-                    card.Height = 84;
-                    card.TextAlign = ContentAlignment.MiddleRight;
-                    card.Margin = new Padding(0, 0, 0, 8);
-                    cards.Controls.Add(card);
+                    var title = $"{(page == "issues" ? "תקלה " : "הטענת מפתחות ")}{serial}";
+                    var detail = $"טייסת {V(sheet, "squadron")} · {V(sheet, "shelter")} · מטוס {aircraft}";
+                    var date = V(item, "reviewedAt").Length > 0 ? V(item, "reviewedAt") :
+                        V(item, "completedAt").Length > 0 ? V(item, "completedAt") : V(item, "createdAt");
+                    cards.Controls.Add(FormListCard(title, detail, DisplayDate(date), V(item, "status"),
+                        async (_, _) => await OpenDocument(page, id)));
                 }
             }
             render = Render;
@@ -715,7 +750,7 @@ public sealed partial class NativeWindow : Form
             stack.Controls.Add(Label("בחר תקלה או הטענת מפתחות פתוחה מהרשימה כדי למלא את הטופס שלה.", 52));
             var search = Input("חפש מספר טופס", 20);
             stack.Controls.Add(search);
-            var cards = new FlowLayoutPanel { Width = 780, Height = 520, AutoScroll = true,
+            var cards = new FlowLayoutPanel { Width = 745, Height = 520, AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(cards);
             void Render()
@@ -726,7 +761,7 @@ public sealed partial class NativeWindow : Form
                     .Concat(keys.Where(x => x["status"]?.ToString() == "open").Select(x => (page: "keys", doc: x)))
                     .Where(x => (x.doc["serial"]?.ToString() ?? "").Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase))
                     .ToArray();
-                cards.Height = Math.Min(520, Math.Max(88, tasks.Length * 91 + 12));
+                cards.Height = Math.Min(520, Math.Max(88, tasks.Length * 128 + 12));
                 if (tasks.Length == 0) cards.Controls.Add(Label("אין משימות פתוחות במכשיר הזה.", 58));
                 foreach (var (page, doc) in tasks)
                 {
@@ -735,11 +770,9 @@ public sealed partial class NativeWindow : Form
                     var sheet = doc["sheet"] ?? doc;
                     var aircraft = page == "issues" ? sheet["aircraft"]?.ToString() ?? ""
                         : string.Join(", ", (doc["rows"] as JsonArray ?? new()).Select(x => x?["aircraft"]?.ToString()));
-                    var card = (NativeButton)Button(
-                        $"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · מטוס {aircraft}{Environment.NewLine}{sheet["squadron"]} · משימה פתוחה",
-                        async (_, _) => await OpenDocument(page, id));
-                    card.Secondary = true; card.Width = 750; card.Height = 80;
-                    cards.Controls.Add(card);
+                    cards.Controls.Add(FormListCard($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial}",
+                        $"טייסת {V(sheet, "squadron")} · מטוס {aircraft} · משימה פתוחה",
+                        DisplayDate(V(doc, "createdAt")), "open", async (_, _) => await OpenDocument(page, id)));
                 }
             }
             search.TextChanged += (_, _) => Render();
@@ -847,14 +880,18 @@ public sealed partial class NativeWindow : Form
                     .Select(x => (page: "keys", doc: x)))
                 .OrderByDescending(x => V(x.doc, "completedAt")).ToArray();
             stack.Controls.Add(Label($"{documents.Length} טפסים סגורים · מספרי הטפסים נשמרים גם לאחר הסרת המשתמש.", 48));
+            if (documents.Length == 0) stack.Controls.Add(Label("לא נמצאו טפסים סגורים לטכנאי הזה.", 60));
             foreach (var (page, doc) in documents)
             {
                 var id = V(doc, "id");
                 var serial = V(doc, "serial");
-                var button = (NativeButton)Button($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial} · {DisplayDate(V(doc, "completedAt"))}",
-                    async (_, _) => await OpenDocument(page, id));
-                button.Secondary = true; button.Width = 800; button.Height = 58;
-                stack.Controls.Add(button);
+                var sheet = doc["sheet"] ?? doc;
+                var aircraft = V(sheet, "aircraft");
+                if (aircraft.Length == 0) aircraft = string.Join(", ", (doc["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft")));
+                var completed = V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt");
+                stack.Controls.Add(FormListCard($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {serial}",
+                    $"טייסת {V(sheet, "squadron")} · מטוס {aircraft}", DisplayDate(completed), "closed",
+                    async (_, _) => await OpenDocument(page, id)));
             }
             Present(stack);
             status.Text = $"היסטוריית הטפסים של {person.Name}";

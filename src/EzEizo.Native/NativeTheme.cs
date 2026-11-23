@@ -405,6 +405,35 @@ internal sealed class NativeBadge : Control
     }
 }
 
+internal sealed class NativeStatusBadge : Control
+{
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string State { get; set; } = "open";
+
+    public NativeStatusBadge()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        Font = NativeFonts.Create(8.5f, FontStyle.Bold);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(Parent?.BackColor ?? Color.White);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var (surface, ink) = State switch
+        {
+            "closed" => (Color.FromArgb(232, 239, 245), Color.FromArgb(50, 86, 108)),
+            "pendingReview" => (Color.FromArgb(255, 244, 224), Color.FromArgb(144, 88, 23)),
+            _ => (Color.FromArgb(228, 245, 238), Color.FromArgb(25, 108, 83))
+        };
+        using var path = NativeButton.Rounded(new Rectangle(1, 1, Width - 3, Height - 3), Height / 2);
+        using var brush = new SolidBrush(surface);
+        e.Graphics.FillPath(brush, path);
+        TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
+    }
+}
+
 internal sealed class NativeSkeletonBlock : Control
 {
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 75 };

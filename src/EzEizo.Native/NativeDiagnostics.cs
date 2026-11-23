@@ -17,7 +17,49 @@ public static class NativeDiagnostics
     {
         // The packaged template has only a manager. Add a throwaway technician to
         // exercise the user list and history page without changing the ZIP template.
-        new Database().CreateAccount("טכנאי תצוגה", TestNumber(), "mechanic", TestPassword());
+        var database = new Database();
+        var technician = database.CreateAccount("טכנאי תצוגה", TestNumber(), "mechanic", TestPassword());
+        var teammate = database.CreateAccount("טכנאי נוסף", TestNumber(), "mechanic", TestPassword());
+        var initial = Path.Combine(Database.DataDirectory, "initial-manager.txt");
+        var managerPassword = File.ReadAllLines(initial).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
+        var managerNumber = File.ReadAllLines(initial).Single(x => x.StartsWith("מספר אישי:")).Split(':')[1].Trim();
+        var manager = database.Authenticate(managerNumber, managerPassword, AppRole.Manager)
+            ?? throw new InvalidOperationException("The manager template is missing.");
+        var store = new OfflineStore();
+        using var sampleSheet = JsonDocument.Parse("""{"fault":"בדיקת ממשק תקלה","squadron":"105","shelter":"14","aircraft":"603","systemName":"מכם | FCR","systemCode":"74A","constants":{},"actions":[]}""");
+        using var team = JsonDocument.Parse(JsonSerializer.Serialize(new[] { new { uid = technician.Id, name = technician.Name }, new { uid = teammate.Id, name = teammate.Name } }));
+        for (var index = 0; index < 3; index++)
+        {
+            var serial = store.CreateIssues(sampleSheet.RootElement, team.RootElement, manager);
+            if (index == 0) continue;
+            var issue = store.List("issues", manager).Single(x => x["sheet"]?["serial"]?.ToString() == serial);
+            var id = issue["id"]!.ToString(); var session = Guid.NewGuid().ToString();
+            store.Lock("issues", id, session, technician);
+            using var submit = JsonDocument.Parse(JsonSerializer.Serialize(new
+                { record = new { serial }, state = new { repair = "בוצע טיפול", technicianNote = "בדיקת תצוגה" }, session }));
+            store.Update("issues", id, "submit", submit.RootElement, technician);
+            store.ReleaseLock(id, session);
+            if (index == 2)
+            {
+                using var approval = JsonDocument.Parse("""{"signature":"data:image/png;base64,aGVsbG8="}""");
+                store.Update("issues", id, "approve", approval.RootElement, manager);
+            }
+        }
+        using var keySample = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            squadron = "105", shelter = "14", date = DateTime.Today.ToString("yyyy-MM-dd"),
+            time = DateTime.Now.ToString("HH:mm"), period = "11-12/26",
+            teamUids = new[] { technician.Id, teammate.Id }, teamNames = new[] { technician.Name, teammate.Name },
+            rows = new[] { new { aircraft = "603", blue = true, shach = true, notes = "בדיקת ממשק" } }
+        }));
+        store.CreateKey(keySample.RootElement, manager);
+        var completedKey = store.CreateKey(keySample.RootElement, manager);
+        var keyId = completedKey["id"]!.ToString(); var keySession = Guid.NewGuid().ToString();
+        store.Lock("keyLoads", keyId, keySession, technician);
+        using (var completedWork = JsonDocument.Parse(JsonSerializer.Serialize(new
+            { session = keySession, work = new { aircraft = new[] { new { blueDone = true, shachDone = true } } } })))
+            store.Update("keyLoads", keyId, "complete", completedWork.RootElement, technician);
+        store.ReleaseLock(keyId, keySession);
         using var window = new NativeWindow(AppRole.Manager);
         var stage = 0;
         var started = DateTime.UtcNow;
@@ -32,13 +74,9 @@ public static class NativeDiagnostics
                 var controls = Descendants(window).ToArray();
                 if (stage == 0 && window.DiagnosticPage == "login")
                 {
-                    var file = Path.Combine(Database.DataDirectory, "initial-manager.txt");
-                    if (!File.Exists(file)) return;
                     Capture(window, "native-login.png");
-                    var password = File.ReadAllLines(file).Single(x => x.StartsWith("סיסמה ראשונית:")).Split(':')[1].Trim();
-                    var number = File.ReadAllLines(file).Single(x => x.StartsWith("מספר אישי:")).Split(':')[1].Trim();
-                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = number;
-                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = password;
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "7 ספרות").Text = managerNumber;
+                    controls.OfType<TextBox>().Single(x => x.PlaceholderText == "6 תווים").Text = managerPassword;
                     controls.OfType<Button>().Single(x => x.Text == "התחבר").PerformClick();
                     stage = 1;
                 }
@@ -50,6 +88,35 @@ public static class NativeDiagnostics
                 else if (stage == 2 && window.DiagnosticPage == "issues")
                 {
                     Capture(window, "native-issues.png");
+                    controls.OfType<Button>().First(x => x.Text == "תקלות לסגירה").PerformClick(); stage = 20;
+                }
+                else if (stage == 20 && window.DiagnosticPage == "issues")
+                {
+                    Capture(window, "native-issues-pending.png");
+                    controls.OfType<Button>().First(x => x.Text == "תקלות סגורות").PerformClick(); stage = 21;
+                }
+                else if (stage == 21 && window.DiagnosticPage == "issues")
+                {
+                    Capture(window, "native-issues-closed.png");
+                    controls.OfType<Button>().First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 22;
+                }
+                else if (stage == 22 && window.DiagnosticPage == "document")
+                {
+                    Capture(window, "native-manager-closed-document.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 23;
+                }
+                else if (stage == 23 && window.DiagnosticPage == "issues")
+                {
+                    controls.OfType<Button>().First(x => x.Text == "תקלות לסגירה").PerformClick();
+                    controls.OfType<Button>().First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 24;
+                }
+                else if (stage == 24 && window.DiagnosticPage == "document")
+                {
+                    Capture(window, "native-manager-pending-document.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 25;
+                }
+                else if (stage == 25 && window.DiagnosticPage == "issues")
+                {
                     controls.OfType<Button>().First(x => x.Text == "פתיחת תקלה").PerformClick(); stage = 3;
                 }
                 else if (stage == 3 && window.DiagnosticPage == "new-fault")
@@ -62,6 +129,20 @@ public static class NativeDiagnostics
                 else if (stage == 4 && window.DiagnosticPage == "keys")
                 {
                     Capture(window, "native-keys.png");
+                    controls.OfType<Button>().First(x => x.Text == "הטענות סגורות").PerformClick(); stage = 26;
+                }
+                else if (stage == 26 && window.DiagnosticPage == "keys")
+                {
+                    Capture(window, "native-keys-closed.png");
+                    controls.OfType<Button>().First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 27;
+                }
+                else if (stage == 27 && window.DiagnosticPage == "document")
+                {
+                    Capture(window, "native-manager-closed-key.png");
+                    controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 28;
+                }
+                else if (stage == 28 && window.DiagnosticPage == "keys")
+                {
                     controls.OfType<Button>().First(x => x.Text == "הטענה חדשה").PerformClick(); stage = 5;
                 }
                 else if (stage == 5 && window.DiagnosticPage == "new-key")
@@ -235,7 +316,9 @@ public static class NativeDiagnostics
                 else if (stage == 1 && window.DiagnosticPage == "queue")
                 {
                     Capture(window, "native-technician-queue.png");
-                    controls.OfType<Button>().First(x => x.Text.StartsWith("תקלה ")).PerformClick(); stage = 2;
+                    controls.OfType<NativeCard>().First(x => x.Controls.OfType<Label>()
+                        .Any(label => label.Text.StartsWith("תקלה "))).Controls.OfType<Button>()
+                        .First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 2;
                 }
                 else if (stage == 2 && window.DiagnosticPage == "fault-editor")
                 {
@@ -248,7 +331,9 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 3 && window.DiagnosticPage == "queue")
                 {
-                    controls.OfType<Button>().First(x => x.Text.StartsWith("הטענת מפתחות ")).PerformClick(); stage = 4;
+                    controls.OfType<NativeCard>().First(x => x.Controls.OfType<Label>()
+                        .Any(label => label.Text.StartsWith("הטענת מפתחות "))).Controls.OfType<Button>()
+                        .First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 4;
                 }
                 else if (stage == 4 && window.DiagnosticPage == "key-editor")
                 {
