@@ -56,15 +56,21 @@ public sealed partial class NativeWindow
                             ForeColor = Muted, TextAlign = ContentAlignment.MiddleCenter,
                             Font = NativeFonts.Create(8.25f, FontStyle.Bold)
                         });
+                        var frame = new NativeInputFrame
+                        {
+                            Location = new Point(x, y + 20), Size = new Size(64, 34)
+                        };
                         var input = new TextBox
                         {
-                            Text = value, Tag = key, Location = new Point(x, y + 20), Size = new Size(64, 32),
+                            Text = value, Tag = key, Location = new Point(5, 6), Size = new Size(54, 22),
                             AutoSize = false, MaxLength = 80, RightToLeft = RightToLeft.No,
-                            TextAlign = HorizontalAlignment.Center,
-                            BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White,
-                            ForeColor = Navy, Font = NativeFonts.Create(10)
+                            TextAlign = HorizontalAlignment.Center, BorderStyle = BorderStyle.None,
+                            BackColor = Color.White, ForeColor = Navy, Font = NativeFonts.Create(9.75f)
                         };
-                        card.Controls.Add(input);
+                        input.Enter += (_, _) => frame.Invalidate();
+                        input.Leave += (_, _) => frame.Invalidate();
+                        frame.Controls.Add(input);
+                        card.Controls.Add(frame);
                         fields.Add((groupName, key, input));
                     }
                     groups.Controls.Add(card);
