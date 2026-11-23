@@ -120,7 +120,7 @@ public sealed partial class NativeWindow
                 Section(stack, "עדכון קבועים לפי מטוס", "ניהול");
                 stack.Controls.Add(Label("בחר טייסת ומטוס כדי לראות ולערוך את הקבועים שלו. לכל מטוס נשמרת רשומה משלו.", 48));
                 var tabs = new FlowLayoutPanel { Width = 745, Height = 62, WrapContents = false,
-                    FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
+                    FlowDirection = FlowDirection.LeftToRight, RightToLeft = RightToLeft.Yes, BackColor = Color.White };
                 var buttons = new List<NativeButton>();
                 var aircraft = new FlowLayoutPanel { Name = "AircraftPicker", Width = 745, Height = 320,
                     FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White,
@@ -141,7 +141,7 @@ public sealed partial class NativeWindow
                     {
                         var rowWidth = rowPlanes.Length * 144;
                         var row = new FlowLayoutPanel { Width = rowWidth, Height = 51, WrapContents = false,
-                            FlowDirection = FlowDirection.RightToLeft, RightToLeft = RightToLeft.Yes,
+                            FlowDirection = FlowDirection.LeftToRight, RightToLeft = RightToLeft.Yes,
                             BackColor = Color.White };
                         foreach (var plane in rowPlanes)
                         {
@@ -188,7 +188,7 @@ public sealed partial class NativeWindow
             Section(stack, "היסטוריית מפתחות", "שלוש טייסות");
             stack.Controls.Add(Label("ארז כחול ושחק מתעדכנים בנפרד לאחר הטענה שהושלמה. סוג מפתח שלא נטען מסומן ״טרם הוטען״.", 48));
             var tabs = new FlowLayoutPanel { Width = 745, Height = 62, WrapContents = false,
-                FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
+                FlowDirection = FlowDirection.LeftToRight, RightToLeft = RightToLeft.Yes, BackColor = Color.White };
             stack.Controls.Add(tabs);
             var grid = new DataGridView
             {

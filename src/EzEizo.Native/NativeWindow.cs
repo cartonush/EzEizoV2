@@ -20,7 +20,7 @@ public sealed partial class NativeWindow : Form
     private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
     private readonly Panel bottomNav = new() { Dock = DockStyle.Top, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
     private readonly Panel actionDock = new() { Dock = DockStyle.Bottom, Height = 68, BackColor = Color.White, Visible = false };
-    private readonly FlowLayoutPanel actionButtons = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(12, 8, 12, 8), BackColor = Color.White };
+    private readonly FlowLayoutPanel actionButtons = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, RightToLeft = RightToLeft.Yes, WrapContents = false, Padding = new Padding(12, 8, 12, 8), BackColor = Color.White };
     private readonly NativeButton backButton = new() { Text = "→ חזרה", Secondary = true, OnDark = true, Width = 110, Height = 37 };
     private readonly NativeButton logoutButton = new() { Text = "התנתק", Secondary = true, OnDark = true, Width = 105, Height = 37 };
     private string documentSection = "issues";

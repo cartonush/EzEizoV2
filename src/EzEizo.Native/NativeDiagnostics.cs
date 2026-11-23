@@ -222,7 +222,9 @@ public static class NativeDiagnostics
                     var picker = controls.OfType<FlowLayoutPanel>().Single(x => x.Name == "AircraftPicker");
                     foreach (var row in picker.Controls.OfType<FlowLayoutPanel>())
                     {
-                        if (row.FlowDirection != FlowDirection.RightToLeft || row.RightToLeft != RightToLeft.Yes ||
+                        var buttons = row.Controls.OfType<NativeButton>().ToArray();
+                        if (row.FlowDirection != FlowDirection.LeftToRight || row.RightToLeft != RightToLeft.Yes ||
+                            buttons.Length > 1 && buttons[0].Left <= buttons[^1].Left ||
                             Math.Abs(row.Margin.Left - (picker.ClientSize.Width - row.Width) / 2) > 1)
                             throw new InvalidOperationException("Aircraft choices are not centered in RTL rows.");
                     }
