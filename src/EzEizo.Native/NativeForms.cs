@@ -328,6 +328,17 @@ public sealed partial class NativeWindow
         stack.Controls.Add(combinedNotes);
         Field(stack, "תיאור תיקון", state, "repair", true);
         Section(stack, "פעולות לביצוע");
+        var actionGroup = new FlowLayoutPanel { Width = 745, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Visible = false };
+        var actionToggle = (NativeButton)Button("הצג את 12 הפעולות", (_, _) =>
+        {
+            actionGroup.Visible = !actionGroup.Visible;
+        });
+        actionToggle.Secondary = true;
+        actionToggle.Click += (_, _) => actionToggle.Text = actionGroup.Visible ? "הסתר את 12 הפעולות" : "הצג את 12 הפעולות";
+        stack.Controls.Add(actionToggle);
+        stack.Controls.Add(actionGroup);
         var actionValues = state["actions"] as JsonArray ?? new JsonArray();
         while (actionValues.Count < 12) actionValues.Add(false);
         if (state["actions"] is null) state["actions"] = actionValues;
@@ -339,26 +350,26 @@ public sealed partial class NativeWindow
                 var keyName = i == 1 ? "arrivalTime" : "completionTime";
                 var picker = new DateTimePicker { Width = 190, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = DateTime.Today };
                 if (TimeSpan.TryParse(V(state, keyName), out var value)) picker.Value = DateTime.Today.Add(value);
-                stack.Controls.Add(Label($"{i + 1:D2}. {NativeCatalog.Actions[i]}")); stack.Controls.Add(picker);
+                actionGroup.Controls.Add(Label($"{i + 1:D2}. {NativeCatalog.Actions[i]}")); actionGroup.Controls.Add(picker);
                 var now = Button("השעה עכשיו", (_, _) => { picker.Value = DateTime.Now; state[keyName] = picker.Value.ToString("HH:mm"); actionValues[index] = true; });
-                stack.Controls.Add(now);
+                actionGroup.Controls.Add(now);
                 picker.ValueChanged += (_, _) => { state[keyName] = picker.Value.ToString("HH:mm"); actionValues[index] = true; };
             }
             else if (i == 10)
             {
-                stack.Controls.Add(Label($"11. {NativeCatalog.Actions[i]}"));
+                actionGroup.Controls.Add(Label($"11. {NativeCatalog.Actions[i]}"));
                 var choice = new NativeChoice { Width = 240, Height = 42 };
                 choice.Items.AddRange(["בחר תוצאה", "✓ בוצע", "X לא נדרש"]);
                 choice.SelectedIndex = V(state, "action11Result") == "done" ? 1 : V(state, "action11Result") == "notRequired" ? 2 : 0;
                 choice.SelectedIndexChanged += (_, _) => { state["action11Result"] = choice.SelectedIndex == 1 ? "done" : choice.SelectedIndex == 2 ? "notRequired" : ""; actionValues[index] = choice.SelectedIndex > 0; };
-                stack.Controls.Add(choice);
+                actionGroup.Controls.Add(choice);
             }
             else
             {
-                var box = new NativeCheckBox { Text = $"{i + 1:D2}. {NativeCatalog.Actions[i]}", Width = 750, Height = 45,
+                var box = new NativeCheckBox { Text = $"{i + 1:D2}. {NativeCatalog.Actions[i]}", Width = 720, Height = 45,
                     Checked = bool.TryParse(actionValues[i]?.ToString(), out var checkedValue) && checkedValue };
                 box.CheckedChanged += (_, _) => actionValues[index] = box.Checked;
-                stack.Controls.Add(box);
+                actionGroup.Controls.Add(box);
             }
         }
         Section(stack, "יחידות שפורקו והורכבו");

@@ -46,8 +46,8 @@ public sealed partial class NativeWindow
     {
         stack.Controls.Add(Label("צוות טכנאים", 42, true));
         stack.Controls.Add(Label("בחר לפחות שני טכנאים מרשימת המשתמשים הפעילים.", 34));
-        var list = new NativeCheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
-            CheckOnClick = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254) };
+        var list = new NativeCheckedListBox { Width = 720, Height = Math.Min(192, Math.Max(78, technicians.Count * 38 + 8)),
+            CheckOnClick = true, BackColor = Color.White };
         foreach (var tech in technicians) list.Items.Add(new PersonChoice(tech));
         stack.Controls.Add(list);
         if (technicians.Count == 0)
