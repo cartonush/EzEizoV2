@@ -102,17 +102,27 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 22 && window.DiagnosticPage == "document")
                 {
+                    if (!controls.OfType<NativeStatusBadge>().Any(x => x.State == "closed"))
+                        throw new InvalidOperationException("Closed fault document was not opened.");
                     Capture(window, "native-manager-closed-document.png");
+                    CaptureScrolledPage(window, "native-manager-closed-document-bottom.png");
                     controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 23;
                 }
                 else if (stage == 23 && window.DiagnosticPage == "issues")
                 {
                     controls.OfType<Button>().First(x => x.Text == "תקלות לסגירה").PerformClick();
+                    stage = 29;
+                }
+                else if (stage == 29 && window.DiagnosticPage == "issues")
+                {
                     controls.OfType<Button>().First(x => x.Text == "פתיחת טופס").PerformClick(); stage = 24;
                 }
                 else if (stage == 24 && window.DiagnosticPage == "document")
                 {
+                    if (!controls.OfType<NativeStatusBadge>().Any(x => x.State == "pendingReview"))
+                        throw new InvalidOperationException("Pending review fault document was not opened.");
                     Capture(window, "native-manager-pending-document.png");
+                    CaptureScrolledPage(window, "native-manager-pending-document-bottom.png");
                     controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 25;
                 }
                 else if (stage == 25 && window.DiagnosticPage == "issues")
@@ -139,6 +149,7 @@ public static class NativeDiagnostics
                 else if (stage == 27 && window.DiagnosticPage == "document")
                 {
                     Capture(window, "native-manager-closed-key.png");
+                    CaptureScrolledPage(window, "native-manager-closed-key-bottom.png");
                     controls.OfType<Button>().First(x => x.Text == "→ חזרה").PerformClick(); stage = 28;
                 }
                 else if (stage == 28 && window.DiagnosticPage == "keys")
@@ -195,6 +206,7 @@ public static class NativeDiagnostics
                             x.Controls.OfType<Panel>().Count() == 5))
                         throw new InvalidOperationException("Report summary cards did not render.");
                     Capture(window, "native-report-results.png");
+                    CaptureScrolledPage(window, "native-report-results-bottom.png");
                     controls.OfType<Button>().First(x => x.Text == "ניהול").PerformClick(); stage = 12;
                 }
                 else if (stage == 12 && window.DiagnosticPage == "management")

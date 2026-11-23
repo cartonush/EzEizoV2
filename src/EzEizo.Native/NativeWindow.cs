@@ -642,8 +642,8 @@ public sealed partial class NativeWindow : Form
             Action render = () => { };
             if (role == AppRole.Manager)
             {
-                var tabs = new FlowLayoutPanel { Width = 785, Height = 64, WrapContents = true,
-                    FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 18) };
+                var tabs = new FlowLayoutPanel { Width = 785, Height = 54, WrapContents = true,
+                    FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 7) };
                 var tabButtons = new List<NativeButton>();
                 void AddTab(string caption, string filter)
                 {
@@ -675,7 +675,6 @@ public sealed partial class NativeWindow : Form
                 }
                 stack.Controls.Add(tabs);
             }
-            stack.Controls.Add(Label(page == "issues" ? "דפי התקלות ורשומות הטיפול" : "דפי הטענת המפתחות של הצוות", 38));
             var search = Input("חפש מספר סידורי", 20);
             search.Text = searchTerm;
             stack.Controls.Add(Label(page == "issues" ? "חיפוש לפי מספר תקלה" : "חיפוש לפי מספר הטענה", 32));
@@ -784,12 +783,14 @@ public sealed partial class NativeWindow : Form
 
     private async Task OpenUsers()
     {
-        if (role != AppRole.Manager || account is null) return;
+        var user = account;
+        if (role != AppRole.Manager || user is null) return;
         refreshTimer.Stop();
         Loading("טוען משתמשים…");
         try
         {
-            var users = await Work(() => database.AllTechnicians());
+            var (users, issues, keys) = await Work(() =>
+                (database.AllTechnicians(), store.List("issues", user), store.List("keyLoads", user)));
             currentPage = "users";
             var stack = Stack();
             Section(stack, "ניהול משתמשים");
@@ -797,7 +798,7 @@ public sealed partial class NativeWindow : Form
             stack.Controls.Add(Label("חיפוש לפי שם או מספר אישי", 30));
             var search = Input("חפש שם או מספר אישי", 80);
             stack.Controls.Add(search);
-            var list = new FlowLayoutPanel { Width = 745, Height = Math.Min(480, Math.Max(110, users.Count * 112 + 12)),
+            var list = new FlowLayoutPanel { Width = 745, Height = Math.Min(480, Math.Max(125, users.Count * 126 + 12)),
                 AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             stack.Controls.Add(list);
             void Render()
@@ -807,16 +808,28 @@ public sealed partial class NativeWindow : Form
                 if (matching.Length == 0) list.Controls.Add(Label("לא נמצאו משתמשים מתאימים.", 55));
                 foreach (var person in matching)
                 {
-                    var row = new NativeCard { Width = 720, Height = 104, Margin = new Padding(0, 0, 0, 9) };
+                    var assigned = issues.Where(x => (x["assigneeUids"] as JsonArray ?? new())
+                        .Any(id => id?.ToString() == person.Id)).ToArray();
+                    var openCount = assigned.Count(x => V(x, "status") == "open");
+                    var pendingCount = assigned.Count(x => V(x, "status") == "pendingReview");
+                    var closedCount = assigned.Count(x => V(x, "status") == "closed") +
+                        keys.Count(x => V(x, "status") == "closed" &&
+                            (x["teamUids"] as JsonArray ?? new()).Any(id => id?.ToString() == person.Id));
+                    var row = new NativeCard { Width = 720, Height = 115, Margin = new Padding(0, 0, 0, 9) };
                     row.Controls.Add(new Label { Text = person.Name, Location = new Point(350, 9), Width = 350, Height = 30,
                         TextAlign = ContentAlignment.MiddleLeft, Font = NativeFonts.Create(11, FontStyle.Bold), ForeColor = Navy });
                     row.Controls.Add(new Label { Text = $"מספר אישי {person.PersonalNumber}  ·  {(person.Active ? "פעיל" : "הוסר")}",
                         Location = new Point(350, 40), Width = 350, Height = 23, TextAlign = ContentAlignment.MiddleLeft,
                         Font = NativeFonts.Create(9), ForeColor = person.Active ? Color.FromArgb(22, 139, 121) : Muted });
+                    row.Controls.Add(new Label { Text = $"פתוחות {openCount} · לסגירה {pendingCount} · סגורות {closedCount}",
+                        Location = new Point(335, 67), Width = 365, Height = 23, TextAlign = ContentAlignment.MiddleLeft,
+                        Font = NativeFonts.Create(8.75f), ForeColor = Muted });
                     var history = (NativeButton)Button("טפסים סגורים", async (_, _) => await OpenUserHistory(person)); history.Width = 160;
                     history.Height = 38; history.Location = new Point(12, 48); history.Secondary = true; row.Controls.Add(history);
                     var active = (NativeButton)Button(person.Active ? "הסר" : "שחזר", async (_, _) =>
                     {
+                        if (person.Active && openCount > 0)
+                        { status.Text = $"יש לשייך מחדש {openCount} תקלות פתוחות לפני הסרת {person.Name}."; return; }
                         try { await Work(() => { database.SetTechnicianActive(person.Id, !person.Active); return true; }); await OpenUsers(); }
                         catch (Exception ex) { Error(ex); }
                     }); active.Width = 145; active.Height = 38; active.Location = new Point(180, 48);
@@ -884,8 +897,8 @@ public sealed partial class NativeWindow : Form
             foreach (var (page, doc) in documents)
             {
                 var id = V(doc, "id");
-                var serial = V(doc, "serial");
                 var sheet = doc["sheet"] ?? doc;
+                var serial = V(doc, "serial").Length > 0 ? V(doc, "serial") : V(sheet, "serial");
                 var aircraft = V(sheet, "aircraft");
                 if (aircraft.Length == 0) aircraft = string.Join(", ", (doc["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft")));
                 var completed = V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt");
@@ -914,9 +927,22 @@ public sealed partial class NativeWindow : Form
             var stack = Stack();
             var sheet = page == "issues" ? doc["sheet"] ?? doc : doc;
             Section(stack, page == "issues" ? "נתוני התקלה" : "פרטי הטענת מפתחות");
-            stack.Controls.Add(Label($"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}", 60, true));
+            var documentStatus = V(doc, "status");
+            var summary = new Panel { Width = 745, Height = 59, BackColor = Color.White };
+            summary.Controls.Add(new Label { Text = $"{(page == "issues" ? "תקלה" : "הטענת מפתחות")} {doc["serial"] ?? sheet["serial"]}",
+                Location = new Point(190, 0), Size = new Size(525, 51), TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Navy, Font = NativeFonts.Create(14.25f, FontStyle.Bold) });
+            summary.Controls.Add(new NativeStatusBadge { State = documentStatus,
+                Text = documentStatus switch { "closed" => "סגור", "pendingReview" => "ממתין לסגירה", _ => "פתוח" },
+                Location = new Point(12, 12), Size = new Size(155, 33) });
+            stack.Controls.Add(summary);
             if (doc["createdAt"] is not null)
-                stack.Controls.Add(Label($"שעת פתיחה: {DisplayDate(V(doc, "createdAt"))}     שעת סגירה: {DisplayDate(V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt"))}", 46));
+            {
+                var completed = V(doc, "reviewedAt").Length > 0 ? V(doc, "reviewedAt") : V(doc, "completedAt");
+                var times = $"שעת פתיחה: {DisplayDate(V(doc, "createdAt"))}";
+                if (completed.Length > 0) times += $"     שעת סגירה: {DisplayDate(completed)}";
+                stack.Controls.Add(Label(times, 38));
+            }
             var details = new FlowLayoutPanel { Width = 780, Height = page == "issues" ? 165 : 84,
                 WrapContents = true, FlowDirection = FlowDirection.LeftToRight };
             foreach (var (title, key) in new[] { ("טייסת", "squadron"), ("דת״ק", "shelter"), ("מספר מטוס", "aircraft"),

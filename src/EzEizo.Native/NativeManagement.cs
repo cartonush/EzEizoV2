@@ -324,7 +324,9 @@ public sealed partial class NativeWindow
                 else squadCaption.Text = "טייסות";
             }
             report.SelectedIndexChanged += (_, _) => LayoutFilters(); LayoutFilters();
-            Section(stack, "תצוגה מקדימה לדוח");
+            var reportHeading = Section(stack, "תצוגה מקדימה לדוח");
+            var reportOverview = Label("בחר סוג דוח והצג תוצאות כדי לראות סיכום וטפסים להורדה.", 48);
+            stack.Controls.Add(reportOverview);
             var results = new DataGridView { Width = 745, Height = 360, ReadOnly = true, RowHeadersVisible = false,
                 AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
             results.Columns.Add("type", "סוג"); results.Columns.Add("serial", "מספר טופס"); results.Columns.Add("squad", "טייסת");
@@ -373,6 +375,9 @@ public sealed partial class NativeWindow
                             _ => true
                         };
                     }).ToArray();
+                    reportHeading.Text = Selected(report);
+                    reportOverview.Text = $"{found.Length} טפסים · " + (allDates.Checked ? "כל התקופות" :
+                        $"{from.Value:dd/MM/yyyy HH:mm}–{until.Value:dd/MM/yyyy HH:mm}");
                     results.Rows.Clear();
                     foreach (var item in found)
                     {
@@ -393,6 +398,8 @@ public sealed partial class NativeWindow
                     }) summary.Controls.Add(DetailTile(label, count.ToString(), 135));
                     summary.Visible = true;
                     resultCards.Controls.Clear();
+                    if (found.Length == 0)
+                        resultCards.Controls.Add(Label("לא נמצאו טפסים התואמים לסינון. אפשר לשנות את הבחירה ולהציג שוב.", 76));
                     foreach (var item in found)
                     {
                         var sheet = item["sheet"] ?? item;
