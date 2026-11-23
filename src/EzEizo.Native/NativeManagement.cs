@@ -20,7 +20,7 @@ public sealed partial class NativeWindow
                 currentPage = "constants-editor";
                 var stack = Stack();
                 Section(stack, $"טייסת {squadron} · מטוס {aircraft}", "קבועים למטוס");
-                var back = Button("→ חזרה לרשימת המטוסים", (_, _) => ShowPicker());
+                var back = (NativeButton)Button("→ חזרה לרשימת המטוסים", (_, _) => ShowPicker());
                 back.Secondary = true;
                 stack.Controls.Add(back);
                 stack.Controls.Add(Label("עדכן את ערכי הקבועים של המטוס. השינויים יחולו על תקלות חדשות.", 44));
@@ -126,7 +126,7 @@ public sealed partial class NativeWindow
                     foreach (var plane in catalog.aircraft)
                     {
                         var updated = records.Any(x => V(x, "squadron") == name && V(x, "aircraft") == plane);
-                        var chip = Button("מטוס " + plane + (updated ? " · עודכן" : ""), (_, _) => ShowEditor(name, plane));
+                        var chip = (NativeButton)Button("מטוס " + plane + (updated ? " · עודכן" : ""), (_, _) => ShowEditor(name, plane));
                         chip.Secondary = true;
                         chip.Width = 135; chip.Height = 42; chip.Margin = new Padding(0, 0, 9, 9);
                         aircraft.Controls.Add(chip);
