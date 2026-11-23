@@ -135,21 +135,28 @@ public static class NativeDiagnostics
                         controls.OfType<Label>().Any(x => x.Text == group)))
                         throw new InvalidOperationException("The aircraft constant groups did not render.");
                     Capture(window, "native-constants-editor.png");
-                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick();
+                    controls.OfType<TextBox>().First(x => Equals(x.Tag, "K2")).Text = "75";
+                    controls.OfType<Button>().First(x => x.Text == "שמור קבועים למטוס").PerformClick();
                     stage = 16;
                 }
-                else if (stage == 16 && window.DiagnosticPage == "keys")
+                else if (stage == 16 && window.DiagnosticPage == "constants-editor" &&
+                    controls.OfType<Label>().Any(x => x.Text.Contains("קבועי מטוס 603 נשמרו")))
                 {
-                    controls.OfType<Button>().First(x => x.Text == "היסטוריית מפתחות").PerformClick();
+                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick();
                     stage = 17;
                 }
-                else if (stage == 17 && window.DiagnosticPage == "key-history")
+                else if (stage == 17 && window.DiagnosticPage == "keys")
+                {
+                    controls.OfType<Button>().First(x => x.Text == "היסטוריית מפתחות").PerformClick();
+                    stage = 18;
+                }
+                else if (stage == 18 && window.DiagnosticPage == "key-history")
                 {
                     var grid = controls.OfType<DataGridView>().Single(x => Equals(x.Tag, "key-history"));
                     if (grid.RowCount == 0 || grid.Columns.Count != 5)
                         throw new InvalidOperationException("Key history table did not render.");
                     Capture(window, "native-key-history.png");
-                    stage = 18; window.Close();
+                    stage = 19; window.Close();
                 }
             }
             catch (Exception ex)
@@ -162,7 +169,7 @@ public static class NativeDiagnostics
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 18) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 19) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
     }
     private static void Capture(Form window, string file)
     {
