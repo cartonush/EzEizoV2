@@ -164,8 +164,8 @@ internal sealed class NativeCheckBox : CheckBox
         var textLeft = RightToLeft == RightToLeft.Yes ? Padding.Left + 4 : mark.Right + 10;
         var textRight = RightToLeft == RightToLeft.Yes ? mark.Left - 10 : Width - Padding.Right - 4;
         var textBounds = new Rectangle(textLeft, 3, Math.Max(0, textRight - textLeft), Height - 6);
-        var flags = TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis |
-            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left);
+        var flags = TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.HorizontalCenter |
+            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft : 0);
         TextRenderer.DrawText(g, Text, Font, textBounds, Enabled ? ForeColor : Color.FromArgb(126, 143, 153), flags);
     }
 }
@@ -175,6 +175,7 @@ internal sealed class NativeCheckedListBox : CheckedListBox
     private static readonly Color Teal = Color.FromArgb(22, 139, 121);
     public NativeCheckedListBox()
     {
+        RightToLeft = RightToLeft.Yes;
         DrawMode = DrawMode.OwnerDrawFixed;
         ItemHeight = 36;
         IntegralHeight = false;
@@ -217,8 +218,8 @@ internal sealed class NativeCheckedListBox : CheckedListBox
         var textLeft = RightToLeft == RightToLeft.Yes ? row.Left + 10 : mark.Right + 10;
         var textRight = RightToLeft == RightToLeft.Yes ? mark.Left - 10 : row.Right - 10;
         var textBounds = new Rectangle(textLeft, row.Top, Math.Max(0, textRight - textLeft), row.Height);
-        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
-            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left);
+        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.HorizontalCenter |
+            (RightToLeft == RightToLeft.Yes ? TextFormatFlags.RightToLeft : 0);
         TextRenderer.DrawText(g, GetItemText(Items[e.Index]), Font, textBounds,
             Enabled ? Color.FromArgb(21, 43, 64) : Color.FromArgb(126, 143, 153), flags);
         if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
@@ -248,7 +249,7 @@ internal sealed class NativeChoice : ComboBox
         var bounds = Rectangle.Inflate(e.Bounds, -12, 0);
         TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, bounds,
             e.Index == 0 ? Color.FromArgb(111, 132, 145) : ForeColor,
-            TextFormatFlags.RightToLeft | TextFormatFlags.Right | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.RightToLeft | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
             TextFormatFlags.EndEllipsis);
         if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
     }

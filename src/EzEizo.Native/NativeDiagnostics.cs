@@ -219,6 +219,13 @@ public static class NativeDiagnostics
                 }
                 else if (stage == 14 && window.DiagnosticPage == "constants")
                 {
+                    var picker = controls.OfType<FlowLayoutPanel>().Single(x => x.Name == "AircraftPicker");
+                    foreach (var row in picker.Controls.OfType<FlowLayoutPanel>())
+                    {
+                        if (row.FlowDirection != FlowDirection.RightToLeft || row.RightToLeft != RightToLeft.Yes ||
+                            Math.Abs(row.Margin.Left - (picker.ClientSize.Width - row.Width) / 2) > 1)
+                            throw new InvalidOperationException("Aircraft choices are not centered in RTL rows.");
+                    }
                     controls.OfType<Button>().First(x => x.Text.StartsWith("מטוס 603")).PerformClick();
                     stage = 15;
                 }
@@ -266,6 +273,18 @@ public static class NativeDiagnostics
     }
     private static void Capture(Form window, string file)
     {
+        foreach (var control in Descendants(window).Where(x => x.Visible))
+        {
+            if (control is Label label && (label.RightToLeft != RightToLeft.Yes ||
+                    label.TextAlign != ContentAlignment.MiddleCenter) ||
+                control is TextBox input && (input.RightToLeft != RightToLeft.Yes ||
+                    input.TextAlign != HorizontalAlignment.Center) ||
+                control is NativeChoice choice && choice.RightToLeft != RightToLeft.Yes ||
+                control is DataGridView grid && (grid.RightToLeft != RightToLeft.Yes ||
+                    grid.DefaultCellStyle.Alignment != DataGridViewContentAlignment.MiddleCenter ||
+                    grid.ColumnHeadersDefaultCellStyle.Alignment != DataGridViewContentAlignment.MiddleCenter))
+                throw new InvalidOperationException($"RTL/center alignment failed for {control.GetType().Name} on {file}.");
+        }
         using var screenshot = new Bitmap(window.Width, window.Height);
         try
         {

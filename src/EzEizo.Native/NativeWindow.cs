@@ -16,7 +16,7 @@ public sealed partial class NativeWindow : Form
     private readonly OfflineStore store = new();
     private readonly BlockingCollection<(Func<object?> work, TaskCompletionSource<object?> done)> jobs = new();
     private readonly Panel content = new() { Dock = DockStyle.Fill, BackColor = Pale };
-    private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.White };
+    private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(14, 6, 14, 6), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.White };
     private readonly NativeHeader header = new() { Dock = DockStyle.Top, Height = 78 };
     private readonly Panel bottomNav = new() { Dock = DockStyle.Top, Height = 72, BackColor = Color.FromArgb(249, 252, 253) };
     private readonly Panel actionDock = new() { Dock = DockStyle.Bottom, Height = 68, BackColor = Color.White, Visible = false };
@@ -264,6 +264,7 @@ public sealed partial class NativeWindow : Form
         content.Controls.Add(card);
         StyleInputs(card);
         StyleGrids(card);
+        CenterRtlText(card);
         CenterCard();
         bottomNav.Visible = !loading && account is not null && role == AppRole.Manager;
         logoutButton.Visible = !loading && account is not null;
@@ -376,6 +377,46 @@ public sealed partial class NativeWindow : Form
             }
             StyleGrids(child);
         }
+    }
+    private static void CenterRtlText(Control parent)
+    {
+        switch (parent)
+        {
+            case Label label:
+                label.RightToLeft = RightToLeft.Yes;
+                label.TextAlign = ContentAlignment.MiddleCenter;
+                break;
+            case TextBox input:
+                input.RightToLeft = RightToLeft.Yes;
+                input.TextAlign = HorizontalAlignment.Center;
+                break;
+            case DataGridView grid:
+                grid.RightToLeft = RightToLeft.Yes;
+                grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.EditingControlShowing += (_, e) =>
+                {
+                    e.Control.RightToLeft = RightToLeft.Yes;
+                    if (e.Control is TextBox editor) editor.TextAlign = HorizontalAlignment.Center;
+                };
+                break;
+            case ComboBox choice:
+                choice.RightToLeft = RightToLeft.Yes;
+                break;
+            case DateTimePicker picker:
+                picker.RightToLeft = RightToLeft.Yes;
+                picker.RightToLeftLayout = true;
+                break;
+            case CheckBox checkbox:
+                checkbox.RightToLeft = RightToLeft.Yes;
+                checkbox.TextAlign = ContentAlignment.MiddleCenter;
+                break;
+            case CheckedListBox list:
+                list.RightToLeft = RightToLeft.Yes;
+                break;
+        }
+        foreach (Control child in parent.Controls) CenterRtlText(child);
+        parent.ControlAdded += (_, e) => CenterRtlText(e.Control);
     }
     private static void StyleInputs(Control parent)
     {

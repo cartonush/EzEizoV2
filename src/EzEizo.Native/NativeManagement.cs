@@ -122,23 +122,39 @@ public sealed partial class NativeWindow
                 var tabs = new FlowLayoutPanel { Width = 745, Height = 62, WrapContents = false,
                     FlowDirection = FlowDirection.RightToLeft, BackColor = Color.White };
                 var buttons = new List<NativeButton>();
-                var aircraft = new FlowLayoutPanel { Width = 745, Height = 320,
-                    FlowDirection = FlowDirection.RightToLeft, WrapContents = true, BackColor = Color.White };
+                var aircraft = new FlowLayoutPanel { Name = "AircraftPicker", Width = 745, Height = 320,
+                    FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White,
+                    RightToLeft = RightToLeft.No };
+                void CenterRows()
+                {
+                    foreach (var row in aircraft.Controls.OfType<FlowLayoutPanel>())
+                        row.Margin = new Padding(Math.Max(0, (aircraft.ClientSize.Width - row.Width) / 2), 0, 0, 0);
+                }
+                aircraft.Resize += (_, _) => CenterRows();
                 void SelectSquadron(string name)
                 {
                     selectedSquadron = name;
                     foreach (var button in buttons) { button.Active = button.Text == "טייסת " + name; button.Invalidate(); }
                     aircraft.Controls.Clear();
                     if (!NativeCatalog.Squadrons.TryGetValue(name, out var catalog)) return;
-                    foreach (var plane in catalog.aircraft)
+                    foreach (var rowPlanes in catalog.aircraft.Chunk(5))
                     {
-                        var updated = records.Any(x => V(x, "squadron") == name && V(x, "aircraft") == plane);
-                        var chip = (NativeButton)Button("מטוס " + plane + (updated ? " · עודכן" : ""), (_, _) => ShowEditor(name, plane));
-                        chip.Secondary = true;
-                        chip.Width = 135; chip.Height = 42; chip.Margin = new Padding(0, 0, 9, 9);
-                        aircraft.Controls.Add(chip);
+                        var rowWidth = rowPlanes.Length * 144;
+                        var row = new FlowLayoutPanel { Width = rowWidth, Height = 51, WrapContents = false,
+                            FlowDirection = FlowDirection.RightToLeft, RightToLeft = RightToLeft.Yes,
+                            BackColor = Color.White };
+                        foreach (var plane in rowPlanes)
+                        {
+                            var updated = records.Any(x => V(x, "squadron") == name && V(x, "aircraft") == plane);
+                            var chip = (NativeButton)Button("מטוס " + plane + (updated ? " · עודכן" : ""), (_, _) => ShowEditor(name, plane));
+                            chip.Secondary = true;
+                            chip.Width = 135; chip.Height = 42; chip.Margin = new Padding(0, 0, 9, 9);
+                            row.Controls.Add(chip);
+                        }
+                        aircraft.Controls.Add(row);
                     }
                     aircraft.Height = ((catalog.aircraft.Length + 4) / 5) * 51 + 8;
+                    CenterRows();
                 }
                 foreach (var squadron in NativeCatalog.Squadrons.Keys)
                 {
