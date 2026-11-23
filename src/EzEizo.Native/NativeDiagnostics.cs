@@ -119,7 +119,38 @@ public static class NativeDiagnostics
                 else if (stage == 12 && window.DiagnosticPage == "management")
                 { controls.OfType<Button>().First(x => x.Text.StartsWith("עדכון קבועים")).PerformClick(); stage = 13; }
                 else if (stage == 13 && window.DiagnosticPage == "constants")
-                { Capture(window, "native-constants.png"); stage = 14; window.Close(); }
+                {
+                    Capture(window, "native-constants.png");
+                    controls.OfType<Button>().First(x => x.Text == "טייסת 105").PerformClick();
+                    stage = 14;
+                }
+                else if (stage == 14 && window.DiagnosticPage == "constants")
+                {
+                    controls.OfType<Button>().First(x => x.Text.StartsWith("מטוס 603")).PerformClick();
+                    stage = 15;
+                }
+                else if (stage == 15 && window.DiagnosticPage == "constants-editor")
+                {
+                    if (!new[] { "HUD", "CTVS", "CAMERA", "TFL", "INS" }.All(group =>
+                        controls.OfType<Label>().Any(x => x.Text == group)))
+                        throw new InvalidOperationException("The aircraft constant groups did not render.");
+                    Capture(window, "native-constants-editor.png");
+                    controls.OfType<Button>().First(x => x.Text == "מפתחות").PerformClick();
+                    stage = 16;
+                }
+                else if (stage == 16 && window.DiagnosticPage == "keys")
+                {
+                    controls.OfType<Button>().First(x => x.Text == "היסטוריית מפתחות").PerformClick();
+                    stage = 17;
+                }
+                else if (stage == 17 && window.DiagnosticPage == "key-history")
+                {
+                    var grid = controls.OfType<DataGridView>().Single(x => Equals(x.Tag, "key-history"));
+                    if (grid.RowCount == 0 || grid.Columns.Count != 5)
+                        throw new InvalidOperationException("Key history table did not render.");
+                    Capture(window, "native-key-history.png");
+                    stage = 18; window.Close();
+                }
             }
             catch (Exception ex)
             {
@@ -131,7 +162,7 @@ public static class NativeDiagnostics
         };
         timer.Start();
         Application.Run(window);
-        if (stage != 14) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
+        if (stage != 18) throw new InvalidOperationException(failure ?? "Native UI login and navigation did not complete.");
     }
     private static void Capture(Form window, string file)
     {
