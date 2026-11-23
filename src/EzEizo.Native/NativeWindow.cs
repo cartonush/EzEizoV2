@@ -240,6 +240,7 @@ public sealed partial class NativeWindow : Form
         PinImportantActions(page);
         activeCard = card;
         content.Controls.Add(card);
+        StyleInputs(card);
         StyleGrids(card);
         CenterCard();
         bottomNav.Visible = !loading && account is not null && role == AppRole.Manager;
@@ -307,7 +308,8 @@ public sealed partial class NativeWindow : Form
                     if (child is System.Windows.Forms.Label or DataGridView || Equals(child.Tag, "section-heading") ||
                         child is FlowLayoutPanel || child is CheckBox || child is NativeSkeletonBlock)
                         child.Width = inner;
-                    else if (child is TextBox input && input.Multiline) child.Width = inner;
+                    else if (child is NativeInputFrame frame && Equals(frame.Tag, "wide-input"))
+                        frame.Width = inner;
                 }
             }
         }
@@ -347,6 +349,31 @@ public sealed partial class NativeWindow : Form
                 };
             }
             StyleGrids(child);
+        }
+    }
+    private static void StyleInputs(Control parent)
+    {
+        foreach (var child in parent.Controls.Cast<Control>().ToArray())
+        {
+            if (child is TextBox input && input.BorderStyle == BorderStyle.FixedSingle && parent is FlowLayoutPanel flow)
+            {
+                var index = flow.Controls.GetChildIndex(input);
+                flow.Controls.Remove(input);
+                var frame = new NativeInputFrame { Width = input.Width, Height = input.Height,
+                    Margin = input.Margin, Tag = input.Multiline ? "wide-input" : null };
+                input.BorderStyle = BorderStyle.None;
+                input.Margin = Padding.Empty;
+                input.Location = new Point(11, input.Multiline ? 9 : 11);
+                input.Width = frame.Width - 22;
+                input.Height = Math.Max(20, frame.Height - (input.Multiline ? 18 : 17));
+                input.GotFocus += (_, _) => frame.Invalidate();
+                input.LostFocus += (_, _) => frame.Invalidate();
+                frame.Resize += (_, _) => input.Width = Math.Max(20, frame.ClientSize.Width - 22);
+                frame.Controls.Add(input);
+                flow.Controls.Add(frame);
+                flow.Controls.SetChildIndex(frame, index);
+            }
+            else StyleInputs(child);
         }
     }
     private static IEnumerable<Control> Descendants(Control root)
