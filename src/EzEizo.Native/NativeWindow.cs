@@ -262,6 +262,7 @@ public sealed partial class NativeWindow : Form
     }
     private static Control BuildPage(FlowLayoutPanel stack)
     {
+        if (Equals(stack.Tag, "dashboard")) return stack;
         if (!stack.Controls.Cast<Control>().Any(x => Equals(x.Tag, "section-heading")))
         {
             var plain = new NativeCard { Dock = DockStyle.Fill, Padding = new Padding(3) };
@@ -401,16 +402,59 @@ public sealed partial class NativeWindow : Form
         for (var i = 0; i < navButtons.Count; i++)
             navButtons[i].SetBounds(left + (3 - i) * (each + 8), 10, each, 53);
     }
+    private static NativeCard DashboardCard(string kicker, string title, string? description, int height)
+    {
+        var card = new NativeCard { Width = 850, Height = height, Margin = new Padding(0, 0, 0, 16) };
+        card.Controls.Add(new Label
+        {
+            Text = kicker, Location = new Point(24, 20), Size = new Size(800, 22),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Blue,
+            Font = NativeFonts.Create(8.25f, FontStyle.Bold)
+        });
+        card.Controls.Add(new Label
+        {
+            Text = title, Location = new Point(24, 48), Size = new Size(800, 36),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            TextAlign = ContentAlignment.MiddleLeft, ForeColor = Navy,
+            Font = NativeFonts.Create(14.25f, FontStyle.Bold)
+        });
+        if (description is not null)
+            card.Controls.Add(new Label
+            {
+                Text = description, Location = new Point(24, 94), Size = new Size(800, 35),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                TextAlign = ContentAlignment.MiddleLeft, ForeColor = Muted,
+                Font = NativeFonts.Create(10)
+            });
+        return card;
+    }
+
+    private static NativeButton DashboardTile(string title, string detail, Func<Task> action)
+    {
+        var tile = (NativeButton)Button(title, async (_, _) => await action());
+        tile.Secondary = true;
+        tile.TileTitle = title;
+        tile.TileDescription = detail;
+        tile.AccessibleName = title;
+        tile.AccessibleDescription = detail;
+        tile.Margin = Padding.Empty;
+        return tile;
+    }
+
     private async Task OpenHome()
     {
         if (account is null) { Login(); return; }
         currentPage = "home"; refreshTimer.Stop();
         var stack = Stack();
-        stack.Controls.Add(Label("דף בית", 29));
-        stack.Controls.Add(Label("שלום " + account.Name, 58, true));
-        stack.Controls.Add(Label("בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.", 45));
-        var tiles = new FlowLayoutPanel { Width = 780, Height = 370, WrapContents = true };
-        foreach (var (title, detail, action) in new (string, string, Func<Task>)[]
+        stack.Tag = "dashboard";
+        stack.BackColor = Pale;
+        stack.Padding = new Padding(0, 0, 14, 12);
+        var intro = DashboardCard("דף בית", "שלום " + account.Name,
+            "בחר את תחום העבודה כדי לפתוח דף או לעקוב אחר משימות הצוות.", 153);
+        stack.Controls.Add(intro);
+        var tiles = new Panel { Width = 850, Height = 339, BackColor = Pale };
+        var entries = new (string title, string detail, Func<Task> action)[]
         {
             ("פתיחת תקלה", "יצירת דף טיפול חדש לטכנאים", ShowCreateFault),
             ("תקלות פתוחות", "משימות טיפול פעילות", () => OpenList("issues")),
@@ -418,37 +462,57 @@ public sealed partial class NativeWindow : Form
             { listSection = "issues"; statusFilter = "ממתין לסגירה"; await OpenList("issues"); }),
             ("מפתחות", "פתיחת הטענה, מעקב והיסטוריה", () => OpenList("keys")),
             ("ניהול", "משתמשים, דוחות וקבועים", OpenManagementHome)
-        })
-        {
-            var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 378; tile.Height = 105;
-            tile.TileTitle = title; tile.TileDescription = detail;
-            tiles.Controls.Add(tile);
-        }
+        };
+        var buttons = entries.Select(entry => DashboardTile(entry.title, entry.detail, entry.action)).ToArray();
+        tiles.Controls.AddRange(buttons);
         stack.Controls.Add(tiles);
-        Present(stack); status.Text = "הנתונים נשמרים במסד המקומי";
+        void Fit()
+        {
+            var width = Math.Max(520, stack.ClientSize.Width - stack.Padding.Horizontal - 16);
+            intro.Width = tiles.Width = width;
+            var tileWidth = (width - 12) / 2;
+            for (var i = 0; i < buttons.Length; i++)
+                buttons[i].SetBounds(i % 2 == 0 ? width - tileWidth : 0,
+                    i / 2 * 117, tileWidth, 105);
+        }
+        stack.Resize += (_, _) => Fit();
+        Present(stack);
+        Fit();
+        status.Text = "הנתונים נשמרים במסד המקומי";
         await Task.CompletedTask;
     }
+
     private async Task OpenManagementHome()
     {
         if (account is null || role != AppRole.Manager) return;
         currentPage = "management"; refreshTimer.Stop();
         var stack = Stack();
-        stack.Controls.Add(Label("דף ראשי", 29));
-        stack.Controls.Add(Label("ניהול", 58, true));
-        foreach (var (title, detail, action) in new (string, string, Func<Task>)[]
+        stack.Tag = "dashboard";
+        stack.BackColor = Pale;
+        stack.Padding = new Padding(0, 0, 14, 12);
+        var card = DashboardCard("דף ראשי", "ניהול", null, 372);
+        var entries = new (string title, string detail, Func<Task> action)[]
         {
             ("ניהול משתמשים", "יצירה, חיפוש והסרה של משתמשים", OpenUsers),
             ("הפקת דוחות", "סינון וייצוא טפסים", OpenReports),
             ("עדכון קבועים לפי מטוס", "עריכת ערכי המערכות למטוסים", OpenConstants)
-        })
+        };
+        var buttons = entries.Select(entry => DashboardTile(entry.title, entry.detail, entry.action)).ToArray();
+        card.Controls.AddRange(buttons);
+        stack.Controls.Add(card);
+        void Fit()
         {
-            var tile = (NativeButton)Button(title + Environment.NewLine + detail, async (_, _) => await action());
-            tile.Secondary = true; tile.Width = 745; tile.Height = 84;
-            tile.TileTitle = title; tile.TileDescription = detail;
-            stack.Controls.Add(tile);
+            var width = Math.Max(520, stack.ClientSize.Width - stack.Padding.Horizontal - 16);
+            card.Width = width;
+            var tileWidth = (width - 60) / 2;
+            for (var i = 0; i < buttons.Length; i++)
+                buttons[i].SetBounds(i % 2 == 0 ? width - 24 - tileWidth : 24,
+                    108 + i / 2 * 117, tileWidth, 105);
         }
-        Present(stack); status.Text = "ניהול המערכת";
+        stack.Resize += (_, _) => Fit();
+        Present(stack);
+        Fit();
+        status.Text = "ניהול המערכת";
         await Task.CompletedTask;
     }
     private void Login()
