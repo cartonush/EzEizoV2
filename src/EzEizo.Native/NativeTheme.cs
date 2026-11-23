@@ -39,7 +39,7 @@ internal sealed class NativeButton : Button
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var bounds = new Rectangle(1, 1, Width - 3, Height - 3);
         if (bounds.Width < 2 || bounds.Height < 2) return;
-        using var path = Rounded(bounds, 10);
+        using var path = Rounded(bounds, TileTitle is null ? 10 : 15);
         var fill = !Enabled ? Color.FromArgb(228, 235, 239) :
             OnDark ? hovering ? Color.FromArgb(48, 99, 132) : Color.FromArgb(34, 79, 110) :
             Active || !Secondary ? hovering ? Color.FromArgb(17, 88, 127) : Color.FromArgb(30, 107, 158) :
