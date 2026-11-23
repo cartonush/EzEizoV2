@@ -71,6 +71,7 @@ public sealed partial class NativeWindow : Form
             if (currentPage == "document" && historyPerson is not null) await OpenUserHistory(historyPerson);
             else if (currentPage is "document" or "fault-editor" or "key-editor" or "edit-definition") await OpenList(documentSection);
             else if (currentPage is "new-key" or "key-history") await OpenList("keys");
+            else if (currentPage == "constants-editor") await OpenConstants();
             else if (currentPage == "user-history") await OpenUsers();
             else if (currentPage is "users" or "constants" or "reports") await OpenManagementHome();
             else await OpenList("issues");
@@ -249,7 +250,7 @@ public sealed partial class NativeWindow : Form
         {
             "home" => 0, "issues" or "new-fault" or "fault-editor" => 1,
             "keys" or "new-key" or "key-editor" or "key-history" => 2,
-            "management" or "users" or "user-history" or "constants" or "reports" => 3,
+            "management" or "users" or "user-history" or "constants" or "constants-editor" or "reports" => 3,
             "document" or "edit-definition" => documentSection == "keys" ? 2 : 1, _ => -1
         };
         for (var i = 0; i < navButtons.Count; i++)
@@ -367,6 +368,7 @@ public sealed partial class NativeWindow : Form
             "new-key" => new HashSet<string>(["פתח הטענה"]),
             "fault-editor" => new HashSet<string>(["שמירה וסגירה"]),
             "key-editor" => new HashSet<string>(["סיים הטענה"]),
+            "constants-editor" => new HashSet<string>(["שמור קבועים למטוס"]),
             "document" => new HashSet<string>(["בדוק וסגור"]),
             "reports" => new HashSet<string>(["הצג דוח", "הורד PDF של הדוח", "הפק CSV", "הורד את תוצאות החיפוש"]),
             _ => new HashSet<string>()
