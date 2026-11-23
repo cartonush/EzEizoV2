@@ -45,7 +45,7 @@ public sealed partial class NativeWindow
     private static CheckedListBox Team(FlowLayoutPanel stack, IReadOnlyList<Account> technicians)
     {
         stack.Controls.Add(Label("צוות טכנאים", 42, true));
-        stack.Controls.Add(Label("בחר טכנאים מרשימת המשתמשים הפעילים.", 34));
+        stack.Controls.Add(Label("בחר לפחות שני טכנאים מרשימת המשתמשים הפעילים.", 34));
         var list = new NativeCheckedListBox { Width = 460, Height = Math.Min(180, Math.Max(72, technicians.Count * 31 + 12)),
             CheckOnClick = true, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(251, 253, 254) };
         foreach (var tech in technicians) list.Items.Add(new PersonChoice(tech));
@@ -153,7 +153,7 @@ public sealed partial class NativeWindow
                     var sq = Selected(squadron); var sh = Selected(shelter); var plane = Selected(aircraft); var sys = Selected(system); var people = Checked(team);
                     if (!NativeCatalog.Squadrons.TryGetValue(sq, out var catalog) || !catalog.shelters.Contains(sh) || !catalog.aircraft.Contains(plane) || sys.Length == 0 || Selected(ew).Length == 0 || sh == "מוסך" && Selected(workshop).Length == 0)
                         throw new ArgumentException("יש לבחור טייסת, דת״ק, מטוס ומערכת מהרשימות.");
-                    if (people.Length == 0 || string.IsNullOrWhiteSpace(fault.Text)) throw new ArgumentException("יש להזין תיאור תקלה ולבחור לפחות טכנאי אחד.");
+                    if (people.Length < 2 || string.IsNullOrWhiteSpace(fault.Text)) throw new ArgumentException("יש להזין תיאור תקלה ולבחור לפחות שני טכנאים.");
                     if (!briefing.Checked || !signature.HasSignature) throw new ArgumentException("יש לאשר את התדריך ולחתום כמשלח המשימה.");
                     var index = Array.IndexOf(NativeCatalog.Systems, sys);
                     constantGrid.EndEdit();
@@ -363,7 +363,7 @@ public sealed partial class NativeWindow
                 {
                     var sq = Selected(squad); var sh = Selected(shelter); var plane = Selected(aircraft); var members = Checked(team);
                     if (!NativeCatalog.Squadrons.TryGetValue(sq, out var catalog) || !catalog.shelters.Contains(sh)) throw new ArgumentException("בחר טייסת ודת״ק מהרשימות.");
-                    if (members.Length < (page == "issues" ? 1 : 2)) throw new ArgumentException("בחר צוות טכנאים תקין.");
+                    if (members.Length < 2) throw new ArgumentException("יש לבחור לפחות שני טכנאים.");
                     JsonObject changes;
                     if (page == "issues")
                     {
