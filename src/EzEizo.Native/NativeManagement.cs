@@ -336,7 +336,7 @@ public sealed partial class NativeWindow
             var summary = new FlowLayoutPanel { Width = 745, Height = 82, WrapContents = false, Visible = false };
             stack.Controls.Add(summary);
             var resultCards = new FlowLayoutPanel { Width = 745, Height = 120, WrapContents = true,
-                AutoScroll = true, Visible = false };
+                AutoScroll = false, Visible = false };
             stack.Controls.Add(resultCards);
             JsonNode[] found = [];
             stack.Controls.Add(Button("הצג דוח", (_, _) =>
@@ -382,7 +382,8 @@ public sealed partial class NativeWindow
                     foreach (var item in found)
                     {
                         var sheet = item["sheet"] ?? item; var kind = item["sheet"] is null ? "מפתחות" : "תקלה";
-                        results.Rows.Add(kind, V(item, "serial"), V(sheet, "squadron"),
+                        var serial = V(item, "serial").Length > 0 ? V(item, "serial") : V(sheet, "serial");
+                        results.Rows.Add(kind, serial, V(sheet, "squadron"),
                             V(sheet, "aircraft").Length > 0 ? V(sheet, "aircraft") : string.Join(", ", (item["rows"] as JsonArray ?? new()).Select(x => V(x, "aircraft"))),
                             V(item, "status") switch { "open" => "פתוח", "pendingReview" => "ממתין לסגירה", "closed" => "סגור", var state => state },
                             DisplayDate(V(item, "createdAt")));
@@ -403,7 +404,7 @@ public sealed partial class NativeWindow
                     foreach (var item in found)
                     {
                         var sheet = item["sheet"] ?? item;
-                        var serial = V(item, "serial");
+                        var serial = V(item, "serial").Length > 0 ? V(item, "serial") : V(sheet, "serial");
                         var name = item["sheet"] is null ? "הטענת מפתחות" : "תקלה";
                         var aircraft = V(sheet, "aircraft");
                         if (aircraft.Length == 0)
@@ -427,7 +428,7 @@ public sealed partial class NativeWindow
                         download.Secondary = true; download.Location = new Point(12, 101);
                         card.Controls.Add(download); resultCards.Controls.Add(card);
                     }
-                    resultCards.Height = Math.Min(400, Math.Max(110, (int)Math.Ceiling(found.Length / 2.0) * 158 + 10));
+                    resultCards.Height = Math.Max(110, (int)Math.Ceiling(found.Length / 2.0) * 158 + 10);
                     resultCards.Visible = true;
                     status.Text = $"נמצאו {found.Length} טפסים.";
                 }

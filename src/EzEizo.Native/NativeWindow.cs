@@ -399,6 +399,22 @@ public sealed partial class NativeWindow : Form
                 flow.Controls.Add(frame);
                 flow.Controls.SetChildIndex(frame, index);
             }
+            else if (child is NativeChoice choice && parent is FlowLayoutPanel choices)
+            {
+                var index = choices.Controls.GetChildIndex(choice);
+                choices.Controls.Remove(choice);
+                var frame = new NativeInputFrame { Width = choice.Width, Height = 44, Margin = choice.Margin };
+                choice.Margin = Padding.Empty;
+                choice.FlatStyle = FlatStyle.Flat;
+                choice.Location = new Point(5, 4);
+                choice.Width = frame.Width - 10;
+                choice.GotFocus += (_, _) => frame.Invalidate();
+                choice.LostFocus += (_, _) => frame.Invalidate();
+                frame.Resize += (_, _) => choice.Width = Math.Max(40, frame.ClientSize.Width - 10);
+                frame.Controls.Add(choice);
+                choices.Controls.Add(frame);
+                choices.Controls.SetChildIndex(frame, index);
+            }
             else StyleInputs(child);
         }
     }
